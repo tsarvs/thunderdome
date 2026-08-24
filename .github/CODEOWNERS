@@ -1,16 +1,1 @@
-# See docs/adr/0007-repository-enforcement.md for the reasoning behind this file.
-#
-# CODEOWNERS controls required human reviewers. It does NOT stop a PR from bundling unrelated
-# paths together, or a maintainer from accidentally approving a boundary-violating mixed-scope
-# PR — that mechanical gate is tools/boundary-check, run as a required CI status check.
-
-# Default: every PR needs a maintainer's eyes, including bot PRs — Docker-executing arbitrary
-# community code is inherently risky even when a manifest looks clean.
-*                    @thunderdome/maintainers
-
-# Games run in-process inside the trusted engine: require both domain review and platform
-# sign-off (both codeowners lines apply — GitHub requires approval from each matched owner).
-/games/              @thunderdome/game-stewards @thunderdome/maintainers
-
-# No explicit /bots/ entry: falls through to the `*` rule above, so every bot PR still requires
-# a maintainer approval on top of the mechanical boundary-check gate.
+*                    @tsarvs
