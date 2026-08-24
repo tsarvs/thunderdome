@@ -1,0 +1,18 @@
+{
+  "id": "counter-bot",
+  "name": "Counter Bot",
+  "version": "1.0.0",
+  "game": "rock-paper-scissors",
+  "author": {
+    "name": "Thunderdome Docs",
+    "contact": "docs@example.com"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Plays whatever beats the opponent's most recently revealed choice; rock on the first round."
+}

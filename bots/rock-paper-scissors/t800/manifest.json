@@ -1,0 +1,18 @@
+{
+  "id": "t800",
+  "name": "t800",
+  "version": "1.0.0",
+  "game": "rock-paper-scissors",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom.sarver@7factor.io"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Three fixed phases over a 300-round match: early-game deck exploration (with an immediate exploit if an obvious opponent self-pattern shows up), mid-game exploitation of what the early game taught it, and a late game that either keeps coasting or re-evaluates via win-stay/lose-shift."
+}

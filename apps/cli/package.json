@@ -1,0 +1,22 @@
+{
+  "name": "@thunderdome/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "thunderdome": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@thunderdome/engine": "^0.1.0",
+    "@thunderdome/registry": "^0.1.0",
+    "@thunderdome/rng": "^0.1.0",
+    "@thunderdome/runtime": "^0.1.0",
+    "@thunderdome/tournament-formats": "^0.1.0",
+    "@thunderdome/tournament-store": "^0.1.0"
+  }
+}

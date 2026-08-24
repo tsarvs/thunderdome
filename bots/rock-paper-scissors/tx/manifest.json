@@ -1,0 +1,18 @@
+{
+  "id": "tx",
+  "name": "tx",
+  "version": "1.0.0",
+  "game": "rock-paper-scissors",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom.sarver@7factor.io"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Defaults to a self-correcting balancing deck (RESEARCH); only exploits a detected opponent pattern once the evidence clears a strict z-score bar, and retreats to RESEARCH on any real recent lead to protect Series/Standing Points already in hand."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "copycat-rps",
+  "name": "Copycat RPS",
+  "version": "1.0.0",
+  "game": "rock-paper-scissors",
+  "author": {
+    "name": "Thunderdome Maintainers",
+    "contact": "maintainers@example.com"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Plays whatever the opponent played in the previous round; rock on the first round."
+}

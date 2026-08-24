@@ -1,0 +1,40 @@
+name: Boundary Check
+
+# Mechanically enforces the platform/competitor boundary described in
+# docs/adr/0007-repository-enforcement.md. Complements, and does not replace, CODEOWNERS review.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+concurrency:
+  group: boundary-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  boundary-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+
+      - name: Install Yarn
+        run: npm install -g yarn@1.22.22 --silent
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build
+        run: yarn build
+
+      - name: Run boundary check
+        env:
+          THUNDERDOME_MAINTAINER_OVERRIDE: ${{ contains(github.event.pull_request.labels.*.name, 'maintainer-override') }}
+        run: |
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" \
+            | node tools/boundary-check/dist/index.js

@@ -1,0 +1,8 @@
+dist
+.yarn
+node_modules
+*.lock
+
+# Competitor-owned, any language/style — the platform never imposes its own formatting on
+# submitted bot code (mirrors the same exclusion in eslint.config.js).
+bots/**

@@ -1,0 +1,18 @@
+{
+  "id": "connect-four",
+  "name": "Connect Four",
+  "version": "1.0.0",
+  "entryPackage": "@thunderdome/game-connect-four",
+  "protocolVersion": "^1.0",
+  "minParticipants": 2,
+  "maxParticipants": 2,
+  "deterministic": true,
+  "supportedTournamentFormats": ["round-robin", "single-elimination"],
+  "maintainers": [
+    {
+      "name": "Thunderdome Maintainers",
+      "contact": "maintainers@example.com"
+    }
+  ],
+  "description": "Classic 7x6 Connect Four — the platform's second game, and first sequential, no-hidden-information one (unlike Rock-Paper-Scissors' simultaneous reveal)."
+}

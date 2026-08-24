@@ -1,0 +1,18 @@
+{
+  "id": "only-paper",
+  "name": "Only Paper",
+  "version": "1.0.0",
+  "game": "rock-paper-scissors",
+  "author": {
+    "name": "Thunderdome Maintainers",
+    "contact": "maintainers@example.com"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Always plays paper, no matter what. Written in TypeScript, compiled to JS at Docker build time."
+}

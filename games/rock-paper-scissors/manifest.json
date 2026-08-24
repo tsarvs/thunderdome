@@ -1,0 +1,18 @@
+{
+  "id": "rock-paper-scissors",
+  "name": "Rock Paper Scissors",
+  "version": "1.0.0",
+  "entryPackage": "@thunderdome/game-rock-paper-scissors",
+  "protocolVersion": "^1.0",
+  "minParticipants": 2,
+  "maxParticipants": 2,
+  "deterministic": false,
+  "supportedTournamentFormats": ["round-robin"],
+  "maintainers": [
+    {
+      "name": "Thunderdome Maintainers",
+      "contact": "maintainers@example.com"
+    }
+  ],
+  "description": "Best-of-N Rock Paper Scissors — the platform's first vertical-slice game."
+}

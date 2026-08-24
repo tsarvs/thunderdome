@@ -1,0 +1,18 @@
+{
+  "id": "leftmost-connect-four",
+  "name": "Leftmost Connect Four",
+  "version": "1.0.0",
+  "game": "connect-four",
+  "author": {
+    "name": "Thunderdome Maintainers",
+    "contact": "maintainers@example.com"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Always drops into the lowest-indexed column that still has room, ignoring the board entirely."
+}

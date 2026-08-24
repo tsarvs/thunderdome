@@ -1,0 +1,18 @@
+{
+  "id": "random-connect-four",
+  "name": "Random Connect Four",
+  "version": "1.0.0",
+  "game": "connect-four",
+  "author": {
+    "name": "Thunderdome Maintainers",
+    "contact": "maintainers@example.com"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Picks a uniformly random legal column each turn, using a PRNG seeded from this match's rngSeed rather than uncontrolled Math.random()."
+}

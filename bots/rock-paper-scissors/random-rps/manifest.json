@@ -1,0 +1,18 @@
+{
+  "id": "random-rps",
+  "name": "Random RPS",
+  "version": "1.0.0",
+  "game": "rock-paper-scissors",
+  "author": {
+    "name": "Thunderdome Maintainers",
+    "contact": "maintainers@example.com"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Picks a uniformly random choice each round, using a PRNG seeded from this match's rngSeed rather than uncontrolled Math.random()."
+}

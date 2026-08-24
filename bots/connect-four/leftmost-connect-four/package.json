@@ -1,0 +1,9 @@
+{
+  "name": "leftmost-connect-four",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@thunderdome/bot-sdk": "file:./vendor/thunderdome-bot-sdk.tgz"
+  }
+}
