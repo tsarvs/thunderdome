@@ -1,4 +1,4 @@
-// `thunderdome match run` — Phase 6's registry-backed, real end-to-end match runner. Resolves
+// `thunderdome match run` — the registry-backed, real end-to-end match runner. Resolves
 // bot/game ids through @thunderdome/registry, builds each bot's Docker image on demand from its
 // own manifest (no manual pre-build step), then drives a real match through @thunderdome/engine
 // and @thunderdome/runtime — the registry-driven successor to an earlier ad hoc scrimmage script

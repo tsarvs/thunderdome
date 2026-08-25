@@ -1,4 +1,4 @@
-// Shared by `match run` (Phase 6) and `tournament run` (Phase 7): resolving bot/game ids through
+// Shared by `match run` and `tournament run`: resolving bot/game ids through
 // the registry, building bot images on demand, and driving one real match through the engine and
 // runtime. Neither command duplicates this — a tournament is just this same single-match wiring,
 // called once per `MatchDescriptor` a `TournamentFormat` unlocks.

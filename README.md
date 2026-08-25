@@ -74,12 +74,85 @@ plot of scorched earth.
 
 ## Forging your arms (local development)
 
-Requires Node.js 25.x and Yarn 1.22.22 (Classic) — see
+Requires Node.js 25.x, Yarn 1.22.22 (Classic), and Docker — see
 [`docs/adr/0008-toolchain-simplification.md`](docs/adr/0008-toolchain-simplification.md) for the
-full decree — plus Docker, for there is no combat permitted outside the cage.
+full decree on the first two. There is no combat permitted outside the cage: Docker is what
+actually runs every bot, and the real thing (`yarn thunderdome match run`, the runtime's own
+integration tests) needs it running, not just installed.
+
+### 1. Node.js 25.x
+
+The exact version in use is pinned in [`.node-version`](.node-version) (`25`) and enforced by
+`package.json`'s `"engines"` field (`>=25 <26`). Installing it through a version manager — rather
+than your OS's package manager directly — is what keeps you from clobbering whatever Node version
+some other project on your machine expects.
+
+**[fnm](https://github.com/Schniz/fnm)** is the one recommendation here that behaves identically
+on macOS, Linux, and Windows, and reads this repo's `.node-version` file natively (no `.nvmrc`
+translation needed):
+
+| Platform | Install fnm                                          |
+| -------- | ---------------------------------------------------- |
+| macOS    | `brew install fnm`                                   |
+| Linux    | `curl -fsSL https://fnm.vercel.app/install \| bash`  |
+| Windows  | `winget install Schniz.fnm` (or `scoop install fnm`) |
+
+Then, from anywhere inside this repo, on any platform:
 
 ```bash
-npm install -g yarn@1.22.22   # if you don't already have this exact Yarn version
+fnm use --install-if-missing   # reads .node-version, installs 25.x if you don't have it, and switches to it
+node -v                        # sanity check — should print a v25.x.x
+```
+
+`fnm`'s install instructions end with a one-time shell hook (`eval "$(fnm env --use-on-cd)"` in
+your `.bashrc`/`.zshrc`, or the PowerShell equivalent on Windows) that makes it auto-switch
+versions when you `cd` into a directory with a `.node-version` file — worth doing once so you
+don't have to remember to run `fnm use` by hand every time.
+
+Already using a different version manager? Any of these work too, as long as you land on a real
+Node 25.x — none of them read `.node-version` automatically the way `fnm` does, so you'll need to
+name the version explicitly:
+
+- **nvm** (macOS/Linux): `nvm install 25 && nvm use 25`
+- **nvm-windows**: `nvm install 25.8.0 && nvm use 25.8.0` (needs an exact version, not a range)
+- **Volta** (macOS/Linux/Windows): `volta install node@25`
+
+### 2. Yarn 1.22.22 (Classic)
+
+There's no version-manager pinning for Yarn here (a deliberate simplification —
+`docs/adr/0008-toolchain-simplification.md`), so install this exact version globally with npm
+(which you already have once Node is installed), on any platform:
+
+```bash
+npm install -g yarn@1.22.22
+yarn -v   # should print exactly 1.22.22
+```
+
+### 3. Docker
+
+Any bot's match — including this repo's own integration tests — runs inside a real Docker
+container (`docs/adr/0003-docker-bot-isolation.md`), so this isn't optional.
+
+| Platform | Install                                                                                                                                                                                                                                                                                                                  |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| macOS    | [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/), or `brew install --cask docker`                                                                                                                                                                                                          |
+| Windows  | [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/) (uses the WSL2 backend — Docker's installer walks you through enabling WSL2 if it isn't already)                                                                                                                                  |
+| Linux    | [Docker Engine](https://docs.docker.com/engine/install/) via your distro's package manager, or the official convenience script: `curl -fsSL https://get.docker.com \| sh`. Afterwards, add yourself to the `docker` group (`sudo usermod -aG docker $USER`, then log out/in) so you don't need `sudo` for every command. |
+
+Verify it's actually running (Docker Desktop needs to be launched, not just installed, on
+macOS/Windows) before moving on:
+
+```bash
+docker ps
+```
+
+### 4. Clone and bootstrap
+
+```bash
+git clone <this-repo-url>
+cd thunderdome
+fnm use --install-if-missing   # or your version manager's equivalent — see step 1
+npm install -g yarn@1.22.22    # if you don't already have this exact Yarn version
 yarn install
 yarn build
 yarn lint

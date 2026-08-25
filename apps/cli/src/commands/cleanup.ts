@@ -1,4 +1,4 @@
-// `thunderdome cleanup` — Phase 12's backstop for leftover bot containers. `match run`/
+// `thunderdome cleanup` — a backstop for leftover bot containers. `match run`/
 // `tournament run` (via apps/cli/src/lib/match-execution.ts) and the CLI's own SIGINT/SIGTERM
 // handler (apps/cli/src/index.ts) are the primary defense; this exists for whatever slips past
 // both — most notably the process being SIGKILLed (or the host crashing) before either gets a
