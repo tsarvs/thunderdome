@@ -12,9 +12,9 @@ import {
 import { abortActiveMatch } from './lib/match-execution.js';
 
 // Presentation layer only — no engine logic lives here (docs/architecture.md §2), with three
-// exceptions: `match run` (Phase 6), `tournament run` (Phase 7), and `play` are real,
-// registry-backed behavior — see commands/match.ts, commands/tournament.ts, and commands/play.ts.
-// Every other subcommand group below is still a stub.
+// exceptions: `match run`, `tournament run`, and `play` are real, registry-backed behavior — see
+// commands/match.ts, commands/tournament.ts, and commands/play.ts. Every other subcommand group
+// below is still a stub.
 const SUBCOMMANDS = ['games', 'bots', 'tournament', 'match', 'play', 'cleanup'] as const;
 type Subcommand = (typeof SUBCOMMANDS)[number];
 

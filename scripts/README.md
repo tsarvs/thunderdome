@@ -8,7 +8,7 @@ Dev tooling that isn't a workspace package in its own right.
 | `pack-bot-sdk.sh` | Builds `@thunderdome/bot-sdk` and vendors it into every bot that depends on it. See below.                                                                                               |
 
 Running a real match between bots from `/bots` is now `yarn thunderdome match run <botId>
-<botId>` (`apps/cli/src/commands/match.ts`) — the registry-backed, Phase 6 successor to what used
+<botId>` (`apps/cli/src/commands/match.ts`) — the registry-backed successor to what used
 to be a hand-rolled `run-scrimmage.mjs` script here. See
 [`docs/guides/rps-bot-author-guide.md`](../docs/guides/rps-bot-author-guide.md) for usage.
 

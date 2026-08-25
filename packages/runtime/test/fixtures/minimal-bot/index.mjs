@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Minimal test bot for validating the runtime's Docker lifecycle end-to-end (Phase 4). This is
+// Minimal test bot for validating the runtime's Docker lifecycle end-to-end. This is
 // a test fixture, not a competitive bot or an example for bot authors — it just speaks the
 // protocol correctly: acknowledge init, echo back an action for any awaited observation, and
 // exit cleanly on match-end.

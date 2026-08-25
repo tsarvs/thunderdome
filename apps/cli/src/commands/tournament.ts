@@ -1,15 +1,14 @@
-// `thunderdome tournament run` — Phase 7's tournament orchestrator (round robin), joined in
-// Phase 9 by single elimination — wired to real bots. Reuses exactly the same
-// registry-resolution, on-demand image build, and single-match execution `match run` (Phase 6)
-// already established (apps/cli/src/lib/match-execution.ts) — a tournament is just that same
-// wiring, called once per `MatchDescriptor` the format unlocks via `@thunderdome/engine`'s
-// `runTournament()`.
+// `thunderdome tournament run` — the tournament orchestrator, supporting both round robin and
+// single elimination — wired to real bots. Reuses exactly the same registry-resolution,
+// on-demand image build, and single-match execution `match run` already established
+// (apps/cli/src/lib/match-execution.ts) — a tournament is just that same wiring, called once per
+// `MatchDescriptor` the format unlocks via `@thunderdome/engine`'s `runTournament()`.
 //
-// Phase 11 added persistence: every `run` writes a `TournamentRecord`
-// (`@thunderdome/tournament-store`) to disk as it goes, and `inspect`/`replay`/`list` read it
-// back. The tournament-author-guide's original three-piece design (`tournament create`, then a
-// separate run-by-id step) was simplified into one — `run` always creates *and* drives its own
-// record — since nothing in this platform needs a record to exist before it's actually played.
+// Persistence: every `run` writes a `TournamentRecord` (`@thunderdome/tournament-store`) to disk
+// as it goes, and `inspect`/`replay`/`list` read it back. The tournament-author-guide's original
+// three-piece design (`tournament create`, then a separate run-by-id step) was simplified into
+// one — `run` always creates *and* drives its own record — since nothing in this platform needs
+// a record to exist before it's actually played.
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { parseArgs } from 'node:util';

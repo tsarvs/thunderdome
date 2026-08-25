@@ -20,13 +20,13 @@ example here yet.
 
 A tournament is the combination of:
 
-| Piece               | What it is                                                                | Status                                                                                                                                         |
-| ------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Game**            | Which game, which version, and that game's own config                     | Real — `rock-paper-scissors`, `{ totalRounds, onMissingAction }`                                                                               |
-| **Roster**          | Which bots (from the bot registry) are competing                          | Real (Phase 6) — `@thunderdome/registry`'s `scanBots`/`scanGames`                                                                              |
-| **Format**          | How matchups are generated and standings computed                         | Real for round robin (Phase 7) and single elimination (Phase 9) — `@thunderdome/tournament-formats`; Swiss and pool-then-elimination not built |
-| **Seed**            | The one entropy boundary this tournament's reproducibility traces back to | Real — `@thunderdome/rng`                                                                                                                      |
-| **Resource limits** | Per-game CPU/memory/timeout ceilings                                      | Partially real — `GameDefinition.resourceLimits` exists; runtime enforcement is per-match, not tournament-level yet                            |
+| Piece               | What it is                                                                | Status                                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Game**            | Which game, which version, and that game's own config                     | Real — `rock-paper-scissors`, `{ totalRounds, onMissingAction }`                                                           |
+| **Roster**          | Which bots (from the bot registry) are competing                          | Real — `@thunderdome/registry`'s `scanBots`/`scanGames`                                                                    |
+| **Format**          | How matchups are generated and standings computed                         | Real for round robin and single elimination — `@thunderdome/tournament-formats`; Swiss and pool-then-elimination not built |
+| **Seed**            | The one entropy boundary this tournament's reproducibility traces back to | Real — `@thunderdome/rng`                                                                                                  |
+| **Resource limits** | Per-game CPU/memory/timeout ceilings                                      | Partially real — `GameDefinition.resourceLimits` exists; runtime enforcement is per-match, not tournament-level yet        |
 
 None of these are new concepts invented for this guide — they're exactly
 `docs/architecture.md`'s mental model: **Games + Tournaments + Bots → Matches → Match
@@ -258,28 +258,27 @@ into a table; `getPublicStandings` projects that into whatever a spectator or CL
 
 ## 5. What's done, and what's still missing
 
-Done, as of Phase 6, 7, 9, and 11:
+Done:
 
-1. **Bot registry** (Phase 6) — `@thunderdome/registry`'s `scanBots`/`scanGames`, so a roster can
+1. **Bot registry** — `@thunderdome/registry`'s `scanBots`/`scanGames`, so a roster can
    reference real bot ids instead of a made-up list.
-2. **Runtime ↔ engine adapter** (Phase 6) — `@thunderdome/runtime`'s `DockerActionCollector`, a
+2. **Runtime ↔ engine adapter** — `@thunderdome/runtime`'s `DockerActionCollector`, a
    real `ActionCollector` (`@thunderdome/engine`) backed by real `BotLifecycle` instances, so
    `runMatch()` can actually drive Docker containers instead of a test's scripted collector.
-3. **A CLI command for a single match** (Phase 6) — `yarn thunderdome match run <botId> <botId>`
+3. **A CLI command for a single match** — `yarn thunderdome match run <botId> <botId>`
    (`apps/cli/src/commands/match.ts`) — see [the bot guide's
    §7](rps-bot-author-guide.md#7-testing-your-bot-locally).
-4. **Two `TournamentFormat` implementations** — round robin (Phase 7) and single elimination
-   (Phase 9), both in `packages/tournament-formats`, both concretely implementing the interface in
-   §3.
-5. **Tournament orchestrator** (Phase 7) — `@thunderdome/engine`'s `runTournament()`
+4. **Two `TournamentFormat` implementations** — round robin and single elimination, both in
+   `packages/tournament-formats`, both concretely implementing the interface in §3.
+5. **Tournament orchestrator** — `@thunderdome/engine`'s `runTournament()`
    (`src/tournament-runner.ts`), the generic pull-loop that calls a match executor for each
    `readyMatches` entry and feeds results back into the format. Game/runtime-agnostic by
    construction: it takes a plain `(match) => Promise<MatchRecord>` callback rather than knowing
    anything about Docker or the registry itself.
-6. **A CLI command for a whole tournament** (Phase 7) — `yarn thunderdome tournament run <botId>
+6. **A CLI command for a whole tournament** — `yarn thunderdome tournament run <botId>
 <botId> [...]` (`apps/cli/src/commands/tournament.ts`), with `--tournament-config`'s `format`
    field choosing between the two implemented formats — see §2.
-7. **Tournament persistence** (Phase 11) — every `run` writes a `TournamentRecord`
+7. **Tournament persistence** — every `run` writes a `TournamentRecord`
    (`@thunderdome/tournament-store`) as it goes; `tournament list`/`inspect`/`replay` read it
    back. See §6.
 

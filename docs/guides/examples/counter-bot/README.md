@@ -75,8 +75,8 @@ registry entry (it lives under `docs/guides/examples/`, not `bots/`) — see the
 [`/bots/rock-paper-scissors/`](../../../../bots/rock-paper-scissors/) for that. Once your own bot
 is submitted there (`docs/guides/rps-bot-author-guide.md` §8), `yarn thunderdome match run
 <your-bot-id> <opponent-id>` resolves both through the real bot registry and drives an actual
-match via `@thunderdome/engine` and `@thunderdome/runtime` (Phase 6) — or
+match via `@thunderdome/engine` and `@thunderdome/runtime` — or
 `yarn thunderdome tournament run <your-bot-id> <opponent-id> [...]` for a real round-robin
-tournament among more than two bots (Phase 7). See
+tournament among more than two bots. See
 [`docs/guides/tournament-author-guide.md`](../../tournament-author-guide.md) for what's still
 missing beyond round robin (other formats, persistence).

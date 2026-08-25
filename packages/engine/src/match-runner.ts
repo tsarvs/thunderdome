@@ -9,7 +9,7 @@ import type {
 /**
  * The generic per-match loop. Contains no game-specific logic and no knowledge of Docker, bot
  * processes, or any wire protocol — `ActionCollector` is the seam a real adapter fills in with
- * real bot processes (`@thunderdome/runtime`'s `DockerActionCollector`, Phase 6); here it's just
+ * real bot processes (`@thunderdome/runtime`'s `DockerActionCollector`); here it's just
  * an interface, so this whole module is testable with a synthetic collector and a synthetic game
  * (see test/match-runner.test.ts).
  */

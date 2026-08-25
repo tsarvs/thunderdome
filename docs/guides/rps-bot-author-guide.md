@@ -11,11 +11,11 @@ how to test it before submitting it.
 exists today, providing both the manifest schema (§5 below uses it directly) and a
 developer-facing protocol client (`runBot()`) that TypeScript/JavaScript bots can use instead of
 implementing the wire protocol by hand — §4 below covers both paths. The bot registry and a
-`match run` CLI command (Phase 6) are also real now — §7 covers running your bot against a real
-second one. What's **not** built yet is a whole-tournament CLI (`TournamentFormat` and the
-orchestrator are Phase 7 — see `docs/guides/tournament-author-guide.md`). Where this guide
-describes something that doesn't exist yet, it says so explicitly rather than pretending
-otherwise.
+`match run` CLI command are also real now — §7 covers running your bot against a real
+second one. A whole-tournament CLI is real too (`TournamentFormat` and the orchestrator — see
+`docs/guides/tournament-author-guide.md` for round robin, single elimination, and persistence).
+Where this guide describes something that doesn't exist yet, it says so explicitly rather than
+pretending otherwise.
 
 ## 1. What a bot is
 
@@ -371,7 +371,7 @@ expected — the same mechanics (timeouts, forfeit reasons, graceful shutdown) a
 will use. It's a good template for testing your own bot: swap in your image tag and whatever
 observation sequence exercises your strategy.
 
-**Against a real second bot, end to end.** `yarn thunderdome match run <botId> <botId>` (Phase 6)
+**Against a real second bot, end to end.** `yarn thunderdome match run <botId> <botId>`
 resolves both bot ids and their shared game through the real bot/game registry
 (`@thunderdome/registry`), builds each bot's Docker image on demand from its own manifest — no
 manual `docker build` step first — and drives a real match through the generic engine
@@ -404,7 +404,7 @@ rather than only ever reading it off a final tally. Type "quit" any time to stop
 Open a PR that touches only `bots/rock-paper-scissors/<your-bot-id>/` — mechanically enforced by
 `tools/boundary-check` (`docs/adr/0007-repository-enforcement.md`; bots are grouped under
 `bots/<game-id>/`, so a Rock-Paper-Scissors bot's directory is `bots/rock-paper-scissors/<id>/`).
-There's no separate registration step: the bot registry (Phase 6, `@thunderdome/registry`) is a
+There's no separate registration step: the bot registry (`@thunderdome/registry`) is a
 pure filesystem scan of `manifest.json` files, so the moment your PR merges, your bot is
 discoverable and playable via `yarn thunderdome match run <your-bot-id> <opponent-id>` — no index
 to update, nothing else to run.

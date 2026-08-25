@@ -32,8 +32,8 @@ const dockerAvailable = await checkDockerAvailable();
 
 describe.runIf(dockerAvailable)('runTournamentCommand (real Docker, real registry)', () => {
   // Every test gets its own store directory, outside the real repo tree — `tournament run`
-  // always persists a record now (Phase 11), and this keeps that from littering the actual
-  // working tree (or one test's records from leaking into another's) on every test run.
+  // always persists a record, and this keeps that from littering the actual working tree (or
+  // one test's records from leaking into another's) on every test run.
   let storeDir: string;
 
   beforeEach(async () => {

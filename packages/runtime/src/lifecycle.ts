@@ -20,8 +20,8 @@ import type { BotProcess, ExitInfo } from './bot-process.js';
  *   -> MATCH_END_SENT -> GRACE_PERIOD -> TERMINATED
  *
  * Deliberately game-agnostic and Docker-agnostic: it only knows about one `BotProcess` and the
- * wire protocol. A future match-runner (Phase 5) drives N of these per match; this class never
- * knows how many participants exist or what game is being played.
+ * wire protocol. `@thunderdome/engine`'s match-runner drives N of these per match; this class
+ * never knows how many participants exist or what game is being played.
  */
 export type BotLifecycleState =
   'spawning' | 'awaiting-ready' | 'running' | 'match-end-sent' | 'grace-period' | 'terminated';
