@@ -76,11 +76,25 @@ describe('thunderdome CLI', () => {
       error.mockRestore();
     });
 
-    it('exits 1 with a usage message when given more than one bot id', async () => {
+    it('accepts multiple bot ids (one per remaining seat) as valid usage, not a usage error', async () => {
+      // Multiple bot ids fill every non-human seat for a >2-player game like Hearts — this is
+      // real syntax now, not a usage error. Unknown ids fail at registry resolution instead
+      // (no real bot exists, so nothing here ever reaches a Docker build) — proof it got past
+      // usage parsing, without this unit test needing a real Docker daemon.
       const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-      const code = await run(['play', 'only-rock', 'only-paper']);
+      const code = await run(['play', 'not-a-real-bot-1', 'not-a-real-bot-2']);
       expect(code).toBe(1);
-      expect(error).toHaveBeenCalledWith(expect.stringContaining('Usage: thunderdome play'));
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('Unknown bot id'));
+      error.mockRestore();
+    });
+
+    it("exits 1 when --as collides with any of the given bot ids", async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const code = await run(['play', 'only-rock', 'only-paper', '--as', 'only-paper']);
+      expect(code).toBe(1);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining(`--as "only-paper" can't be the same id as a bot you're playing.`),
+      );
       error.mockRestore();
     });
   });

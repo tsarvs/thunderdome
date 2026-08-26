@@ -1,0 +1,17 @@
+{
+  "id": "card-game-hearts",
+  "name": "Hearts",
+  "version": "0.1.0",
+  "entryPackage": "@thunderdome/game-card-game-hearts",
+  "protocolVersion": "^1.0",
+  "minParticipants": 4,
+  "maxParticipants": 4,
+  "deterministic": false,
+  "maintainers": [
+    {
+      "name": "Tom Sarver",
+      "contact": "tom@tomsarver.dev"
+    }
+  ],
+  "description": "The classic 4-player card game of hearts."
+}

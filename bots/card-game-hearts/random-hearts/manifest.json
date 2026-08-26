@@ -1,0 +1,18 @@
+{
+  "id": "random-hearts",
+  "name": "Random Hearts",
+  "version": "0.1.0",
+  "game": "card-game-hearts",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Passes 3 random cards and plays a uniformly random legal card each turn, seeded from the match's rngSeed."
+}

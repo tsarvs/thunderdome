@@ -1,0 +1,18 @@
+{
+  "id": "lowest-card-hearts",
+  "name": "Lowest Card Hearts",
+  "version": "0.1.0",
+  "game": "card-game-hearts",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Always plays the lowest-ranked legal card and passes its 3 highest-ranked cards, ignoring the trick, hearts, or scores entirely."
+}

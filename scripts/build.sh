@@ -8,6 +8,7 @@ set -euo pipefail
 INDEPENDENT_PACKAGES=(
   "@thunderdome/protocol"
   "@thunderdome/rng"
+  "@thunderdome/card-kit"
   "@thunderdome/engine"
   "@thunderdome/runtime"
   "@thunderdome/tournament-formats"
@@ -18,6 +19,7 @@ INDEPENDENT_PACKAGES=(
   "@thunderdome/cli"
   "@thunderdome/game-rock-paper-scissors"
   "@thunderdome/game-connect-four"
+  "@thunderdome/game-card-game-hearts"
 )
 
 for pkg in "${INDEPENDENT_PACKAGES[@]}"; do

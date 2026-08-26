@@ -9,6 +9,7 @@
   "workspaces": [
     "apps/*",
     "packages/*",
+    "packages/game-dev-toolkit/*",
     "games/*",
     "tools/*"
   ],
@@ -21,7 +22,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "thunderdome": "tsx apps/cli/src/index.ts",
-    "boundary-check": "yarn workspace @thunderdome/boundary-check run start"
+    "boundary-check": "yarn workspace @thunderdome/boundary-check run start",
+    "scaffold:game": "node scripts/scaffold-game.mjs",
+    "scaffold:bot": "node scripts/scaffold-bot.mjs"
   },
   "devDependencies": {
     "@types/node": "^25.0.0",

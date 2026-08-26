@@ -259,8 +259,10 @@ export interface RunHumanMatchArgs {
   config: unknown;
   matchId: string;
   humanParticipantId: string;
-  botParticipantId: string;
-  botImageTag: string;
+  /** One or more bots filling every non-human seat — a 2-player game passes exactly one; a
+   * 4-player game like Hearts passes three. */
+  botParticipantIds: readonly string[];
+  botImageTagsByBotId: ReadonlyMap<string, string>;
   /** The tournament's one entropy boundary (ADR-0004) — everything else derives from this. */
   tournamentSeed: Buffer;
   input?: NodeJS.ReadableStream;
@@ -275,9 +277,12 @@ export interface RunHumanMatchArgs {
  */
 const HUMAN_MATCH_DEADLINE_MS = 60 * 60 * 1000; // 1 hour
 
-/** `thunderdome play`'s single-bot, single-human counterpart to `runSingleMatch` — one real
- * Docker container for the bot, one `TerminalHumanCollector` prompting a real terminal for the
- * human, driven through the same `runMatch()` loop either way. */
+/** `thunderdome play`'s single-human counterpart to `runSingleMatch` — one real Docker container
+ * per bot (one for a 2-player game, more for a game like Hearts that needs a full roster), one
+ * `TerminalHumanCollector` prompting a real terminal for the human and delegating every other
+ * participant to a `DockerActionCollector` over those containers, driven through the same
+ * `runMatch()` loop either way. Mirrors `runSingleMatch`'s per-participant container loop and its
+ * teardown-on-any-failure guarantee — the only structural difference is the human's own seat. */
 export async function runHumanMatch(args: RunHumanMatchArgs): Promise<SingleMatchOutcome> {
   const {
     game,
@@ -285,29 +290,20 @@ export async function runHumanMatch(args: RunHumanMatchArgs): Promise<SingleMatc
     config,
     matchId,
     humanParticipantId,
-    botParticipantId,
-    botImageTag: imageTag,
+    botParticipantIds,
+    botImageTagsByBotId,
     tournamentSeed,
     input,
     output,
   } = args;
-  const roster = [humanParticipantId, botParticipantId];
+  const roster = [humanParticipantId, ...botParticipantIds];
   const matchRng = createRng(deriveSeed(tournamentSeed, 'match', matchId));
 
-  const botProcess = new DockerBotProcess({
-    imageRef: imageTag,
-    matchId,
-    participantId: botParticipantId,
-    resourceLimits: DEFAULT_RESOURCE_LIMITS,
-  });
-  await botProcess.start();
-  const lifecycle = new BotLifecycle({ process: botProcess, matchId });
-  activeLifecycles.add(lifecycle);
-
+  const lifecycles = new Map<string, BotLifecycle>();
   const collector = new TerminalHumanCollector({
     humanParticipantId,
     game,
-    fallback: new DockerActionCollector(new Map([[botParticipantId, lifecycle]])),
+    fallback: new DockerActionCollector(lifecycles),
     // Omitted entirely when absent, rather than set to `undefined` — required by
     // tsconfig.base.json's `exactOptionalPropertyTypes`.
     ...(input !== undefined ? { input } : {}),
@@ -315,20 +311,40 @@ export async function runHumanMatch(args: RunHumanMatchArgs): Promise<SingleMatc
   });
 
   try {
-    const rngSeedHex = seedToHex(deriveSeed(tournamentSeed, 'bot', matchId, botParticipantId));
-    const initOutcome = await lifecycle.initialize(
-      {
-        gameId: gameEntry.manifest.id,
-        gameVersion: gameEntry.manifest.version,
+    for (const botParticipantId of botParticipantIds) {
+      const imageTag = botImageTagsByBotId.get(botParticipantId);
+      if (imageTag === undefined) {
+        throw new Error(`unreachable: no image built for bot "${botParticipantId}"`);
+      }
+      const botProcess = new DockerBotProcess({
+        imageRef: imageTag,
+        matchId,
         participantId: botParticipantId,
-        roster,
-        rngSeed: rngSeedHex,
-        config,
-      },
-      { initTimeoutMs: 10_000 },
-    );
-    if (!initOutcome.ok) {
-      throw new Error(`${botParticipantId} failed to initialize: ${initOutcome.detail}`);
+        resourceLimits: DEFAULT_RESOURCE_LIMITS,
+      });
+      await botProcess.start();
+      const lifecycle = new BotLifecycle({ process: botProcess, matchId });
+      // Tracked immediately, same reasoning as runSingleMatch: a later bot's own start()/
+      // initialize() failing still tears every earlier one (and the human collector) down, via
+      // the catch block below.
+      lifecycles.set(botParticipantId, lifecycle);
+      activeLifecycles.add(lifecycle);
+
+      const rngSeedHex = seedToHex(deriveSeed(tournamentSeed, 'bot', matchId, botParticipantId));
+      const initOutcome = await lifecycle.initialize(
+        {
+          gameId: gameEntry.manifest.id,
+          gameVersion: gameEntry.manifest.version,
+          participantId: botParticipantId,
+          roster,
+          rngSeed: rngSeedHex,
+          config,
+        },
+        { initTimeoutMs: 10_000 },
+      );
+      if (!initOutcome.ok) {
+        throw new Error(`${botParticipantId} failed to initialize: ${initOutcome.detail}`);
+      }
     }
 
     const outcome = await runMatch({
@@ -345,7 +361,9 @@ export async function runHumanMatch(args: RunHumanMatchArgs): Promise<SingleMatc
       outcome.status === 'completed'
         ? { result: outcome.result, reason: 'completed' as const }
         : { result: null, reason: 'aborted' as const };
-    await lifecycle.finish(matchEndPayload);
+    await Promise.all(
+      [...lifecycles.values()].map((lifecycle) => lifecycle.finish(matchEndPayload)),
+    );
 
     return {
       status: outcome.status,
@@ -356,10 +374,16 @@ export async function runHumanMatch(args: RunHumanMatchArgs): Promise<SingleMatc
         : {}),
     };
   } catch (error) {
-    await lifecycle.finish({ result: null, reason: 'aborted' });
+    await Promise.all(
+      [...lifecycles.values()].map((lifecycle) =>
+        lifecycle.finish({ result: null, reason: 'aborted' }),
+      ),
+    );
     throw error;
   } finally {
-    activeLifecycles.delete(lifecycle);
+    for (const lifecycle of lifecycles.values()) {
+      activeLifecycles.delete(lifecycle);
+    }
     collector.close();
   }
 }
