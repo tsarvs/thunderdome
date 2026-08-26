@@ -1,4 +1,5 @@
 import { cardId, parseCardId, sortCards, type Card } from '@thunderdome/card-kit';
+import { passTargetIndex } from './rules.js';
 import type { HeartsAction, HeartsObservation } from './types.js';
 
 // An empty string, not '\n' — `.join('\n')` below already inserts a newline between every pair
@@ -13,7 +14,35 @@ const CARD_NOTATION_LINE =
 // Marks the start of a new turn's prompt, so consecutive rounds don't visually run together.
 const SEPARATOR = '----------';
 
+/** left ↔ right pass to each other; across passes to itself (offset 2 of 4 is its own inverse). */
+const OPPOSITE_PASS_DIRECTION: Record<'left' | 'right' | 'across', 'left' | 'right' | 'across'> = {
+  left: 'right',
+  right: 'left',
+  across: 'across',
+};
+
 export function describeObservation(observation: HeartsObservation): string {
+  const youIndex = observation.participantIds.indexOf(observation.you) as 0 | 1 | 2 | 3;
+  const passDirectionLine =
+    observation.phase !== 'passing'
+      ? undefined
+      : observation.passDirection === 'hold'
+        ? '  — passing direction: hold (no pass this hand)'
+        : `  — passing direction: ${observation.passDirection}`;
+  const youPassToLine =
+    observation.phase !== 'passing' || observation.passDirection === 'hold'
+      ? undefined
+      : `  — pass to: ${
+          observation.participantIds[passTargetIndex(observation.passDirection, youIndex)]
+        }`;
+  const youReceiveFromLine =
+    observation.phase !== 'passing' || observation.passDirection === 'hold'
+      ? undefined
+      : `  — receive from: ${
+          observation.participantIds[
+            passTargetIndex(OPPOSITE_PASS_DIRECTION[observation.passDirection], youIndex)
+          ]
+        }`;
   const handLine = `Your hand: ${sortCards(observation.hand).map(cardId).join(' ')}`;
   const lastTrickLine =
     observation.lastTrick === null
@@ -28,9 +57,12 @@ export function describeObservation(observation: HeartsObservation): string {
             ? 'you'
             : observation.lastTrick.winnerId
         }`;
-  const scoresLine = `Scores — ${observation.participantIds
-    .map((id) => `${id === observation.you ? 'you' : id}: ${String(observation.scores[id] ?? 0)}`)
-    .join(', ')} (lowest wins at ${String(observation.pointLimit)})`;
+  const scoresLine = `Scores (lowest wins at ${String(observation.pointLimit)})`;
+  const handPointsOf = (id: string) => String(observation.handPoints[id] ?? 0);
+  const scoresLineWithYou = `  — you: ${String(observation.scores[observation.you] ?? 0)} (${handPointsOf(observation.you)} this hand)`;
+  const scoresLinesForOthers = observation.participantIds
+    .filter((id) => id !== observation.you)
+    .map((id) => `  — ${id}: ${String(observation.scores[id] ?? 0)} (${handPointsOf(id)} this hand)`);
   const trickLine =
     observation.currentTrick === null
       ? undefined
@@ -55,13 +87,20 @@ export function describeObservation(observation: HeartsObservation): string {
           })()
         : undefined;
 
+  const heartsBrokenLine = `  — hearts broken: ${observation.heartsBroken ? 'yes' : 'no'}`;
+
   return (
     [
       SEPARATOR,
       BLANK_LINE,
-      `Hearts — Hand ${String(observation.handNumber + 1)} (${observation.phase}) — passing direction: ${observation.passDirection}`,
+      `Hearts — Hand ${String(observation.handNumber + 1)} (${observation.phase})`,
+      heartsBrokenLine,
+      passDirectionLine,
+      youPassToLine,
+      youReceiveFromLine,
       scoresLine,
-      `Hearts broken: ${observation.heartsBroken ? 'yes' : 'no'}`,
+      scoresLineWithYou,
+      ...scoresLinesForOthers,
       BLANK_LINE,
       lastTrickLine,
       observation.lastTrick === null ? undefined : BLANK_LINE,

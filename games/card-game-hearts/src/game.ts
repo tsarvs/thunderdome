@@ -274,6 +274,7 @@ export const hearts: GameDefinition<
       isFirstTrick: state.tricksCompleted === 0,
       currentTrick: state.phase === 'playing' ? state.currentTrick : null,
       lastTrick: state.lastTrick,
+      handPoints: state.handPoints,
       scores: state.scores,
       pointLimit: state.config.pointLimit,
       youMustAct: state.phase === 'passing' || isYourTurn,

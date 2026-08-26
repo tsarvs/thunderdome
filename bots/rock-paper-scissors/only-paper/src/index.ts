@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Only Paper — always plays "paper", no matter what.
  *

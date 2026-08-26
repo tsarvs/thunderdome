@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Leftmost Connect Four — always drops into the lowest-indexed column that isn't full yet.
  *

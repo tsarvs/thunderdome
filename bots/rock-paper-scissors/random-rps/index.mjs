@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Random RPS — picks a uniformly random choice each round.
  *

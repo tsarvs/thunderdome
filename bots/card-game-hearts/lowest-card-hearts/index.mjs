@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Lowest Card Hearts — always plays the lowest-ranked legal card, ignoring the trick, hearts, or
  * scores entirely. Passes its 3 highest-ranked cards (the simplest possible way to unload

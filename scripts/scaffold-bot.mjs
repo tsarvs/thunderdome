@@ -62,6 +62,107 @@ if (!existsSync(gameManifestPath)) {
 const botDir = join(REPO_ROOT, 'bots', gameId, botId);
 assertTargetIsFresh(botDir, `bots/${gameId}/${botId}`);
 
+/**
+ * Known Observation/Action TypeScript shapes for games defined in this repo, so a scaffolded TS
+ * bot starts with the real types instead of `{ [key: string]: unknown }` placeholders. These are
+ * copies of games/<id>/src/types.ts, not imports — bots/** never depends on games/** (see
+ * docs/adr/0001-monorepo-and-boundary.md) — so keep each entry in sync by hand if the source
+ * types change.
+ */
+const GAME_TS_TYPES = {
+  'rock-paper-scissors': `
+type RpsChoice = 'rock' | 'paper' | 'scissors';
+
+/** What a bot sees each round — never includes the current round's opponent choice. */
+interface Observation {
+  round: number;
+  totalRounds: number;
+  yourWins: number;
+  opponentWins: number;
+  opponentId: string;
+  history: {
+    round: number;
+    you: RpsChoice | null;
+    opponent: RpsChoice | null;
+    winner: 'you' | 'opponent' | 'draw';
+  }[];
+}
+
+interface Action {
+  choice: RpsChoice;
+}
+`,
+  'connect-four': `
+/**
+ * Fully observable — the same board every participant sees, relabeled to your own perspective
+ * ('you' / 'opponent' / null) rather than raw participant ids. Sent only when it's your turn to
+ * move — receiving one at all already means "act now".
+ */
+interface Observation {
+  board: ('you' | 'opponent' | null)[][];
+  columns: number;
+  rows: number;
+  winLength: number;
+  /** Columns not yet full — the only legal \`column\` values for this move. */
+  legalColumns: number[];
+  opponentId: string;
+  moveCount: number;
+}
+
+interface Action {
+  column: number;
+}
+`,
+  'card-game-hearts': `
+type Suit = 'clubs' | 'diamonds' | 'hearts' | 'spades';
+/** 2..10, then 11=J, 12=Q, 13=K, 14=A — numeric so "highest of suit" is a plain \`>\`. */
+type Rank = 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
+interface Card {
+  suit: Suit;
+  rank: Rank;
+}
+
+interface HeartsTrick {
+  leaderId: string;
+  plays: { participantId: string; card: Card }[];
+}
+
+interface CompletedTrick {
+  plays: { participantId: string; card: Card }[];
+  winnerId: string;
+}
+
+interface Observation {
+  you: string;
+  participantIds: [string, string, string, string];
+  phase: 'passing' | 'playing';
+  handNumber: number;
+  passDirection: 'left' | 'right' | 'across' | 'hold';
+  /** Your full hand, sorted. */
+  hand: Card[];
+  /** Every participant including yourself — no other player's actual cards. */
+  handSizes: Record<string, number>;
+  heartsBroken: boolean;
+  tricksCompleted: number;
+  isFirstTrick: boolean;
+  /** \`null\` while passing. */
+  currentTrick: HeartsTrick | null;
+  /** The most recently completed trick this hand — \`null\` before the first trick of the current
+   * hand has completed. */
+  lastTrick: CompletedTrick | null;
+  scores: Record<string, number>;
+  pointLimit: number;
+  /** Present only when it's your turn to play a card. */
+  legalPlays?: Card[];
+  youMustAct: boolean;
+}
+
+/** Passing happens once at the start of each hand (except every 4th, which holds); playing a
+ * card happens on every other turn. */
+type Action = { type: 'pass'; cards: [Card, Card, Card] } | { type: 'play'; card: Card };
+`,
+};
+
 console.log(`Scaffolding bots/${gameId}/${botId}/ ("${title}", ${lang})...`);
 
 writeScaffoldFile(
@@ -82,6 +183,8 @@ writeScaffoldFile(
     2,
   )}\n`,
 );
+
+const knownGameTypes = GAME_TS_TYPES[gameId];
 
 if (lang === 'ts') {
   writeScaffoldFile(
@@ -151,23 +254,9 @@ ENTRYPOINT ["node", "dist/index.js"]
 `,
   );
 
-  writeScaffoldFile(
-    join(botDir, 'src', 'index.ts'),
-    `#!/usr/bin/env node
-/**
- * ${title} — a starter bot for the "${gameId}" game.
- *
- * All of the NDJSON wire-protocol handling (the init/ready handshake, reading "observation",
- * exiting on "match-end") lives in @thunderdome/bot-sdk's runBot() — see
- * docs/guides/rps-bot-author-guide.md for the full protocol walkthrough. There are two things
- * left to do here:
- *   1. Replace the Observation/Action placeholder types below with the real shapes for
- *      "${gameId}" (check games/${gameId}/src/types.ts if it's defined in this repo).
- *   2. Implement decideAction().
- */
-import { runBot } from '@thunderdome/bot-sdk';
-
-// TODO: replace with the real observation shape for "${gameId}".
+  const typesBlock = knownGameTypes
+    ? knownGameTypes.trim()
+    : `// TODO: replace with the real observation shape for "${gameId}".
 interface Observation {
   [key: string]: unknown;
 }
@@ -175,7 +264,25 @@ interface Observation {
 // TODO: replace with the real action shape for "${gameId}".
 interface Action {
   [key: string]: unknown;
-}
+}`;
+
+  const typesComment = knownGameTypes
+    ? ` * The Observation/Action types below are copied from games/${gameId}/src/types.ts, so\n` +
+      ` * there's one thing left to do here: implement decideAction().`
+    : ` * There are two things left to do here:\n` +
+      ` *   1. Replace the Observation/Action placeholder types below with the real shapes for\n` +
+      ` *      "${gameId}" (check games/${gameId}/src/types.ts if it's defined in this repo).\n` +
+      ` *   2. Implement decideAction().`;
+
+  writeScaffoldFile(
+    join(botDir, 'src', 'index.ts'),
+    `/**
+ * ${title} — a starter bot for the "${gameId}" game.
+${typesComment}
+ */
+import { runBot } from '@thunderdome/bot-sdk';
+
+${typesBlock}
 
 function decideAction(_observation: Observation): Action {
   // TODO: implement your strategy.
@@ -215,15 +322,8 @@ ENTRYPOINT ["node", "index.mjs"]
 
   writeScaffoldFile(
     join(botDir, 'index.mjs'),
-    `#!/usr/bin/env node
-/**
+    `/**
  * ${title} — a starter bot for the "${gameId}" game.
- *
- * All of the NDJSON wire-protocol handling (the init/ready handshake, reading "observation",
- * exiting on "match-end") lives in @thunderdome/bot-sdk's runBot() — see
- * docs/guides/rps-bot-author-guide.md for the full protocol walkthrough. There's one thing left
- * to do here: implement decideAction() below for however "${gameId}" observations/actions are
- * actually shaped (check games/${gameId}/src/types.ts if it's defined in this repo).
  *
  * If your strategy needs its own randomness, seed a PRNG from the \`rngSeed\` runBot() hands you
  * via \`onInit\` — never Math.random() (docs/adr/0004-deterministic-randomness.md) — see
@@ -256,12 +356,18 @@ this directory and generate a matching package-lock.json:
 const packBotSdkPath = join(REPO_ROOT, 'scripts', 'pack-bot-sdk.sh');
 insertIntoBashArray(packBotSdkPath, 'BOT_DIRS', `bots/${gameId}/${botId}`);
 
+const step2 =
+  lang === 'ts' && knownGameTypes
+    ? `  2. Implement decideAction() in bots/${gameId}/${botId}/src/index.ts — its Observation/Action
+     types are already filled in for "${gameId}".`
+    : `  2. Fill in the Observation/Action types and decideAction() in
+     bots/${gameId}/${botId}/${lang === 'ts' ? 'src/index.ts' : 'index.mjs'}`;
+
 console.log(`
 Next steps:
   1. ./scripts/pack-bot-sdk.sh   # vendors @thunderdome/bot-sdk into bots/${gameId}/${botId}/
                                   # and generates its package-lock.json (requires network access)
-  2. Fill in the Observation/Action types and decideAction() in
-     bots/${gameId}/${botId}/${lang === 'ts' ? 'src/index.ts' : 'index.mjs'}
+${step2}
   3. docker build -t thunderdome-${botId} bots/${gameId}/${botId}
   4. yarn thunderdome match run ${botId} <another-bot-id> --config '{}'
      (see docs/guides/rps-bot-author-guide.md §7-8 for the full loop, including smoke-test.mjs)

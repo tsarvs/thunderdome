@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Random Connect Four — picks a uniformly random legal column each turn.
  *

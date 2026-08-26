@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Only Scissors — always plays "scissors", no matter what.
  *

@@ -7,6 +7,7 @@
   "minParticipants": 4,
   "maxParticipants": 4,
   "deterministic": false,
+  "supportedTournamentFormats": ["swiss-league"],
   "maintainers": [
     {
       "name": "Tom Sarver",

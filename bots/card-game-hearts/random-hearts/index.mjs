@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Random Hearts — a uniformly random legal action every turn: 3 random cards during the passing
  * phase, a random card from `legalPlays` during the playing phase.

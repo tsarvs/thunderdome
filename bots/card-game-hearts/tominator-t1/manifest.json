@@ -1,0 +1,18 @@
+{
+  "id": "tominator-t1",
+  "name": "Tominator T1",
+  "version": "0.1.0",
+  "game": "card-game-hearts",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "TODO: describe Tominator T1's strategy."
+}

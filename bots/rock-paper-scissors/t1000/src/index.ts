@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * t1000 — ported from a standalone RPS-bot-tournament template ("T2"). Builds on the same
  * primitives as t800 ("T1") but adds a real state machine over the match (RED_HERRING, RESEARCH,

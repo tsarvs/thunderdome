@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Verifies t800 against the real Docker runtime: completes the handshake, always answers with a
 // valid choice, is a deterministic function of rngSeed (docs/adr/0004-deterministic-randomness.md
 // — not uncontrolled Math.random()), and shuts down cleanly. Requires:
