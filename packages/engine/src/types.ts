@@ -119,5 +119,13 @@ export interface GameDefinition<TConfig, TState, TObservation, TAction, TResult>
   humanInterface?: {
     describeObservation(observation: TObservation): string;
     parseInput(raw: string): TAction | undefined;
+    /**
+     * Optional: confirms the action `parseInput` just accepted, printed immediately after —
+     * e.g. "Passed: 2C 5C TH" — before the next observation's prompt. Lets a human verify their
+     * input was understood as intended (not just that *something* was accepted), which matters
+     * most for a game with enough notation for a typo to silently parse into the wrong-but-valid
+     * action. Omit if the next prompt already makes the outcome obvious on its own.
+     */
+    describeAction?(action: TAction): string;
   };
 }

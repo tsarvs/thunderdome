@@ -16,7 +16,7 @@ export default tseslint.config(
       '.yarn/**',
       '**/test/fixtures/**/*.mjs',
       'docs/guides/examples/**',
-      'scripts/*.mjs',
+      'scripts/**/*.mjs',
     ],
   },
   js.configs.recommended,
@@ -31,6 +31,7 @@ export default tseslint.config(
         project: [
           './apps/*/tsconfig.test.json',
           './packages/*/tsconfig.test.json',
+          './packages/game-dev-toolkit/*/tsconfig.test.json',
           './games/*/tsconfig.test.json',
           './tools/*/tsconfig.test.json',
         ],

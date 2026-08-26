@@ -33,7 +33,7 @@ today.
 | Command              | Status                                                                                           |
 | -------------------- | ------------------------------------------------------------------------------------------------ |
 | `match run`          | Real — runs one match between two or more bots. See below.                                       |
-| `play`               | Real — a human, typing into this terminal, plays one interactive match against a bot. See below. |
+| `play`               | Real — a human, typing into this terminal, plays one interactive match against one or more bots. See below. |
 | `tournament run`     | Real — runs a round-robin or single-elimination tournament among two or more bots. See below.    |
 | `tournament list`    | Real — lists persisted tournament records. See below.                                            |
 | `tournament inspect` | Real — prints one persisted tournament's details and final standings. See below.                 |
@@ -75,17 +75,31 @@ Match: only-rock vs only-paper (Rock Paper Scissors)
 (At the real default of 300 rounds, the per-round lines are replaced with a single
 `(300 rounds played)` line instead — see [the note below](#a-note-on-ties-and-non-terminating-matches).)
 
+For a game with more than 2 participants, like Hearts (which requires **exactly 4**, not "2 or
+more"), pass one bot id per seat:
+
+```bash
+yarn thunderdome match run random-hearts lowest-card-hearts point-dodger-hearts <your-bot-id> \
+  --config '{"pointLimit":100}'
+```
+
 - `--config` is whatever JSON the shared game's own `parseConfig` expects — for
   Rock-Paper-Scissors, `{"totalRounds": <positive int>}` (defaults to 300 hands if omitted; see
-  `games/rock-paper-scissors/src/types.ts`'s `RpsConfigSchema`). Every configured hand is played
-  regardless of who's ahead — the tally at the end decides the winner, or a genuine tie if it's
-  exactly even. Defaults to `{}`, which is valid on its own for Rock-Paper-Scissors.
+  `games/rock-paper-scissors/src/types.ts`'s `RpsConfigSchema`); for Hearts,
+  `{"pointLimit": <positive int>}` (defaults to 100 if omitted; see
+  `games/card-game-hearts/src/types.ts`'s `HeartsConfigSchema`) — the match ends once any
+  player's cumulative score crosses it, lowest score wins. Defaults to `{}`, which is valid on its
+  own for both games.
 - Bot ids are whatever a bot's own `manifest.json` declares as `id` — see
-  [`/bots/rock-paper-scissors/`](../../bots/rock-paper-scissors/) for what's available today, or
-  [`docs/guides/rps-bot-author-guide.md`](../../docs/guides/rps-bot-author-guide.md) for writing
-  your own.
+  [`/bots/rock-paper-scissors/`](../../bots/rock-paper-scissors/) or
+  [`/bots/card-game-hearts/`](../../bots/card-game-hearts/) for what's available today, or
+  [`docs/guides/rps-bot-author-guide.md`](../../docs/guides/rps-bot-author-guide.md) /
+  [`docs/guides/hearts-bot-author-guide.md`](../../docs/guides/hearts-bot-author-guide.md) for
+  writing your own.
 - All bots in one `match run` must share the same `game` (checked against each bot's own
-  manifest) — you'll get a clear error, not a confusing crash, if they don't.
+  manifest) — you'll get a clear error, not a confusing crash, if they don't. Passing the wrong
+  number of bot ids for that game (e.g. 3 for Hearts) gets a clear error from the game's own
+  `initialize()`, not a hang or a crash.
 - Exits 0 on a completed, forfeited, or timed-out match (see below), 1 on any resolution error
   (unknown bot/game id, mismatched games, invalid `--config`, or a bot failing to initialize).
 
@@ -116,13 +130,15 @@ for the full explanation. If you still see this, it's a new issue, not the old o
 ## `play`
 
 ```bash
-yarn thunderdome play <botId> [--as <yourParticipantId>] [--game-config '<json>']
+yarn thunderdome play <botId> [...moreBotIds] [--as <yourParticipantId>] [--game-config '<json>']
 ```
 
-Resolves the one given bot id (and its game) through the registry exactly like `match run`, builds
-its Docker image on demand, then drives a real match through the same `@thunderdome/engine`
-`runMatch()` loop — except this time, one side of the match is you: every round, the game's own
-prompt is printed right here in this terminal, and whatever you type becomes your action.
+Resolves the given bot id(s) (and their shared game) through the registry exactly like
+`match run`, builds each Docker image on demand, then drives a real match through the same
+`@thunderdome/engine` `runMatch()` loop — except this time, one seat is you: every round it's
+your turn, the game's own prompt is printed right here in this terminal, and whatever you type
+becomes your action. One bot id per remaining seat, in order after you — a 2-player game (Rock
+Paper Scissors) takes exactly one; a 4-player game (Hearts) takes three.
 
 ```bash
 yarn thunderdome play only-rock --game-config '{"totalRounds":3}'
@@ -144,18 +160,55 @@ rock, paper, or scissors? (r/p/s) paper
 2. only-rock (loss, score=0)
 ```
 
+For a 4-player game like Hearts, pass 3 bot ids to fill the other 3 seats:
+
+```bash
+yarn thunderdome play random-hearts lowest-card-hearts point-dodger-hearts \
+  --game-config '{"pointLimit":100}'
+```
+
+```
+Building 3 bot image(s)...
+
+You (you) vs random-hearts, lowest-card-hearts, point-dodger-hearts (Hearts). Type "quit" anytime to resign.
+
+Hearts — Hand 1 (passing) — passing direction: left
+Your hand: 9C QC 2D 4D 9D TD QD KD TH KH 5S JS QS
+Hearts broken: no
+Scores — you: 0, random-hearts: 0, lowest-card-hearts: 0, point-dodger-hearts: 0 (lowest wins at 100)
+Cards: rank+suit — 2-9, T=10, J, Q, K, A; C=clubs, D=diamonds, H=hearts, S=spades (e.g. QS = queen of spades, TH = ten of hearts).
+Pass 3 cards left. Type: PASS <card> <card> <card>  (example: PASS 2C 5C TH)
+> PASS 9C QC 2D
+Passed: 9C QC 2D
+...
+
+1. point-dodger-hearts (win, score=31)
+2. lowest-card-hearts (loss, score=53)
+3. random-hearts (loss, score=99)
+4. you (loss, score=103)
+```
+
+Every prompt includes the card-notation legend and a format example with a real, currently-legal
+card substituted in, and every accepted action is echoed back immediately (`Passed: 9C QC 2D`,
+`Played: 4D`, ...) — via the optional `humanInterface.describeAction` hook
+(`packages/engine/src/types.ts`) — so you can confirm your input was understood as intended before
+the match moves on, not just that *something* was accepted. An unparseable line reprompts with an
+explicit "Sorry, I didn't understand that — try again." rather than silently repeating the same
+block.
+
 - Requires the shared game to opt in via `GameDefinition.humanInterface` (an optional hook next to
   `onMissingAction` on the same interface, `packages/engine/src/types.ts`) — it owns rendering each
   round's prompt and parsing your reply into that game's own action shape, the same way every other
-  piece of a game's rules lives in the game package, not the CLI. Rock-Paper-Scissors implements
-  it (`games/rock-paper-scissors/src/game.ts`); a game that hasn't yet gets a clear error here
-  rather than a garbled prompt.
+  piece of a game's rules lives in the game package, not the CLI. Rock-Paper-Scissors
+  (`games/rock-paper-scissors/src/game.ts`) and Hearts (`games/card-game-hearts/src/game.ts`)
+  both implement it; a game that hasn't yet gets a clear error here rather than a garbled prompt.
 - Type "quit" (or "resign") at any prompt to forfeit the match early instead of playing out every
   configured round — this is the same generic missing-action path a bot's crash or timeout takes,
   not a special case.
 - An unparseable line (a typo, an empty line, anything the game's `humanInterface.parseInput`
   doesn't recognize) just reprompts — it never counts as a forfeit or an illegal move.
-- `--as` names your own participant id (defaults to `you`); it can't collide with the bot's own id.
+- `--as` names your own participant id (defaults to `you`); it can't collide with any of the given
+  bots' ids.
 - Unlike a bot's per-turn deadline, nothing times out your own replies — you set the pace. The
   match as a whole is still capped (a generous 1 hour, not `match run`'s 120 seconds) as pure
   defense-in-depth against a genuinely abandoned session, matching
@@ -163,7 +216,7 @@ rock, paper, or scissors? (r/p/s) paper
   above.
 - Subject to the same
   [interrupt handling](#interrupting-a-running-match-run--play--tournament-run) as
-  `match run`/`tournament run` — Ctrl+C tears down the bot's container before exiting.
+  `match run`/`tournament run` — Ctrl+C tears down every bot's container before exiting.
 
 ## `tournament run`
 
@@ -359,6 +412,7 @@ Any tournament format beyond round robin and single elimination (Swiss, pool-the
 for the design that still-aspirational piece is meant to fit.
 
 `play` only works against a game that implements `GameDefinition.humanInterface` — today, that's
-Rock-Paper-Scissors only. Connect Four hasn't implemented it yet (`play leftmost-connect-four`
-gives a clear error, not a crash); doing so is just a matter of `games/connect-four` adding its
-own `describeObservation`/`parseInput` pair, no CLI or engine change required.
+Rock-Paper-Scissors and Hearts. Connect Four hasn't implemented it yet (`play
+leftmost-connect-four` gives a clear error, not a crash); doing so is just a matter of
+`games/connect-four` adding its own `describeObservation`/`parseInput` pair, no CLI or engine
+change required.

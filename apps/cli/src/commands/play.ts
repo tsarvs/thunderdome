@@ -18,9 +18,11 @@ import {
 import { printRoundEvents } from './match.js';
 
 const USAGE =
-  'Usage: thunderdome play <botId> [--as <yourParticipantId>] ' +
+  'Usage: thunderdome play <botId> [...moreBotIds] [--as <yourParticipantId>] ' +
   '[--game-config \'{"totalRounds":300}\']\n' +
-  '  Type your move at each prompt; type "quit" (or "resign") anytime to end the match early.';
+  '  One bot id per remaining seat, in order after you — a 2-player game takes exactly one; a ' +
+  '4-player game like Hearts takes three. Type your move at each prompt; type "quit" (or ' +
+  '"resign") anytime to end the match early.';
 
 export interface PlayOptions {
   /** Repo root to scan games/ and bots/ under. */
@@ -42,18 +44,18 @@ export async function runPlayCommand(
     allowPositionals: true,
   });
 
-  const [botId, ...rest] = positionals;
-  if (botId === undefined || rest.length > 0) {
+  const botIds = positionals;
+  if (botIds.length === 0) {
     console.error(USAGE);
     return 1;
   }
   const humanParticipantId = values.as;
-  if (humanParticipantId === botId) {
-    console.error(`--as "${humanParticipantId}" can't be the same id as the bot you're playing.`);
+  if (botIds.includes(humanParticipantId)) {
+    console.error(`--as "${humanParticipantId}" can't be the same id as a bot you're playing.`);
     return 1;
   }
 
-  const resolved = await resolveBotsAndGame(options.rootDir, [botId]);
+  const resolved = await resolveBotsAndGame(options.rootDir, botIds);
   if (!resolved.ok) {
     console.error(resolved.message);
     return 1;
@@ -86,18 +88,14 @@ export async function runPlayCommand(
   }
   const config = configResult.value;
 
-  console.log(`Building 1 bot image...`);
+  console.log(`Building ${String(entries.length)} bot image(s)...`);
   const imageTagsByBotId = await buildBotImages(entries);
-  const imageTag = imageTagsByBotId.get(botId);
-  if (imageTag === undefined) {
-    throw new Error(`unreachable: no image built for bot "${botId}"`);
-  }
 
   const matchId = `play-${String(Date.now())}`;
   const tournamentSeed = generateTournamentSeed(); // the one entropy boundary (ADR-0004)
 
   console.log(
-    `\nYou (${humanParticipantId}) vs ${botId} (${gameEntry.manifest.name}). Type "quit" anytime to resign.\n`,
+    `\nYou (${humanParticipantId}) vs ${botIds.join(', ')} (${gameEntry.manifest.name}). Type "quit" anytime to resign.\n`,
   );
 
   let outcome;
@@ -108,8 +106,8 @@ export async function runPlayCommand(
       config,
       matchId,
       humanParticipantId,
-      botParticipantId: botId,
-      botImageTag: imageTag,
+      botParticipantIds: botIds,
+      botImageTagsByBotId: imageTagsByBotId,
       tournamentSeed,
       // Omitted entirely when absent, rather than set to `undefined` — required by
       // tsconfig.base.json's `exactOptionalPropertyTypes`.

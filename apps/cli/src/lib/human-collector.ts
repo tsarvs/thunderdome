@@ -45,10 +45,19 @@ export class TerminalHumanCollector implements ActionCollector {
     }
 
     // No deadline enforced here, unlike a bot's own requestAction path — a human, not a
-    // container, sets this match's pace. Loops silently past an unparseable line (typing
-    // "roc" is a typo, not a forfeit) rather than ever handing that on to validateAction/resolve.
+    // container, sets this match's pace. Loops past an unparseable line (typing "roc" is a typo,
+    // not a forfeit) rather than ever handing that on to validateAction/resolve — but says so
+    // explicitly on a retry, rather than just silently reprinting the same prompt.
+    let isRetry = false;
     for (;;) {
-      this.output.write(humanInterface.describeObservation(args.observation));
+      if (isRetry) {
+        this.output.write("Sorry, I didn't understand that — try again.\n\n");
+      }
+      // `describeObservation` deliberately ends with no trailing newline (a game's own choice —
+      // see packages/engine/src/types.ts) — the `\n> ` here is what actually separates the
+      // prompt from where you type, so your answer lands on its own line instead of running on
+      // right after the prompt text.
+      this.output.write(`${humanInterface.describeObservation(args.observation)}\n> `);
       const next = await this.lines.next();
       if (next.done) {
         return { ok: false, reason: 'disconnected' }; // stdin ended — nobody left to answer
@@ -59,9 +68,20 @@ export class TerminalHumanCollector implements ActionCollector {
         return { ok: false, reason: 'disconnected' };
       }
       const action = humanInterface.parseInput(raw);
-      if (action !== undefined) {
-        return { ok: true, action };
+      if (action === undefined) {
+        isRetry = true;
+        continue;
       }
+      // Confirms exactly how the input was understood — not just that something was accepted —
+      // so a valid-but-unintended parse (e.g. a typo that still happens to name a real card)
+      // doesn't slip past unnoticed. Optional: a game with nothing useful to add here just omits it.
+      const confirmation = humanInterface.describeAction?.(action);
+      if (confirmation !== undefined) {
+        // No leading newline: pressing Enter to submit already moved the terminal to a new
+        // line, so one here would just add a stray blank line before the confirmation.
+        this.output.write(`${confirmation}\n\n`);
+      }
+      return { ok: true, action };
     }
   }
 
