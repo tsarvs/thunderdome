@@ -34,6 +34,21 @@ export function printRoundEvents(events: RoundEvent[][]): void {
   console.log(`  (${String(events.length)} rounds played)`);
 }
 
+/** Not every game's result carries this — only a game made up of multiple sub-units beneath the
+ * per-round event stream `printRoundEvents` already reports on, e.g. Hearts's `handsPlayed`
+ * (games/card-game-hearts/src/types.ts). Reads it generically off whatever shape `result` happens
+ * to be rather than hardcoding to Hearts, so any other such game gets this for free too — a no-op
+ * for a game whose result has no such field. */
+export function printHandsPlayed(result: unknown): void {
+  if (typeof result !== 'object' || result === null) {
+    return;
+  }
+  const { handsPlayed } = result as Record<string, unknown>;
+  if (typeof handsPlayed === 'number') {
+    console.log(`  (${String(handsPlayed)} hands played)`);
+  }
+}
+
 export interface MatchRunOptions {
   /** Repo root to scan games/ and bots/ under. */
   rootDir: string;
@@ -106,6 +121,7 @@ export async function runMatchCommand(
   }
 
   printRoundEvents(outcome.events);
+  printHandsPlayed(outcome.result);
   console.log();
 
   if (outcome.status === 'forfeit') {

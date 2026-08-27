@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Verifies only-rock against the real Docker runtime. Requires:
 // docker build -t thunderdome-only-rock .
 import { DockerBotProcess, BotLifecycle, DEFAULT_RESOURCE_LIMITS } from '@thunderdome/runtime';

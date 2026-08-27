@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Copycat RPS — plays whatever the opponent played in the previous round, or "rock" on the
  * first round when there's no history yet.

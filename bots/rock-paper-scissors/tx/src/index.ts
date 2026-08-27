@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { runBot } from '@thunderdome/bot-sdk';
 
 type RpsChoice = 'rock' | 'paper' | 'scissors';

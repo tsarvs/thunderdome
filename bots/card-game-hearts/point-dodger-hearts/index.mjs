@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Point Dodger Hearts — a simple heuristic that actually tries to avoid taking points:
  *   - Passing: sheds its 3 most dangerous cards (the queen of spades first, then high spades,

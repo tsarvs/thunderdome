@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Verifies only-paper against the real Docker runtime. Requires:
 // docker build -t thunderdome-only-paper .
 import { DockerBotProcess, BotLifecycle, DEFAULT_RESOURCE_LIMITS } from '@thunderdome/runtime';

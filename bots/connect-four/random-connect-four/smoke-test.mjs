@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Verifies random-connect-four against the real Docker runtime, and specifically that its
 // choices are a deterministic function of rngSeed (docs/adr/0004-deterministic-randomness.md)
 // — not uncontrolled Math.random(). Requires:

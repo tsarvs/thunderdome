@@ -16,9 +16,13 @@ export interface BuildBotImageOptions {
   imageTag: string;
 }
 
+/** Every bot image tag starts with this — also what `cleanup.ts`'s image removal filters on,
+ * since built images carry no labels (only containers do; see docker-config.ts). */
+export const THUNDERDOME_BOT_IMAGE_TAG_PREFIX = 'thunderdome-bot-';
+
 /** The tag convention every caller (CLI, scripts) should use for a registry-resolved bot id. */
 export function botImageTag(botId: string): string {
-  return `thunderdome-bot-${botId}`;
+  return `${THUNDERDOME_BOT_IMAGE_TAG_PREFIX}${botId}`;
 }
 
 /**

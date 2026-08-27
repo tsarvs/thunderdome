@@ -126,6 +126,11 @@ export interface SingleMatchOutcome {
   events: RoundEvent[][];
   standingOutcomes: StandingOutcome[];
   forfeitedParticipantIds?: string[];
+  /** The game's own `getResult()` value — present only when `status === 'completed'`. Untyped
+   * here because this module is game-agnostic (`AnyGameDefinition` erases `TResult`); a
+   * game-specific field on it, e.g. Hearts's `handsPlayed`, is read back out by whatever prints
+   * the match summary (see `printHandsPlayed` in commands/match.ts). */
+  result?: unknown;
 }
 
 /**
@@ -234,6 +239,7 @@ export async function runSingleMatch(args: RunSingleMatchArgs): Promise<SingleMa
       ...(outcome.forfeitedParticipantIds !== undefined
         ? { forfeitedParticipantIds: outcome.forfeitedParticipantIds }
         : {}),
+      ...(outcome.result !== undefined ? { result: outcome.result } : {}),
     };
   } catch (error) {
     // Whatever went wrong — a sibling's container failing to start, a bot failing to
@@ -372,6 +378,7 @@ export async function runHumanMatch(args: RunHumanMatchArgs): Promise<SingleMatc
       ...(outcome.forfeitedParticipantIds !== undefined
         ? { forfeitedParticipantIds: outcome.forfeitedParticipantIds }
         : {}),
+      ...(outcome.result !== undefined ? { result: outcome.result } : {}),
     };
   } catch (error) {
     await Promise.all(

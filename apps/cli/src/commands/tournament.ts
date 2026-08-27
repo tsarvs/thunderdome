@@ -23,8 +23,10 @@ import { scanBots, type GameRegistryEntry } from '@thunderdome/registry';
 import {
   roundRobinFormat,
   singleEliminationFormat,
+  swissLeagueFormat,
   type RoundRobinStandings,
   type SingleEliminationStandings,
+  type SwissLeaguePublicStandingsEntry,
 } from '@thunderdome/tournament-formats';
 import {
   loadTournamentRecord,
@@ -44,11 +46,16 @@ import { printRoundEvents } from './match.js';
 
 const RUN_USAGE =
   'Usage: thunderdome tournament run <botId> <botId> [...moreBotIds] ' +
-  '[--tournament-config \'{"format":"round-robin"|"single-elimination","bestOf":1}\'] ' +
+  '[--tournament-config \'{"format":"round-robin"|"single-elimination","bestOf":1}\' | ' +
+  '\'{"format":"swiss-league","tableSize":4,"rounds":3}\'] ' +
   '[--game-config \'{"totalRounds":300}\'] [--store-dir <path>]\n' +
   '   or: thunderdome tournament run --all-bots <gameId> ' +
-  '[--tournament-config \'{"format":"round-robin"|"single-elimination","bestOf":7}\'] ' +
-  '[--game-config \'{"totalRounds":300}\'] [--store-dir <path>]';
+  '[--tournament-config \'{"format":"round-robin"|"single-elimination","bestOf":7}\' | ' +
+  '\'{"format":"swiss-league","rounds":3}\'] ' +
+  '[--game-config \'{"totalRounds":300}\'] [--store-dir <path>]\n' +
+  '  "swiss-league" (e.g. Hearts) plays N-participant tables per round, ranked by cumulative ' +
+  'score across rounds; "tableSize" defaults from the game\'s manifest when it has a fixed ' +
+  'participant count.';
 
 /**
  * Resolves the roster for `--all-bots <gameId>`: every bot the registry finds for that game,
@@ -93,6 +100,30 @@ function withAllBotsDefaults(formatConfigRaw: unknown): unknown {
     return formatConfigRaw;
   }
   return { ...formatConfigRaw, bestOf: 7 };
+}
+
+/**
+ * `swiss-league`'s `tableSize` has no schema default (`packages/tournament-formats/src/
+ * swiss-league.ts`) — a format never sees the game manifest itself
+ * (`TournamentFormatInitializeArgs` only carries `roster`/`config`/`rng`), so this fills the gap
+ * from the resolved game's own `minParticipants`, but only when that's unambiguous (a fixed
+ * participant count, as Hearts has). A variable-count game, or an already-explicit `tableSize`,
+ * is left alone — the latter case falls through to the format's own required-field error.
+ */
+function withSwissLeagueTableSizeDefault(formatConfigRaw: unknown, gameEntry: GameRegistryEntry): unknown {
+  if (
+    typeof formatConfigRaw !== 'object' ||
+    formatConfigRaw === null ||
+    Array.isArray(formatConfigRaw) ||
+    'tableSize' in formatConfigRaw
+  ) {
+    return formatConfigRaw;
+  }
+  const { minParticipants, maxParticipants } = gameEntry.manifest;
+  if (minParticipants !== maxParticipants) {
+    return formatConfigRaw;
+  }
+  return { ...formatConfigRaw, tableSize: minParticipants };
 }
 
 function defaultStoreDir(rootDir: string): string {
@@ -175,15 +206,65 @@ function printSingleEliminationStandingsEntries(
   });
 }
 
+function printSwissLeagueStandingsEntries(entries: readonly SwissLeaguePublicStandingsEntry[]): void {
+  entries.forEach((entry, index) => {
+    console.log(
+      `${String(index + 1)}. ${entry.participantId} — ${entry.averageScore.toFixed(2)} avg pts ` +
+        `(${String(entry.cumulativeScore)} total / ${String(entry.tablesPlayed)} tables), ` +
+        `${String(entry.tablesWon)}/${String(entry.tablesPlayed)} tables won`,
+    );
+  });
+}
+
+/**
+ * One entry per known `TournamentFormat`, keyed by its own `id` — replaces what used to be a
+ * two-way `isSingleElimination` ternary repeated at every dispatch site (format-id validation,
+ * config parsing, `runWithFormat`'s call/version lookup, and `printStandingsForFormat` below).
+ * `format`/`formatConfig` are deliberately erased to `unknown` here, the same way
+ * `apps/cli/src/lib/match-execution.ts`'s `AnyGameDefinition` erases a game's type params — each
+ * entry's `format`/`printStandings`/`defaultConfig` always agree with each other at runtime
+ * (they're read from the same object), just not statically verified across the object boundary.
+ */
+interface FormatEntry {
+  format: TournamentFormat<unknown, unknown, unknown>;
+  printStandings: (standings: unknown) => void;
+  /** Defaults to apply to the raw config, given the resolved game, before schema validation —
+   * e.g. swiss-league's manifest-derived `tableSize`. Omitted by formats with nothing to default. */
+  defaultConfig?: (raw: unknown, gameEntry: GameRegistryEntry) => unknown;
+}
+
+const FORMATS: Record<string, FormatEntry> = {
+  [roundRobinFormat.id]: {
+    format: roundRobinFormat,
+    printStandings: (standings) => {
+      printRoundRobinStandingsEntries(standings as RoundRobinStandings[string][]);
+    },
+  },
+  [singleEliminationFormat.id]: {
+    format: singleEliminationFormat,
+    printStandings: (standings) => {
+      printSingleEliminationStandingsEntries(standings as SingleEliminationStandings[string][]);
+    },
+  },
+  [swissLeagueFormat.id]: {
+    format: swissLeagueFormat,
+    printStandings: (standings) => {
+      printSwissLeagueStandingsEntries(standings as SwissLeaguePublicStandingsEntry[]);
+    },
+    defaultConfig: withSwissLeagueTableSizeDefault,
+  },
+};
+
 /** Dispatches on a persisted record's own `formatId` — used by `inspect`/`replay`, which only
  * ever see the format's already-projected public standings (`TournamentRecord.standings`),
  * never the internal `TStandings` a live run's `printStandings` closes over. */
 function printStandingsForFormat(formatId: string, standings: unknown): void {
-  if (formatId === singleEliminationFormat.id) {
-    printSingleEliminationStandingsEntries(standings as SingleEliminationStandings[string][]);
+  const entry = FORMATS[formatId];
+  if (entry === undefined) {
+    console.log(`  (standings for unrecognized format "${formatId}")`);
     return;
   }
-  printRoundRobinStandingsEntries(standings as RoundRobinStandings[string][]);
+  entry.printStandings(standings);
 }
 
 export interface TournamentRunOptions {
@@ -191,7 +272,7 @@ export interface TournamentRunOptions {
   rootDir: string;
 }
 
-interface RunFormatArgs<TFormatConfig extends { bestOf: number }, TFormatState, TStandings> {
+interface RunFormatArgs<TFormatConfig extends { bestOf?: number }, TFormatState, TStandings> {
   format: TournamentFormat<TFormatConfig, TFormatState, TStandings>;
   formatConfig: TFormatConfig;
   gameConfig: unknown;
@@ -218,7 +299,7 @@ interface RunFormatArgs<TFormatConfig extends { bestOf: number }, TFormatState, 
  * mutated and saved as matches complete, so a tournament interrupted partway through still
  * leaves every match played so far on disk (`tournament inspect`/`replay`).
  */
-async function runWithFormat<TFormatConfig extends { bestOf: number }, TFormatState, TStandings>(
+async function runWithFormat<TFormatConfig extends { bestOf?: number }, TFormatState, TStandings>(
   args: RunFormatArgs<TFormatConfig, TFormatState, TStandings>,
 ): Promise<number> {
   const {
@@ -290,7 +371,7 @@ async function runWithFormat<TFormatConfig extends { bestOf: number }, TFormatSt
           console.log(winner ? `  winner: ${winner.participantId}` : '  draw');
         }
 
-        if (formatConfig.bestOf > 1) {
+        if ((formatConfig.bestOf ?? 1) > 1) {
           const [p1, p2] = match.participantIds;
           if (p1 !== undefined && p2 !== undefined) {
             const key = seriesPairingKey(match.participantIds);
@@ -304,7 +385,7 @@ async function runWithFormat<TFormatConfig extends { bestOf: number }, TFormatSt
               tally.wins.set(winner.participantId, (tally.wins.get(winner.participantId) ?? 0) + 1);
             }
             seriesTallies.set(key, tally);
-            console.log(seriesStatusLine(tally, formatConfig.bestOf));
+            console.log(seriesStatusLine(tally, formatConfig.bestOf ?? 1));
           }
         }
 
@@ -399,10 +480,10 @@ export async function runTournamentCommand(
   }
 
   const formatId = extractFormatId(formatConfigRaw) ?? roundRobinFormat.id;
-  if (formatId !== roundRobinFormat.id && formatId !== singleEliminationFormat.id) {
+  const formatEntry = FORMATS[formatId];
+  if (formatEntry === undefined) {
     console.error(
-      `Unsupported format "${formatId}" in --tournament-config. Only "${roundRobinFormat.id}" ` +
-        `and "${singleEliminationFormat.id}" are implemented today.`,
+      `Unsupported format "${formatId}" in --tournament-config. Supported: ${Object.keys(FORMATS).join(', ')}.`,
     );
     return 1;
   }
@@ -424,10 +505,9 @@ export async function runTournamentCommand(
   }
   const gameConfig = gameConfigResult.value;
 
-  const isSingleElimination = formatId === singleEliminationFormat.id;
-  const formatConfigResult = isSingleElimination
-    ? singleEliminationFormat.parseConfig(formatConfigRaw)
-    : roundRobinFormat.parseConfig(formatConfigRaw);
+  const formatConfigResult = formatEntry.format.parseConfig(
+    formatEntry.defaultConfig?.(formatConfigRaw, gameEntry) ?? formatConfigRaw,
+  );
   if (!formatConfigResult.ok) {
     console.error(
       `Invalid --tournament-config for format "${formatId}": ${formatConfigResult.reason}`,
@@ -443,9 +523,6 @@ export async function runTournamentCommand(
   const tournamentSeed = generateTournamentSeed();
   const formatRng = createRng(deriveSeed(tournamentSeed, 'format'));
 
-  const formatVersion = isSingleElimination
-    ? singleEliminationFormat.version
-    : roundRobinFormat.version;
   const record: TournamentRecord = {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
@@ -454,7 +531,7 @@ export async function runTournamentCommand(
     gameVersion: gameEntry.manifest.version,
     gameConfig,
     formatId,
-    formatVersion,
+    formatVersion: formatEntry.format.version,
     formatConfig: formatConfigResult.value,
     roster: [...botIds],
     tournamentSeed: seedToHex(tournamentSeed),
@@ -464,7 +541,7 @@ export async function runTournamentCommand(
   // "running, 0 matches" record behind, not silence.
   await saveTournamentRecord(storeDir, record);
 
-  const sharedArgs = {
+  return runWithFormat({
     gameConfig,
     game,
     gameEntry,
@@ -474,25 +551,12 @@ export async function runTournamentCommand(
     formatRng,
     record,
     storeDir,
-  };
-
-  if (isSingleElimination) {
-    return runWithFormat({
-      ...sharedArgs,
-      format: singleEliminationFormat,
-      formatConfig: formatConfigResult.value,
-      printStandings: (standings) => {
-        printSingleEliminationStandingsEntries(standings as SingleEliminationStandings[string][]);
-      },
-    });
-  }
-  return runWithFormat({
-    ...sharedArgs,
-    format: roundRobinFormat,
-    formatConfig: formatConfigResult.value,
-    printStandings: (standings) => {
-      printRoundRobinStandingsEntries(standings as RoundRobinStandings[string][]);
-    },
+    // `formatEntry.format`/`.value` are erased to `unknown` at the FORMATS-registry boundary
+    // (see FormatEntry's own comment) — cast back to the minimal shape `runWithFormat` actually
+    // needs. Sound in practice: both come from the same registry entry, always consistent.
+    format: formatEntry.format as TournamentFormat<{ bestOf?: number }, unknown, unknown>,
+    formatConfig: formatConfigResult.value as { bestOf?: number },
+    printStandings: formatEntry.printStandings,
   });
 }
 

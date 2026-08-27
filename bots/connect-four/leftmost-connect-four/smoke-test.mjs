@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Verifies leftmost-connect-four against the real Docker runtime. Requires:
 // docker build -t thunderdome-leftmost-connect-four .
 import { DockerBotProcess, BotLifecycle, DEFAULT_RESOURCE_LIMITS } from '@thunderdome/runtime';

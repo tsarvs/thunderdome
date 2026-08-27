@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Verifies copycat-rps against the real Docker runtime. Requires:
 // docker build -t thunderdome-copycat-rps .
 import { DockerBotProcess, BotLifecycle, DEFAULT_RESOURCE_LIMITS } from '@thunderdome/runtime';

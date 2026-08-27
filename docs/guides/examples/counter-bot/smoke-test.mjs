@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Drives this bot's real Docker container through a scripted exchange using the platform's own
 // runtime primitives (docs/guides/rps-bot-author-guide.md, "Testing your bot locally"). There's
 // no CLI wrapper for this specific kind of single-bot, scripted-opponent smoke test —

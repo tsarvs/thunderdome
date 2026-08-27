@@ -1,0 +1,18 @@
+{
+  "id": "tominator-t1",
+  "name": "Tominator T1",
+  "version": "0.1.0",
+  "game": "card-game-hearts",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "General strategy for card-game-hearts: play the highest card in your hand that is still lower than the tricks highest card."
+}

@@ -75,6 +75,7 @@ interface HeartsObservation {
   tricksCompleted: number; // 0..13 within the current hand
   isFirstTrick: boolean;
   currentTrick: { leaderId: string; plays: { participantId: string; card: Card }[] } | null; // null while passing
+  handPoints: Record<string, number>; // penalty points taken so far THIS hand — resets every hand
   scores: Record<string, number>; // cumulative match scores so far — lower is better
   pointLimit: number;
   legalPlays?: Card[]; // present ONLY when phase === 'playing' and it's your turn
@@ -134,6 +135,7 @@ clockwise turn order):
       "tricksCompleted": 0,
       "isFirstTrick": true,
       "currentTrick": null,
+      "handPoints": { "your-bot-id": 0, "p2": 0, "p3": 0, "p4": 0 },
       "scores": { "your-bot-id": 0, "p2": 0, "p3": 0, "p4": 0 },
       "pointLimit": 100,
       "youMustAct": true
@@ -188,6 +190,7 @@ round (the other 3 don't hear anything until it's their turn):
         "leaderId": "p2",
         "plays": [{ "participantId": "p2", "card": { "suit": "clubs", "rank": 3 } }]
       },
+      "handPoints": { "your-bot-id": 1, "p2": 3, "p3": 0, "p4": 2 },
       "scores": { "your-bot-id": 4, "p2": 12, "p3": 6, "p4": 9 },
       "pointLimit": 100,
       "legalPlays": [{ "suit": "clubs", "rank": 9 }],

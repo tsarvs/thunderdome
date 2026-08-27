@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Verifies point-dodger-hearts against the real Docker runtime. Requires:
 // docker build -t thunderdome-point-dodger-hearts .
 import { DockerBotProcess, BotLifecycle, DEFAULT_RESOURCE_LIMITS } from '@thunderdome/runtime';

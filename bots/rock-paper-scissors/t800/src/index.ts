@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * t800 — ported from a standalone RPS-bot-tournament template ("T1"). Three fixed phases over a
  * 300-round match: early game (turns 0-98) explores via a no-replacement 33/33/33 deck while

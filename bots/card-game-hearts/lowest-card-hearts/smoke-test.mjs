@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Verifies lowest-card-hearts against the real Docker runtime. Requires:
 // docker build -t thunderdome-lowest-card-hearts .
 import { DockerBotProcess, BotLifecycle, DEFAULT_RESOURCE_LIMITS } from '@thunderdome/runtime';

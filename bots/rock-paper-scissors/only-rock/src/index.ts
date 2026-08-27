@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Only Rock — always plays "rock", no matter what.
  *
