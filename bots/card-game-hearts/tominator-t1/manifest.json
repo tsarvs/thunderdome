@@ -3,7 +3,10 @@
   "name": "Tominator T1",
   "version": "0.1.0",
   "game": "card-game-hearts",
-  "author": "Tom Sarver",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
   "runtime": {
     "language": "node"
   },

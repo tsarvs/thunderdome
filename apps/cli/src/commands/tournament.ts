@@ -26,7 +26,7 @@ import {
   swissLeagueFormat,
   type RoundRobinStandings,
   type SingleEliminationStandings,
-  type SwissLeagueStandings,
+  type SwissLeaguePublicStandingsEntry,
 } from '@thunderdome/tournament-formats';
 import {
   loadTournamentRecord,
@@ -206,10 +206,11 @@ function printSingleEliminationStandingsEntries(
   });
 }
 
-function printSwissLeagueStandingsEntries(entries: readonly SwissLeagueStandings[string][]): void {
+function printSwissLeagueStandingsEntries(entries: readonly SwissLeaguePublicStandingsEntry[]): void {
   entries.forEach((entry, index) => {
     console.log(
-      `${String(index + 1)}. ${entry.participantId} — ${String(entry.cumulativeScore)} cumulative pts, ` +
+      `${String(index + 1)}. ${entry.participantId} — ${entry.averageScore.toFixed(2)} avg pts ` +
+        `(${String(entry.cumulativeScore)} total / ${String(entry.tablesPlayed)} tables), ` +
         `${String(entry.tablesWon)}/${String(entry.tablesPlayed)} tables won`,
     );
   });
@@ -248,7 +249,7 @@ const FORMATS: Record<string, FormatEntry> = {
   [swissLeagueFormat.id]: {
     format: swissLeagueFormat,
     printStandings: (standings) => {
-      printSwissLeagueStandingsEntries(standings as SwissLeagueStandings[string][]);
+      printSwissLeagueStandingsEntries(standings as SwissLeaguePublicStandingsEntry[]);
     },
     defaultConfig: withSwissLeagueTableSizeDefault,
   },

@@ -46,6 +46,7 @@ BOT_DIRS=(
   "bots/card-game-hearts/lowest-card-hearts"
   "bots/card-game-hearts/point-dodger-hearts"
   "bots/card-game-hearts/tominator-t1"
+  "bots/card-game-hearts/tominator-t2"
 )
 
 for dir in "${BOT_DIRS[@]}"; do

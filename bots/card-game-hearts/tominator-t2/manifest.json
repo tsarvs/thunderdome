@@ -1,0 +1,18 @@
+{
+  "id": "tominator-t2",
+  "name": "Tominator T2",
+  "version": "0.1.0",
+  "game": "card-game-hearts",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Tracks played cards and opponents' out-of-suit suits to inform play; defaults to defensive point-avoidance but switches to an aggressive shoot-the-moon mode once a hand-strength signal crosses a threshold while leading."
+}

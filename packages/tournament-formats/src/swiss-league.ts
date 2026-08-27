@@ -45,6 +45,13 @@ export interface SwissLeagueStandingsEntry {
 }
 export type SwissLeagueStandings = Record<string, SwissLeagueStandingsEntry>;
 
+/** What `getPublicStandings` actually projects — `averageScore` only makes sense as a ranking
+ * key once sit-outs can make `tablesPlayed` vary across participants (see its own doc below), so
+ * it's computed here rather than stored on the internal `SwissLeagueStandingsEntry`. */
+export interface SwissLeaguePublicStandingsEntry extends SwissLeagueStandingsEntry {
+  averageScore: number;
+}
+
 export interface SwissLeagueFormatState {
   tableSize: number;
   totalRounds: number;
@@ -60,24 +67,57 @@ export interface SwissLeagueFormatState {
    * lets every round's tiebreak — including round 1, where everyone is tied at 0 — stay
    * deterministic from the tournament seed without needing further randomness later. */
   tiebreakRank: Record<string, number>;
+  /** How many rounds each participant has sat out so far — when the roster doesn't divide evenly
+   * into tables, `roster.length % tableSize` participants sit out each round, chosen by fewest
+   * sit-outs so far (ties broken by `tiebreakRank`). Always 0 for everyone when the roster does
+   * divide evenly. */
+  sitOutCount: Record<string, number>;
 }
 
 function initialStandingsEntry(participantId: string): SwissLeagueStandingsEntry {
   return { participantId, cumulativeScore: 0, tablesPlayed: 0, tablesWon: 0 };
 }
 
-/** Sorts the roster by (cumulative score ascending, tiebreak ascending) and chunks it into
- * consecutive `tableSize` groups — classic Swiss "score bracket" pairing. Used for every round,
- * including round 1 (where every score is 0, so the tiebreak alone decides the grouping). */
+/** The `count` participants who've sat out the fewest rounds so far (ties broken by
+ * `tiebreakRank`) — repeated every round, this converges to a perfectly even rotation: with N=5,
+ * tableSize=4 (1 sit-out/round), sit-outs cycle every participant exactly once every 5 rounds. */
+function chooseSitOuts(
+  participantIds: readonly string[],
+  sitOutCount: Record<string, number>,
+  tiebreakRank: Record<string, number>,
+  count: number,
+): string[] {
+  if (count <= 0) {
+    return [];
+  }
+  return [...participantIds]
+    .sort((a, b) => {
+      const sitOutDiff = (sitOutCount[a] ?? 0) - (sitOutCount[b] ?? 0);
+      return sitOutDiff !== 0 ? sitOutDiff : (tiebreakRank[a] ?? 0) - (tiebreakRank[b] ?? 0);
+    })
+    .slice(0, count);
+}
+
+/** Sits out however many participants don't divide evenly into `tableSize` (fewest sit-outs so
+ * far first), then sorts the rest by (cumulative score ascending, tiebreak ascending) and chunks
+ * them into consecutive `tableSize` groups — classic Swiss "score bracket" pairing. Used for
+ * every round, including round 1 (where every score is 0, so the tiebreak alone decides both the
+ * sit-out choice and the grouping). */
 function buildRoundTables(args: {
   round: number;
   participantIds: readonly string[];
   standings: SwissLeagueStandings;
   tiebreakRank: Record<string, number>;
+  sitOutCount: Record<string, number>;
   tableSize: number;
-}): MatchDescriptor[] {
-  const { round, participantIds, standings, tiebreakRank, tableSize } = args;
-  const sorted = [...participantIds].sort((a, b) => {
+}): { tables: MatchDescriptor[]; sitOuts: string[] } {
+  const { round, participantIds, standings, tiebreakRank, sitOutCount, tableSize } = args;
+
+  const sitOuts = chooseSitOuts(participantIds, sitOutCount, tiebreakRank, participantIds.length % tableSize);
+  const sitOutSet = new Set(sitOuts);
+  const active = participantIds.filter(id => !sitOutSet.has(id));
+
+  const sorted = active.sort((a, b) => {
     const scoreDiff =
       (standings[a]?.cumulativeScore ?? 0) - (standings[b]?.cumulativeScore ?? 0);
     return scoreDiff !== 0 ? scoreDiff : (tiebreakRank[a] ?? 0) - (tiebreakRank[b] ?? 0);
@@ -91,7 +131,19 @@ function buildRoundTables(args: {
       round,
     });
   }
-  return tables;
+  return { tables, sitOuts };
+}
+
+function nextSitOutCount(current: Record<string, number>, sitOuts: readonly string[]): Record<string, number> {
+  const next = { ...current };
+  for (const id of sitOuts) {
+    next[id] = (next[id] ?? 0) + 1;
+  }
+  return next;
+}
+
+function sitOutNotice(round: number, sitOuts: readonly string[]): string[] {
+  return sitOuts.length > 0 ? [`Round ${String(round)}: ${sitOuts.join(', ')} sits out`] : [];
 }
 
 function applyMatchStandings(
@@ -120,7 +172,7 @@ export const swissLeagueFormat: TournamentFormat<
   SwissLeagueStandings
 > = {
   id: 'swiss-league',
-  version: '1.0.0',
+  version: '1.1.0',
 
   parseConfig(raw: unknown): Result<SwissLeagueConfig> {
     const result = SwissLeagueConfigSchema.safeParse(raw);
@@ -134,11 +186,6 @@ export const swissLeagueFormat: TournamentFormat<
         `swiss-league requires at least ${String(config.tableSize)} participants (tableSize), got ${String(participantIds.length)}`,
       );
     }
-    if (participantIds.length % config.tableSize !== 0) {
-      throw new Error(
-        `swiss-league requires a roster size that's an exact multiple of tableSize (${String(config.tableSize)}), got ${String(participantIds.length)}`,
-      );
-    }
 
     const tiebreakRank: Record<string, number> = {};
     shuffle(participantIds, rng).forEach((id, index) => {
@@ -150,11 +197,13 @@ export const swissLeagueFormat: TournamentFormat<
       standings[id] = initialStandingsEntry(id);
     }
 
-    const readyMatches = buildRoundTables({
+    const sitOutCount: Record<string, number> = {};
+    const { tables: readyMatches, sitOuts } = buildRoundTables({
       round: 1,
       participantIds,
       standings,
       tiebreakRank,
+      sitOutCount,
       tableSize: config.tableSize,
     });
 
@@ -166,11 +215,13 @@ export const swissLeagueFormat: TournamentFormat<
         tablesRemainingInRound: readyMatches.length,
         participantIds,
         tiebreakRank,
+        sitOutCount: nextSitOutCount(sitOutCount, sitOuts),
       },
       standings,
       readyMatches,
       notices: [
         `swiss-league: ${String(config.rounds)} round(s), ${String(readyMatches.length)} table(s) of ${String(config.tableSize)} each round`,
+        ...sitOutNotice(1, sitOuts),
       ],
     };
   },
@@ -196,11 +247,13 @@ export const swissLeagueFormat: TournamentFormat<
       };
     }
 
-    const readyMatches = buildRoundTables({
-      round: roundsCompleted + 1,
+    const nextRound = roundsCompleted + 1;
+    const { tables: readyMatches, sitOuts } = buildRoundTables({
+      round: nextRound,
       participantIds: formatState.participantIds,
       standings: nextStandings,
       tiebreakRank: formatState.tiebreakRank,
+      sitOutCount: formatState.sitOutCount,
       tableSize: formatState.tableSize,
     });
 
@@ -209,9 +262,11 @@ export const swissLeagueFormat: TournamentFormat<
         ...formatState,
         roundsCompleted,
         tablesRemainingInRound: readyMatches.length,
+        sitOutCount: nextSitOutCount(formatState.sitOutCount, sitOuts),
       },
       standings: nextStandings,
       readyMatches,
+      notices: sitOutNotice(nextRound, sitOuts),
     };
   },
 
@@ -220,11 +275,18 @@ export const swissLeagueFormat: TournamentFormat<
   },
 
   getPublicStandings(standings) {
-    return Object.values(standings).sort(
-      (a, b) =>
-        a.cumulativeScore - b.cumulativeScore ||
-        b.tablesWon - a.tablesWon ||
-        a.participantId.localeCompare(b.participantId),
-    );
+    return Object.values(standings)
+      .map((entry): SwissLeaguePublicStandingsEntry => ({
+        ...entry,
+        // A participant who never got seated (only possible with a very short tournament) sorts
+        // last, not tied-for-best-at-0 — Infinity is never actually "the best average."
+        averageScore: entry.tablesPlayed > 0 ? entry.cumulativeScore / entry.tablesPlayed : Infinity,
+      }))
+      .sort(
+        (a, b) =>
+          a.averageScore - b.averageScore ||
+          b.tablesWon - a.tablesWon ||
+          a.participantId.localeCompare(b.participantId),
+      );
   },
 };

@@ -150,6 +150,8 @@ interface Observation {
   /** The most recently completed trick this hand — \`null\` before the first trick of the current
    * hand has completed. */
   lastTrick: CompletedTrick | null;
+  /** Running penalty tally for the CURRENT hand only; reset every hand. */
+  handPoints: Record<string, number>;
   scores: Record<string, number>;
   pointLimit: number;
   /** Present only when it's your turn to play a card. */

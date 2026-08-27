@@ -1,7 +1,11 @@
 import { runTournament, type MatchDescriptor, type MatchRecord, type RosterEntry } from '@thunderdome/engine';
 import { createRng } from '@thunderdome/rng';
 import { describe, expect, it } from 'vitest';
-import { SwissLeagueConfigSchema, swissLeagueFormat } from '../src/swiss-league.js';
+import {
+  SwissLeagueConfigSchema,
+  swissLeagueFormat,
+  type SwissLeaguePublicStandingsEntry,
+} from '../src/swiss-league.js';
 
 const rng = createRng(Buffer.alloc(16, 3));
 
@@ -59,14 +63,26 @@ describe('swissLeagueFormat.initialize', () => {
     ).toThrow('at least 4 participants');
   });
 
-  it("throws when the roster isn't an exact multiple of tableSize", () => {
-    expect(() =>
-      swissLeagueFormat.initialize({
-        roster: roster('a', 'b', 'c', 'd', 'e'),
-        config: { tableSize: 4, rounds: 1 },
-        rng,
-      }),
-    ).toThrow('exact multiple of tableSize');
+  it("sits out one participant when the roster isn't an exact multiple of tableSize", () => {
+    const { readyMatches, formatState, notices } = swissLeagueFormat.initialize({
+      roster: roster('a', 'b', 'c', 'd', 'e'),
+      config: { tableSize: 4, rounds: 1 },
+      rng,
+    });
+
+    const table = readyMatches[0];
+    if (table === undefined) {
+      throw new Error('expected a ready table');
+    }
+    expect(readyMatches).toHaveLength(1);
+    expect(table.participantIds).toHaveLength(4);
+    const seated = new Set(table.participantIds);
+    const satOut = ['a', 'b', 'c', 'd', 'e'].find(id => !seated.has(id));
+    if (satOut === undefined) {
+      throw new Error('expected exactly one participant to sit out');
+    }
+    expect(formatState.sitOutCount[satOut]).toBe(1);
+    expect(notices?.some(notice => notice.includes('sit'))).toBe(true);
   });
 
   it('builds one table per tableSize-sized group, covering every participant exactly once', () => {
@@ -214,10 +230,44 @@ describe('swissLeagueFormat.recordResult', () => {
     expect(swissLeagueFormat.isComplete(afterRound2)).toBe(true);
     expect(afterRound2.readyMatches).toEqual([]);
   });
+
+  it('rotates sit-outs evenly: every participant sits out exactly once over 5 rounds at N=5/tableSize=4', () => {
+    const state = swissLeagueFormat.initialize({
+      roster: roster('a', 'b', 'c', 'd', 'e'),
+      config: { tableSize: 4, rounds: 5 },
+      rng,
+    });
+    let formatState = state.formatState;
+    let standings = state.standings;
+    const queue = [...state.readyMatches];
+    let matchesPlayed = 0;
+
+    while (queue.length > 0 && matchesPlayed < 20) {
+      const match = queue.shift();
+      if (match === undefined) {
+        break;
+      }
+      const next = swissLeagueFormat.recordResult({
+        formatState,
+        standings,
+        match,
+        record: tableRecord(match, {}),
+      });
+      formatState = next.formatState;
+      standings = next.standings;
+      queue.push(...next.readyMatches);
+      matchesPlayed += 1;
+    }
+
+    expect(swissLeagueFormat.isComplete({ formatState, standings })).toBe(true);
+    for (const id of ['a', 'b', 'c', 'd', 'e']) {
+      expect(formatState.sitOutCount[id]).toBe(1);
+    }
+  });
 });
 
 describe('swissLeagueFormat.getPublicStandings', () => {
-  it('sorts by cumulative score asc, then tablesWon desc, then participantId asc', () => {
+  it('sorts by average score asc, then tablesWon desc, then participantId asc (equal tablesPlayed)', () => {
     const standings = {
       b: { participantId: 'b', cumulativeScore: 10, tablesPlayed: 2, tablesWon: 1 },
       a: { participantId: 'a', cumulativeScore: 5, tablesPlayed: 2, tablesWon: 2 },
@@ -226,11 +276,35 @@ describe('swissLeagueFormat.getPublicStandings', () => {
     };
 
     expect(swissLeagueFormat.getPublicStandings(standings)).toEqual([
-      standings.a,
-      standings.b,
-      standings.d,
-      standings.c,
+      { ...standings.a, averageScore: 2.5 },
+      { ...standings.b, averageScore: 5 },
+      { ...standings.d, averageScore: 5 },
+      { ...standings.c, averageScore: 10 },
     ]);
+  });
+
+  it('ranks by average score, not raw cumulative score, once tablesPlayed differs (sit-outs)', () => {
+    // b has a lower RAW cumulative score than a, but only because it's played half as many
+    // tables (e.g. sat out) — its average is actually worse, and average is what should rank.
+    const standings = {
+      a: { participantId: 'a', cumulativeScore: 20, tablesPlayed: 4, tablesWon: 1 },
+      b: { participantId: 'b', cumulativeScore: 15, tablesPlayed: 2, tablesWon: 0 },
+    };
+
+    const result = swissLeagueFormat.getPublicStandings(standings) as SwissLeaguePublicStandingsEntry[];
+    expect(result.map(entry => entry.participantId)).toEqual(['a', 'b']);
+    expect(result.map(entry => entry.averageScore)).toEqual([5, 7.5]);
+  });
+
+  it('sorts a participant who never got seated (tablesPlayed 0) last, not tied-for-best', () => {
+    const standings = {
+      a: { participantId: 'a', cumulativeScore: 50, tablesPlayed: 5, tablesWon: 0 },
+      b: { participantId: 'b', cumulativeScore: 0, tablesPlayed: 0, tablesWon: 0 },
+    };
+
+    const result = swissLeagueFormat.getPublicStandings(standings) as SwissLeaguePublicStandingsEntry[];
+    expect(result.map(entry => entry.participantId)).toEqual(['a', 'b']);
+    expect(result[1]?.averageScore).toBe(Infinity);
   });
 });
 
@@ -279,6 +353,38 @@ describe('swissLeagueFormat + runTournament (end to end)', () => {
     ]);
     for (const entry of publicStandings) {
       expect(entry.cumulativeScore).toBe((pointsTaken[entry.participantId] ?? 0) * 3);
+    }
+  });
+
+  it('handles a roster that does not divide evenly (N=6, tableSize=4, 2 sit-outs/round)', async () => {
+    const participantIds = ['a', 'b', 'c', 'd', 'e', 'f'];
+    let matchesRun = 0;
+
+    const outcome = await runTournament({
+      format: swissLeagueFormat,
+      config: { tableSize: 4, rounds: 6 },
+      roster: roster(...participantIds),
+      rng,
+      runMatch: match => {
+        matchesRun += 1;
+        return Promise.resolve(tableRecord(match, {}));
+      },
+    });
+
+    // Every round seats exactly 4 of the 6 (2 sit out), so 6 rounds x 4 = 24 total seatings.
+    expect(matchesRun).toBe(6);
+
+    const publicStandings = swissLeagueFormat.getPublicStandings(
+      outcome.standings,
+    ) as SwissLeaguePublicStandingsEntry[];
+    const tablesPlayedByParticipant = new Map(
+      publicStandings.map(entry => [entry.participantId, entry.tablesPlayed]),
+    );
+    expect([...tablesPlayedByParticipant.values()].reduce((sum, n) => sum + n, 0)).toBe(24);
+    // Fair rotation: over 6 rounds x 2 sit-outs/round = 12 total sit-outs across 6 participants,
+    // each should sit out exactly 2 times (24 total seatings / 6 = 4 tables each, out of 6 rounds).
+    for (const played of tablesPlayedByParticipant.values()) {
+      expect(played).toBe(4);
     }
   });
 });
