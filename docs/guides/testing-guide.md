@@ -143,6 +143,19 @@ observations, asserting the bot's replies match what you expect. Its own README 
 exact steps (build → sanity-check by hand → run the smoke test) and is the right template to copy
 when your own bot needs one — you're not expected to write this kind of test from scratch.
 
+To actually run one, from the repo root, with Docker running (§3): build the bot's image (the tag
+its own `smoke-test.mjs` expects is named in a comment at the top of that file), then run the
+script with plain `node` — it isn't wired into `yarn test`, since it needs Docker rather than
+just Vitest:
+
+```bash
+docker build -t thunderdome-only-rock bots/rock-paper-scissors/only-rock
+node bots/rock-paper-scissors/only-rock/smoke-test.mjs
+```
+
+Every bot under `bots/` follows this same two-command pattern — swap in that bot's own directory
+(and the image tag its `smoke-test.mjs` names) to run any other one, including your own.
+
 You generally only need to write a new integration test when you're building something that
 *talks to Docker directly* — a new bot, or a change to `@thunderdome/runtime` itself. A new game or
 tournament format's correctness is proven by its unit tests (§4) plus actually running it for real

@@ -1,6 +1,6 @@
 {
-  "id": "tx",
-  "name": "tx",
+  "id": "tominator-tx",
+  "name": "T-X",
   "version": "1.0.0",
   "game": "rock-paper-scissors",
   "author": {

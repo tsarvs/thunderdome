@@ -36,7 +36,7 @@ information and more than 2 players — 4 seats, your own hand private, a simult
 phase before each hand's sequential trick play. It **does** have its own section in
 [`bot-author-guide.md`](bot-author-guide.md) (§10), and `bots/card-game-hearts/` has five working
 bots (`random-hearts`, `lowest-card-hearts`, `point-dodger-hearts`, `tominator-t1`,
-`tominator-t2` — see `bots/README.md` for which are reference bots versus real competitors).
+`tominator-t101` — see `bots/README.md` for which are reference bots versus real competitors).
 [`game-authoring-guide.md`](game-authoring-guide.md) still only walks through Rock-Paper-Scissors
 and Connect Four from the _implementer's_ side — Hearts' own state machine, hidden-information
 handling, and rules are documented in `games/card-game-hearts/src/types.ts` and

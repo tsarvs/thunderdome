@@ -1,3 +1,8 @@
+/**
+ * The T-X — Uses randomness as a means to keep the score even, all while learning about any
+ * potential opponent patterns. Make educated guesses about 10% of the time, and if we get a lead,
+ * then we go back to random as a way to continue to keep our score ahead.
+ */
 import { runBot } from '@thunderdome/bot-sdk';
 
 type RpsChoice = 'rock' | 'paper' | 'scissors';

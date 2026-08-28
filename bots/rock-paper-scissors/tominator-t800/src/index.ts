@@ -1,10 +1,9 @@
 /**
- * t800 — ported from a standalone RPS-bot-tournament template ("T1"). Three fixed phases over a
- * 300-round match: early game (turns 0-98) explores via a no-replacement 33/33/33 deck while
- * watching for an obvious opponent self-pattern worth exploiting immediately; mid game exploits
- * whatever pattern the early-game window taught it; late game either keeps coasting on a
- * still-winning read or re-evaluates (win-stay/lose-shift, then the general pattern signal) once
- * its edge erodes.
+ * The T-800 — Three fixed phases over a 300-round match: early game (turns 0-98) explores via a
+ * no-replacement 33/33/33 deck while watching for an obvious opponent self-pattern worth exploiting
+ * immediately; mid game exploits whatever pattern the early-game window taught it; late game either
+ * keeps coasting on a still-winning read or re-evaluates (win-stay/lose-shift, then the general
+ * pattern signal) once its edge erodes.
  *
  * All NDJSON wire-protocol handling lives in @thunderdome/bot-sdk's runBot() — see
  * docs/guides/bot-author-guide.md.

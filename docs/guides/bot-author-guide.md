@@ -535,7 +535,7 @@ hands are played — a real, honest outcome of actual gameplay, not a cop-out.
 `bots/rock-paper-scissors/only-rock/src/index.ts` (and its siblings `only-paper`,
 `only-scissors`) are the simplest real, `runBot()`-based bots to read; see
 [`bots/README.md`](../../bots/README.md) for the full roster, from trivial reference bots through
-`t800`/`t1000`/`tx`'s real adaptive strategies.
+`tominator-t800`/`tominator-t1000`/`tominator-tx`'s real adaptive strategies.
 
 ### Testing it for real
 

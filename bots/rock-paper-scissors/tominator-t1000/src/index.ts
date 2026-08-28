@@ -1,10 +1,9 @@
 /**
- * t1000 — ported from a standalone RPS-bot-tournament template ("T2"). Builds on the same
- * primitives as t800 ("T1") but adds a real state machine over the match (RED_HERRING, RESEARCH,
- * EXPLOIT, REEVALUATE, DEFENSE): a short repeated bait move at the top of every 100-turn block to
- * see whether a naive opponent detector locks on; exploiting whenever a signal or recent win rate
- * says it's working; falling back to RESEARCH (or, late and confidently ahead, DEFENSE) once a
- * losing streak says it isn't.
+ * The T-1000 — Builds on the same primitives as the T-800 but adds a real state machine over the
+ * match (RED_HERRING, RESEARCH, EXPLOIT, REEVALUATE, DEFENSE): a short repeated bait move at the
+ * top of every 100-turn block to see whether a naive opponent detector locks on; exploiting
+ * whenever a signal or recent win rate says it's working; falling back to RESEARCH (or, late and
+ * confidently ahead, DEFENSE) once a losing streak says it isn't.
  *
  * All NDJSON wire-protocol handling lives in @thunderdome/bot-sdk's runBot() — see
  * docs/guides/bot-author-guide.md.

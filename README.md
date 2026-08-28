@@ -170,8 +170,8 @@ yarn thunderdome --help
 yarn thunderdome match run only-rock only-paper --config '{"totalRounds":3}'   # one real match
 yarn thunderdome tournament run only-rock only-paper only-scissors --game-config '{"totalRounds":3}'   # a real round-robin tournament, see apps/cli/README.md
 yarn thunderdome match run leftmost-connect-four random-connect-four   # the second game, Connect Four
-yarn thunderdome match run random-hearts lowest-card-hearts point-dodger-hearts tominator-t2   # the third game, Hearts (exactly 4 seats)
-yarn thunderdome play tx --game-config '{"totalRounds":10}'   # step into the ring yourself, see apps/cli/README.md
+yarn thunderdome match run random-hearts lowest-card-hearts point-dodger-hearts tominator-t101   # the third game, Hearts (exactly 4 seats)
+yarn thunderdome play tominator-tx --game-config '{"totalRounds":10}'   # step into the ring yourself, see apps/cli/README.md
 yarn thunderdome cleanup   # force-remove any leftover bot containers, if you ever need to
 ```
 

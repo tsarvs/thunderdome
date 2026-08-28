@@ -167,7 +167,7 @@ describe.runIf(dockerAvailable)('runTournamentCommand (real Docker, real registr
     expect(
       loggedLines.some((line) =>
         line.includes(
-          'copycat-rps, only-paper, only-rock, only-scissors, random-rps, t1000, t800, tx',
+          'copycat-rps, only-paper, only-rock, only-scissors, random-rps, tominator-t1000, tominator-t800, tominator-tx',
         ),
       ),
     ).toBe(true);

@@ -1,10 +1,11 @@
-// Verifies t1000 against the real Docker runtime: completes the handshake, always answers with a
-// valid choice, is a deterministic function of rngSeed (docs/adr/0004-deterministic-randomness.md
-// — not uncontrolled Math.random()), and shuts down cleanly. Requires:
-// docker build -t thunderdome-t1000 .
+// Verifies tominator-t1000 against the real Docker runtime: completes the handshake, always
+// answers with a valid choice, is a deterministic function of rngSeed
+// (docs/adr/0004-deterministic-randomness.md — not uncontrolled Math.random()), and shuts down
+// cleanly. Requires:
+// docker build -t thunderdome-tominator-t1000 .
 import { DockerBotProcess, BotLifecycle, DEFAULT_RESOURCE_LIMITS } from '@thunderdome/runtime';
 
-const IMAGE_TAG = 'thunderdome-t1000';
+const IMAGE_TAG = 'thunderdome-tominator-t1000';
 
 function assertEqual(actual, expected, label) {
   const a = JSON.stringify(actual);
@@ -19,7 +20,7 @@ async function playOneRound(matchId, rngSeed) {
   const botProcess = new DockerBotProcess({
     imageRef: IMAGE_TAG,
     matchId,
-    participantId: 't1000',
+    participantId: 'tominator-t1000',
     resourceLimits: DEFAULT_RESOURCE_LIMITS,
   });
   await botProcess.start();
@@ -29,8 +30,8 @@ async function playOneRound(matchId, rngSeed) {
     {
       gameId: 'rock-paper-scissors',
       gameVersion: '1.0.0',
-      participantId: 't1000',
-      roster: ['t1000', 'opponent'],
+      participantId: 'tominator-t1000',
+      roster: ['tominator-t1000', 'opponent'],
       rngSeed,
       config: { totalRounds: 3, onMissingAction: 'forfeitMatch' },
     },

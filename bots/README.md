@@ -42,13 +42,13 @@ strategies actually trying to win — read them for strategy ideas, not API plum
 
 Real strategies, entered to actually win — not written to demonstrate anything about the protocol.
 
-| Bot                                                                             | Game                | Language   | Strategy                                                                                                      |
-| -------------------------------------------------------------------------------- | ---------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------ |
-| [`rock-paper-scissors/t800`](rock-paper-scissors/t800/)                        | Rock Paper Scissors | TypeScript | Three fixed phases: early-game deck exploration, mid-game exploitation of what it learned, late-game coast-or-reevaluate. |
-| [`rock-paper-scissors/t1000`](rock-paper-scissors/t1000/)                      | Rock Paper Scissors | TypeScript | A red-herring/research/exploit/reevaluate/defense state machine that adapts through the match instead of t800's fixed phases. |
-| [`rock-paper-scissors/tx`](rock-paper-scissors/tx/)                            | Rock Paper Scissors | TypeScript | Defaults to a self-correcting balancing deck; exploits an opponent pattern only past a strict z-score bar, retreating on any real recent lead. |
-| [`card-game-hearts/tominator-t1`](card-game-hearts/tominator-t1/)              | Hearts              | TypeScript | Plays the highest card in hand that still loses to the trick's current highest card.                          |
-| [`card-game-hearts/tominator-t2`](card-game-hearts/tominator-t2/)              | Hearts              | TypeScript | Tracks played cards and which suits opponents have shown out of to inform play; defaults to defensive point-avoidance but switches to an aggressive shoot-the-moon attempt once a hand-strength signal crosses a threshold while leading. |
+| Bot                                                                           | Game                | Language   | Strategy                                                                                                      |
+|-------------------------------------------------------------------------------| ---------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------ |
+| [`rock-paper-scissors/tominator-t800`](rock-paper-scissors/tominator-t800/)   | Rock Paper Scissors | TypeScript | Three fixed phases: early-game deck exploration, mid-game exploitation of what it learned, late-game coast-or-reevaluate. |
+| [`rock-paper-scissors/tominator-t1000`](rock-paper-scissors/tominator-t1000/) | Rock Paper Scissors | TypeScript | A red-herring/research/exploit/reevaluate/defense state machine that adapts through the match instead of tominator-t800's fixed phases. |
+| [`rock-paper-scissors/tominator-tx`](rock-paper-scissors/tominator-tx/)       | Rock Paper Scissors | TypeScript | Defaults to a self-correcting balancing deck; exploits an opponent pattern only past a strict z-score bar, retreating on any real recent lead. |
+| [`card-game-hearts/tominator-t1`](card-game-hearts/tominator-t1/)             | Hearts              | TypeScript | Plays the highest card in hand that still loses to the trick's current highest card.                          |
+| [`card-game-hearts/tominator-t101`](card-game-hearts/tominator-t101/)          | Hearts              | TypeScript | Tracks played cards and which suits opponents have shown out of to inform play; defaults to defensive point-avoidance but switches to an aggressive shoot-the-moon attempt once a hand-strength signal crosses a threshold while leading. |
 
 Both tables are one roster as far as the platform is concerned — nothing about `match run`,
 `tournament run`, or the registry distinguishes a "reference" bot from a "competitor" one; the
@@ -61,14 +61,15 @@ the pattern they follow (build the image, then `node <bot>/smoke-test.mjs` from 
 
 All fifteen depend on `@thunderdome/bot-sdk`'s `runBot()` for the NDJSON wire-protocol handling
 (replying to `init`, reading `observation`, exiting on `match-end`) — each bot's own file is just a
-`decideAction()` (and, for `random-rps`/`t800`/`t1000`/`tx`/`random-connect-four`/`random-hearts`,
+`decideAction()` (and, for `random-rps`/`tominator-t800`/`tominator-t1000`/`tominator-tx`/
+`random-connect-four`/`random-hearts`,
 an `onInit` hook to seed its PRNG from the match's `rngSeed`). Since `bots/**` isn't a Yarn
 workspace member, that dependency is a vendored tarball rather than a live workspace link: each bot
 has its own `package.json`, `package-lock.json`, and `vendor/thunderdome-bot-sdk.tgz`, produced by
-[`scripts/pack-bot-sdk.sh`](../scripts/README.md#pack-bot-sdksh). The `only-*` bots, `t800`,
-`t1000`, `tx`, and both `tominator-*` bots additionally show the shape of a TypeScript bot: their
-own `tsconfig.json` and a multi-stage `Dockerfile` that compiles TS in a build stage and ships only
-the resulting JS plus production `node_modules` — no build tooling ends up in the runtime image.
+[`scripts/pack-bot-sdk.sh`](../scripts/README.md#pack-bot-sdksh). The `only-*` bots and every
+`tominator-*` bot additionally show the shape of a TypeScript bot: their own `tsconfig.json` and a
+multi-stage `Dockerfile` that compiles TS in a build stage and ships only the resulting JS plus
+production `node_modules` — no build tooling ends up in the runtime image.
 Every other bot listed above is plain JS with no build step at all — just an `index.mjs` (or
 `index.js`) shipped directly into the image.
 
