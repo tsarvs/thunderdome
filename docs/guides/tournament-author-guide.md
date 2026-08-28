@@ -9,12 +9,15 @@ resolves bots and a shared game through the registry (`@thunderdome/registry`), 
 image once, and drives every match through the real engine and runtime (`@thunderdome/engine`'s
 `runTournament()` + `@thunderdome/runtime`'s `DockerActionCollector`) — see §2 for exact usage.
 Every run is persisted as it goes (`@thunderdome/tournament-store`, `docs/adr/0009-tournament-persistence.md`):
-`tournament list`/`inspect`/`replay` read a run back after the fact — §6 covers all three. What's
-**not** built yet: any format beyond round robin and single elimination (Swiss,
-pool-then-elimination, ...). This guide documents what's real, using Rock-Paper-Scissors (still
-the running example throughout) — Connect Four is the platform's other real game
-(`docs/guides/README.md`) and fits every piece below identically, just without its own worked
-example here yet.
+`tournament list`/`inspect`/`replay` read a run back after the fact — §6 covers all three. A third
+format, **Swiss league** (N-participant tables per round, ranked by cumulative score — built for
+Hearts, where a single 4-player hand is too noisy to judge a bot fairly on its own), is real too;
+see §3 for how it fits the same `TournamentFormat` contract as the other two. What's **not** built
+yet: anything beyond these three (pool-then-elimination, ...) — see
+[`tournament-format-authoring-guide.md`](tournament-format-authoring-guide.md) if you want to build
+one. This guide documents what's real, using Rock-Paper-Scissors (still the running example
+throughout) — Connect Four is the platform's other real game (`docs/guides/README.md`) and fits
+every piece below identically, just without its own worked example here yet.
 
 ## 1. The five pieces of a tournament
 
@@ -24,7 +27,7 @@ A tournament is the combination of:
 | ------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | **Game**            | Which game, which version, and that game's own config                     | Real — `rock-paper-scissors`, `{ totalRounds, onMissingAction }`                                                           |
 | **Roster**          | Which bots (from the bot registry) are competing                          | Real — `@thunderdome/registry`'s `scanBots`/`scanGames`                                                                    |
-| **Format**          | How matchups are generated and standings computed                         | Real for round robin and single elimination — `@thunderdome/tournament-formats`; Swiss and pool-then-elimination not built |
+| **Format**          | How matchups are generated and standings computed                         | Real for round robin, single elimination, and Swiss league — `@thunderdome/tournament-formats`; pool-then-elimination not built |
 | **Seed**            | The one entropy boundary this tournament's reproducibility traces back to | Real — `@thunderdome/rng`                                                                                                  |
 | **Resource limits** | Per-game CPU/memory/timeout ceilings                                      | Partially real — `GameDefinition.resourceLimits` exists; runtime enforcement is per-match, not tournament-level yet        |
 
@@ -74,7 +77,7 @@ Final standings:
 ```
 
 - Bot ids (positional args, 2 or more) are resolved through the bot registry — same as
-  [`match run`](rps-bot-author-guide.md#7-testing-your-bot-locally); every bot must share one
+  [`match run`](bot-author-guide.md#7-testing-your-bot-locally); every bot must share one
   game.
 - `--all-bots <gameId>` resolves the roster automatically to every bot the registry finds for that
   game (sorted, for a deterministic ordering) instead of typing every bot id — mutually exclusive
@@ -267,9 +270,9 @@ Done:
    `runMatch()` can actually drive Docker containers instead of a test's scripted collector.
 3. **A CLI command for a single match** — `yarn thunderdome match run <botId> <botId>`
    (`apps/cli/src/commands/match.ts`) — see [the bot guide's
-   §7](rps-bot-author-guide.md#7-testing-your-bot-locally).
-4. **Two `TournamentFormat` implementations** — round robin and single elimination, both in
-   `packages/tournament-formats`, both concretely implementing the interface in §3.
+   §7](bot-author-guide.md#7-testing-your-bot-locally).
+4. **Three `TournamentFormat` implementations** — round robin, single elimination, and Swiss
+   league, all in `packages/tournament-formats`, all concretely implementing the interface in §3.
 5. **Tournament orchestrator** — `@thunderdome/engine`'s `runTournament()`
    (`src/tournament-runner.ts`), the generic pull-loop that calls a match executor for each
    `readyMatches` entry and feeds results back into the format. Game/runtime-agnostic by
@@ -284,8 +287,11 @@ Done:
 
 Still missing:
 
-- **Any format beyond round robin and single elimination** — Swiss, pool-then-elimination. §3's
-  `TournamentFormat` interface fits both without engine changes (ADR-0006), but neither is built.
+- **Any format beyond round robin, single elimination, and Swiss league** —
+  pool-then-elimination is the one still commonly requested. §3's `TournamentFormat` interface
+  fits it without engine changes (ADR-0006), but it isn't built. See
+  [`tournament-format-authoring-guide.md`](tournament-format-authoring-guide.md) for the
+  step-by-step path to building it (or any other new format).
 
 This guide will be updated again once that lands.
 
@@ -350,9 +356,11 @@ produced it are gone or have changed.
 
 ## See also
 
+- [`tournament-format-authoring-guide.md`](tournament-format-authoring-guide.md) — building a new
+  `TournamentFormat` from scratch, rather than configuring one of the three that already exist
 - `docs/architecture.md` §6 (Tournament abstraction) and §1 (mental model)
 - `docs/adr/0009-tournament-persistence.md` — the persistence design and why `create` was folded
   into `run`
 - `docs/adr/0006-tournament-format-abstraction.md` — the full design and its reasoning
 - `docs/adr/0004-deterministic-randomness.md` — the seed/reproducibility model this guide's §2 depends on
-- `docs/guides/rps-bot-author-guide.md` — what a roster entry (a bot) actually is today
+- `docs/guides/bot-author-guide.md` — what a roster entry (a bot) actually is today

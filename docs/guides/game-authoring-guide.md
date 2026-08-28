@@ -2,7 +2,7 @@
 
 This guide is for implementing a new game — a new `GameDefinition` — for the platform. It's a
 different job from the other two guides: a **bot author**
-([`rps-bot-author-guide.md`](rps-bot-author-guide.md)) plays an existing game; a **tournament
+([`bot-author-guide.md`](bot-author-guide.md)) plays an existing game; a **tournament
 author** ([`tournament-author-guide.md`](tournament-author-guide.md)) configures matchups between
 bots; a **game author** defines the rules those bots and tournaments run on top of.
 
@@ -12,6 +12,40 @@ bots; a **game author** defines the rules those bots and tournaments run on top 
 exactly the interface this guide describes; neither needed an engine change to exist. A
 hidden-information game (each participant sees something different) is the one shape neither
 exercises yet — ADR-0005 covers how that would work, referenced below.
+
+**New to Node/Docker/dev environments, or to this codebase generally?**
+[`getting-started.md`](getting-started.md) explains the tooling this guide assumes you already
+have working; [`testing-guide.md`](testing-guide.md) explains what a unit test is, if §11's
+testing content below is your first time writing one.
+
+## Quickstart checklist
+
+The rest of this guide is a deep, section-by-section reference — worth reading in full once, but
+not something to hold in your head all at once while building. This checklist is the same journey
+condensed to its actual steps, each one linking to the section that explains it:
+
+1. Run `yarn scaffold:game <your-game-id>` — a real, working (if trivial) `GameDefinition` skeleton
+   lands in `games/<your-game-id>/`, already wired into the registry and build (§10). You're
+   editing an existing, passing implementation from here, not starting from a blank file.
+2. Decide your game's shape: does everyone act every round (simultaneous, like Rock-Paper-Scissors)
+   or does exactly one participant act at a time (sequential, like Connect Four)? This is
+   `getPendingActions`, and it's the first real design decision to make (§2).
+3. Flesh out `TConfig`/`TState`/`TObservation`/`TAction`/`TResult` and the four methods that build
+   and mutate them: `initialize` (§3), `getObservation` (§4), `validateAction`/`resolve` (§5).
+4. Decide whether your game needs `onMissingAction` at all — most games are fine relying on the
+   engine's default forfeit-the-match behavior (§6).
+5. Implement `isTerminal`/`getResult`/`getStandingOutcomes`, and be able to say concretely why
+   `isTerminal` is guaranteed to eventually become `true` (§7).
+6. Set `resourceLimits` (§8) and `parseConfig` with sensible defaults (§9).
+7. Write unit tests covering every distinct case your game can reach (§11,
+   [`testing-guide.md`](testing-guide.md) if you're new to this).
+8. Write at least one real reference bot for it (`bots/<your-game-id>/<bot-id>/`,
+   `yarn scaffold:bot <your-game-id> <bot-id>`), then run it for real — `yarn thunderdome match run`
+   and `tournament run` — to prove the abstraction actually holds end to end (§12).
+9. Once it plays correctly, consider implementing `humanInterface` so a person can actually sit
+   down and play it (`yarn thunderdome play`) — see
+   [`human-friendly-games-guide.md`](human-friendly-games-guide.md) for that, plus other ways to
+   keep developing a game once its rules are solid.
 
 ## 1. The `GameDefinition` interface
 
@@ -337,7 +371,7 @@ your game can reach — Connect Four's suite has one test per win direction plus
 
 A game with no bot that can actually play it isn't finished. Write at least one reference bot
 under `bots/<game-id>/<bot-id>/` (see
-[`rps-bot-author-guide.md`](rps-bot-author-guide.md) for that side of the contract — the wire
+[`bot-author-guide.md`](bot-author-guide.md) for that side of the contract — the wire
 protocol and `@thunderdome/bot-sdk`'s `runBot()` helper are entirely game-agnostic, so this is the
 same for any game), then run the real thing:
 

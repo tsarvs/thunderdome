@@ -1,7 +1,7 @@
 # Counter Bot (example)
 
 A complete, working Rock-Paper-Scissors bot for
-[the bot author guide](../../rps-bot-author-guide.md). Plays whatever beats the opponent's most
+[the bot author guide](../../bot-author-guide.md). Plays whatever beats the opponent's most
 recently revealed choice, or `rock` on the first round when there's no history yet.
 
 ## Files
@@ -11,7 +11,7 @@ recently revealed choice, or `rock` on the first round when there's no history y
 | `harness.mjs`    | Generic NDJSON protocol plumbing — no Rock-Paper-Scissors knowledge at all. Reusable as-is for a bot for a different game. |
 | `strategy.mjs`   | The one Rock-Paper-Scissors-specific function: `decideAction(observation) -> action`.                                      |
 | `index.mjs`      | Three-line entrypoint wiring `harness.mjs` and `strategy.mjs` together.                                                    |
-| `manifest.json`  | The bot manifest (`docs/guides/rps-bot-author-guide.md` §5).                                                               |
+| `manifest.json`  | The bot manifest (`docs/guides/bot-author-guide.md` §5).                                                                   |
 | `Dockerfile`     | Packages the three `.mjs` files into a self-contained image.                                                               |
 | `smoke-test.mjs` | Drives a real container through a scripted exchange using `@thunderdome/runtime`, and asserts the bot replies correctly.   |
 
@@ -73,7 +73,7 @@ This example only proves your bot speaks the protocol correctly in isolation, ag
 opponent view — not a real second bot. This directory is a doc illustration, not itself a
 registry entry (it lives under `docs/guides/examples/`, not `bots/`) — see the real bots in
 [`/bots/rock-paper-scissors/`](../../../../bots/rock-paper-scissors/) for that. Once your own bot
-is submitted there (`docs/guides/rps-bot-author-guide.md` §8), `yarn thunderdome match run
+is submitted there (`docs/guides/bot-author-guide.md` §8), `yarn thunderdome match run
 <your-bot-id> <opponent-id>` resolves both through the real bot registry and drives an actual
 match via `@thunderdome/engine` and `@thunderdome/runtime` — or
 `yarn thunderdome tournament run <your-bot-id> <opponent-id> [...]` for a real round-robin

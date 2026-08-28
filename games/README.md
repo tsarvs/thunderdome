@@ -3,9 +3,14 @@
 The sacred, unbreakable law of engagement for each arena — `games/<game-id>/`. Everything here is
 inner-sanctum code: a Yarn workspace package, reviewed by the council, run in-process by
 `@thunderdome/engine` (never sandboxed like a bot, since a game defines the rules bots play by).
-To write a new one, start with
-[`docs/guides/game-authoring-guide.md`](../docs/guides/game-authoring-guide.md) or generate a
-skeleton with `yarn scaffold:game`.
+To write a new one, generate a skeleton with `yarn scaffold:game <game-id>` and follow
+[`docs/guides/game-authoring-guide.md`](../docs/guides/game-authoring-guide.md); once it's playing
+correctly, [`docs/guides/human-friendly-games-guide.md`](../docs/guides/human-friendly-games-guide.md)
+covers making it pleasant for a human to actually play (`yarn thunderdome play`) and other ways to
+keep developing it further. New to Node/Docker/dev environments, or to unit/integration testing?
+[`docs/guides/getting-started.md`](../docs/guides/getting-started.md) and
+[`docs/guides/testing-guide.md`](../docs/guides/testing-guide.md) explain those from first
+principles before either guide above assumes you already know them.
 
 ## Arenas
 
