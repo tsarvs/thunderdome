@@ -5,7 +5,7 @@
 // you take? It has zero knowledge of Rock-Paper-Scissors or any other game — copy this file
 // as-is into a bot for a different game and only `strategy.mjs` needs to change.
 //
-// See docs/guides/rps-bot-author-guide.md for the protocol this implements.
+// See docs/guides/bot-author-guide.md for the protocol this implements.
 import { createInterface } from 'node:readline';
 
 /**

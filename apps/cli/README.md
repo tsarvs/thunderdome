@@ -93,9 +93,7 @@ yarn thunderdome match run random-hearts lowest-card-hearts point-dodger-hearts 
 - Bot ids are whatever a bot's own `manifest.json` declares as `id` — see
   [`/bots/rock-paper-scissors/`](../../bots/rock-paper-scissors/) or
   [`/bots/card-game-hearts/`](../../bots/card-game-hearts/) for what's available today, or
-  [`docs/guides/rps-bot-author-guide.md`](../../docs/guides/rps-bot-author-guide.md) /
-  [`docs/guides/hearts-bot-author-guide.md`](../../docs/guides/hearts-bot-author-guide.md) for
-  writing your own.
+  [`docs/guides/bot-author-guide.md`](../../docs/guides/bot-author-guide.md) for writing your own.
 - All bots in one `match run` must share the same `game` (checked against each bot's own
   manifest) — you'll get a clear error, not a confusing crash, if they don't. Passing the wrong
   number of bot ids for that game (e.g. 3 for Hearts) gets a clear error from the game's own

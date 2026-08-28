@@ -2,7 +2,7 @@
 
 A precise reference for the wire protocol every bot container speaks, regardless of language or
 game. If you're writing a bot in TypeScript, use `@thunderdome/bot-sdk`'s `runBot()`
-(`docs/guides/rps-bot-author-guide.md` walks through it) and you'll rarely need this document —
+(`docs/guides/bot-author-guide.md` walks through it) and you'll rarely need this document —
 it handles everything here for you. This guide is for implementing a bot client from scratch in
 a language `@thunderdome/bot-sdk` doesn't cover, or for understanding exactly what's on the wire
 when debugging.
@@ -148,7 +148,7 @@ declare an unsupported `protocolVersion`, your match is forfeited (`INIT_TIMEOUT
 ```
 
 `state` is entirely game-defined — see the specific game's own docs (e.g.
-[`rps-bot-author-guide.md`](rps-bot-author-guide.md) §2 for Rock-Paper-Scissors's exact shape,
+[`bot-author-guide.md`](bot-author-guide.md) §9 for Rock-Paper-Scissors's exact shape,
 `games/connect-four/src/types.ts` for Connect Four's). **You only receive an `observation` for a
 round you're actually pending in** — a sequential game's non-active participant simply gets
 nothing that round, not an observation with `awaitingAction: false`. When `awaitingAction` is
@@ -315,5 +315,5 @@ documentation of intent.
 - `docs/adr/0002-universal-bot-protocol.md` — the full design and alternatives considered
 - `docs/adr/0004-deterministic-randomness.md` — the seed-derivation scheme `rngSeed` comes from
 - [`security-model.md`](security-model.md) — the forfeit-reason taxonomy in context, and what triggers each one
-- [`rps-bot-author-guide.md`](rps-bot-author-guide.md) — using `@thunderdome/bot-sdk` instead of implementing this by hand
+- [`bot-author-guide.md`](bot-author-guide.md) — using `@thunderdome/bot-sdk` instead of implementing this by hand
 - `packages/protocol/src/messages.ts` — the actual zod schemas this reference describes

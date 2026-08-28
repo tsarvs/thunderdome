@@ -3,7 +3,7 @@
 const BEATS = { rock: 'paper', paper: 'scissors', scissors: 'rock' };
 
 // Receives the RpsObservation ({ round, totalRounds, yourWins, opponentWins, opponentId, history })
-// described in docs/guides/rps-bot-author-guide.md §2, and returns an RPS action
+// described in docs/guides/bot-author-guide.md §9, and returns an RPS action
 // ({ choice: 'rock' | 'paper' | 'scissors' }).
 export function decideAction(observation) {
   const lastRound = observation.history.at(-1);

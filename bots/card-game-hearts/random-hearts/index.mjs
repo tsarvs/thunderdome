@@ -4,7 +4,7 @@
  *
  * All of the NDJSON wire-protocol handling (replying to "init", reading "observation", exiting
  * on "match-end") lives in @thunderdome/bot-sdk's runBot() — see
- * docs/guides/rps-bot-author-guide.md for the full protocol walkthrough. This file only needs to
+ * docs/guides/bot-author-guide.md for the full protocol walkthrough. This file only needs to
  * decide each turn's action, and seed its own PRNG once the match's rngSeed arrives via `onInit`.
  */
 import { runBot } from '@thunderdome/bot-sdk';

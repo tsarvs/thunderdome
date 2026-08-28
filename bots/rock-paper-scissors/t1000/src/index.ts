@@ -7,7 +7,7 @@
  * losing streak says it isn't.
  *
  * All NDJSON wire-protocol handling lives in @thunderdome/bot-sdk's runBot() — see
- * docs/guides/rps-bot-author-guide.md.
+ * docs/guides/bot-author-guide.md.
  */
 import { runBot } from '@thunderdome/bot-sdk';
 

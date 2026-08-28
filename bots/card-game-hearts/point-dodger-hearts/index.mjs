@@ -13,7 +13,7 @@
  *
  * All of the NDJSON wire-protocol handling (replying to "init", reading "observation", exiting
  * on "match-end") lives in @thunderdome/bot-sdk's runBot() — see
- * docs/guides/rps-bot-author-guide.md for the full protocol walkthrough. This file only needs to
+ * docs/guides/bot-author-guide.md for the full protocol walkthrough. This file only needs to
  * answer one question: decideAction().
  */
 import { runBot } from '@thunderdome/bot-sdk';

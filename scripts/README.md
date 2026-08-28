@@ -12,7 +12,7 @@ Dev tooling that isn't a workspace package in its own right.
 Running a real match between bots from `/bots` is now `yarn thunderdome match run <botId>
 <botId>` (`apps/cli/src/commands/match.ts`) — the registry-backed successor to what used
 to be a hand-rolled `run-scrimmage.mjs` script here. See
-[`docs/guides/rps-bot-author-guide.md`](../docs/guides/rps-bot-author-guide.md) for usage.
+[`docs/guides/bot-author-guide.md`](../docs/guides/bot-author-guide.md) for usage.
 
 ### A known Docker reliability issue (root-caused and fixed)
 
@@ -87,8 +87,9 @@ node scripts/scaffold-bot.mjs card-game-hearts my-first-hearts-bot
 ```
 
 Then fill in the real `Observation`/`Action` shapes and `decideAction()` — see
-[`docs/guides/rps-bot-author-guide.md`](../docs/guides/rps-bot-author-guide.md) for the wire
-protocol walkthrough (game-agnostic apart from the RPS-specific examples).
+[`docs/guides/bot-author-guide.md`](../docs/guides/bot-author-guide.md) for the wire protocol
+walkthrough (game-agnostic throughout §1-§8; §10 has Hearts' own `Observation`/`Action` shapes for
+this example).
 
 The script also adds your bot to `pack-bot-sdk.sh`'s `BOT_DIRS` array so you can run it locally —
 but if you're submitting a community bot PR, `tools/boundary-check` requires that PR to touch only

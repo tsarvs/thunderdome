@@ -1,6 +1,6 @@
 // A game-agnostic Thunderdome bot protocol client. See
 // docs/adr/0002-universal-bot-protocol.md for the wire format this implements, and
-// docs/guides/rps-bot-author-guide.md for a walkthrough of using it from a real bot.
+// docs/guides/bot-author-guide.md for a walkthrough of using it from a real bot.
 //
 // This module owns the NDJSON-over-stdio plumbing (parsing inbound messages, replying to
 // "init"/"observation", exiting on "match-end") that is identical for every bot regardless of

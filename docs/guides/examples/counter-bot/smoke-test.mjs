@@ -1,5 +1,5 @@
 // Drives this bot's real Docker container through a scripted exchange using the platform's own
-// runtime primitives (docs/guides/rps-bot-author-guide.md, "Testing your bot locally"). There's
+// runtime primitives (docs/guides/bot-author-guide.md, "Testing your bot locally"). There's
 // no CLI wrapper for this specific kind of single-bot, scripted-opponent smoke test —
 // `yarn thunderdome match run` is for real two-bot matches through the registry instead — so
 // this script exercises the same DockerBotProcess + BotLifecycle pieces the platform itself uses.

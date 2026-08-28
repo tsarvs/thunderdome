@@ -15,20 +15,23 @@ bias toward any language or any game, sits the **Engine** — judge, executioner
 in the wasteland every contender obeys without question.
 
 **The state of the empire, as chronicled this cycle:** the wire protocol, the Docker-forged cage
-every bot fights inside, the one true game engine, two blood-sworn arenas
-(Rock-Paper-Scissors and Connect Four), the registry that remembers every name ever entered, a
-command to summon a single duel between two registered champions (`yarn thunderdome match run`),
-a full tournament ringmaster — round robin's gauntlet and single elimination's guillotine both now
-law (`yarn thunderdome tournament run`) — and, for any mortal too proud to watch from the stands,
+every bot fights inside, the one true game engine, three blood-sworn arenas
+(Rock-Paper-Scissors, Connect Four, and the 4-seat trick-taking gauntlet of Hearts), the registry
+that remembers every name ever entered, a command to summon a single match between registered
+champions (`yarn thunderdome match run`), a full tournament ringmaster — round robin's gauntlet,
+single elimination's guillotine, and Swiss league's cumulative-score tables all now law
+(`yarn thunderdome tournament run`) — and, for any mortal too proud to watch from the stands,
 a way to step into the ring yourself and trade blows with a champion turn by turn
 (`yarn thunderdome play`) — stand built, tested, and roaring. Consult
 `docs/architecture.md` and `docs/adr/` for the sacred blueprints. Every tournament is etched into
 an eternal black-box record the instant it happens, so any battle, however long past, may be
 summoned back from the dead and watched again (`yarn thunderdome tournament
 list`/`inspect`/`replay`, [`docs/adr/0009-tournament-persistence.md`](docs/adr/0009-tournament-persistence.md)).
-Not yet written into law: any bracket beyond round robin and single elimination — Swiss,
-pool-then-elimination, and other rites still wait in exile — see
-[`docs/guides/tournament-author-guide.md`](docs/guides/tournament-author-guide.md). And no
+Not yet written into law: any bracket beyond round robin, single elimination, and now Swiss
+league's own cumulative-score tables — pool-then-elimination and other rites still wait in exile —
+see [`docs/guides/tournament-author-guide.md`](docs/guides/tournament-author-guide.md), or
+[`docs/guides/tournament-format-authoring-guide.md`](docs/guides/tournament-format-authoring-guide.md)
+if you mean to be the one who ends the exile. And no
 contender's cage, win or lose or crash in flames, is ever left standing after the final bell —
 torn down on victory, on catastrophic failure, on a `Ctrl+C`/`SIGTERM` hurled at the CLI itself —
 with `yarn thunderdome cleanup` standing eternal watch as the last word against any wreckage bold
@@ -37,6 +40,11 @@ enough to survive the purge (see
 cleanup" section).
 
 ## The gates of entry — start here
+
+**New to any of this — Node, Docker, "dev environment," or writing tests at all?** Read
+[`docs/guides/getting-started.md`](docs/guides/getting-started.md) first. It explains what every
+tool below is actually for, in plain language, before asking you to install anything — the setup
+steps that follow assume none of that background yet.
 
 - [`docs/architecture.md`](docs/architecture.md) — the founding scripture. Every subsystem, every
   law, the whole shape of the world laid bare.
@@ -57,7 +65,7 @@ packages/runtime            Docker bot execution, resource limits, forfeit handl
 packages/bot-sdk            TypeScript SDK for bot authors; bot manifest schema; runBot() protocol client
 packages/game-sdk           helpers for game authors; game manifest schema
 packages/registry           filesystem scan + validation of bot/game manifests
-packages/tournament-formats concrete TournamentFormat implementations (round robin, single elimination)
+packages/tournament-formats concrete TournamentFormat implementations (round robin, single elimination, Swiss league)
 packages/tournament-store   persisted TournamentRecord read/write — one JSON file per tournament, no database
 games/<game-id>             game rule implementations (reviewed, run in-process)
 bots/<game-id>/<bot-id>     bot submissions, grouped by game (any language, Docker-only, untrusted)
@@ -162,16 +170,28 @@ yarn thunderdome --help
 yarn thunderdome match run only-rock only-paper --config '{"totalRounds":3}'   # one real match
 yarn thunderdome tournament run only-rock only-paper only-scissors --game-config '{"totalRounds":3}'   # a real round-robin tournament, see apps/cli/README.md
 yarn thunderdome match run leftmost-connect-four random-connect-four   # the second game, Connect Four
+yarn thunderdome match run random-hearts lowest-card-hearts point-dodger-hearts tominator-t2   # the third game, Hearts (exactly 4 seats)
 yarn thunderdome play tx --game-config '{"totalRounds":10}'   # step into the ring yourself, see apps/cli/README.md
 yarn thunderdome cleanup   # force-remove any leftover bot containers, if you ever need to
 ```
 
 ## Taking your place among legends
 
-- **Bot authors**: see [`docs/guides/rps-bot-author-guide.md`](docs/guides/rps-bot-author-guide.md)
-  — march your creation into `bots/<game-id>/<your-bot-id>/` and nowhere else in all the realm.
-- **Game authors**: new arenas are consecrated in `games/<id>/`, and none may open their gates
-  without the maintainers' and stewards' seal.
+- **Bot authors**: `yarn scaffold:bot <game-id> <your-bot-id>` forges a working starting point in
+  `bots/<game-id>/<your-bot-id>/` — nowhere else in all the realm — in seconds; see
+  [`docs/guides/bot-author-guide.md`](docs/guides/bot-author-guide.md) for the full rite (protocol,
+  manifest, Dockerfile, testing, submission), whichever arena you're entering.
+- **Game authors**: `yarn scaffold:game <game-id>` consecrates a new, working-but-trivial arena
+  under `games/<id>/` to build outward from; see
+  [`docs/guides/game-authoring-guide.md`](docs/guides/game-authoring-guide.md) for the full rite,
+  and [`docs/guides/human-friendly-games-guide.md`](docs/guides/human-friendly-games-guide.md) for
+  making a finished arena pleasant for a mortal to actually step into
+  (`yarn thunderdome play`) — none may open their gates without the maintainers' and stewards'
+  seal.
+- **Tournament format authors**: round robin, single elimination, and Swiss league don't exhaust
+  every way a bracket can be shaped — see
+  [`docs/guides/tournament-format-authoring-guide.md`](docs/guides/tournament-format-authoring-guide.md)
+  for forging a new one (pool-then-elimination still waits for its champion).
 - **Platform contributors**: read `docs/architecture.md` and the relevant ADR before you dare
   reforge the ringmaster's own crown — the engine, protocol, and game/tournament interfaces are
   deliberately, unyieldingly minimal, and every new ambition must be weighed against them before

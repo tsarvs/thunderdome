@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Scaffolds a new bots/<game-id>/<bot-id>/ directory — a starter bot using @thunderdome/bot-sdk's
- * runBot() (see docs/guides/rps-bot-author-guide.md), with a decideAction() left as a TODO for
+ * runBot() (see docs/guides/bot-author-guide.md), with a decideAction() left as a TODO for
  * whatever game it's targeting. Works for any game, not just ones scaffolded by
  * scripts/scaffold-game.mjs.
  *
@@ -372,7 +372,7 @@ Next steps:
 ${step2}
   3. docker build -t thunderdome-${botId} bots/${gameId}/${botId}
   4. yarn thunderdome match run ${botId} <another-bot-id> --config '{}'
-     (see docs/guides/rps-bot-author-guide.md §7-8 for the full loop, including smoke-test.mjs)
+     (see docs/guides/bot-author-guide.md §7-8 for the full loop, including smoke-test.mjs)
 
 IMPORTANT if you're submitting this as a community bot PR: tools/boundary-check (CI) requires a
 bot PR to touch only bots/${gameId}/${botId}/** (docs/adr/0007-repository-enforcement.md). The
