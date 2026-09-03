@@ -47,11 +47,14 @@ export class TerminalHumanCollector implements ActionCollector {
     // No deadline enforced here, unlike a bot's own requestAction path — a human, not a
     // container, sets this match's pace. Loops past an unparseable line (typing "roc" is a typo,
     // not a forfeit) rather than ever handing that on to validateAction/resolve — but says so
-    // explicitly on a retry, rather than just silently reprinting the same prompt.
-    let isRetry = false;
+    // explicitly on a retry, rather than just silently reprinting the same prompt. Same treatment
+    // for a well-formed but out-of-range action (e.g. a raise below the min or above the max) —
+    // see `validateInput` on `humanInterface` — since otherwise it would reach `validateAction`,
+    // fail there, and forfeit the match instead of just reprompting.
+    let retryMessage: string | undefined;
     for (;;) {
-      if (isRetry) {
-        this.output.write("Sorry, I didn't understand that — try again.\n\n");
+      if (retryMessage !== undefined) {
+        this.output.write(`${retryMessage}\n\n`);
       }
       // `describeObservation` deliberately ends with no trailing newline (a game's own choice —
       // see packages/engine/src/types.ts) — the `\n> ` here is what actually separates the
@@ -69,7 +72,12 @@ export class TerminalHumanCollector implements ActionCollector {
       }
       const action = humanInterface.parseInput(raw);
       if (action === undefined) {
-        isRetry = true;
+        retryMessage = "Sorry, I didn't understand that — try again.";
+        continue;
+      }
+      const invalidReason = humanInterface.validateInput?.(action, args.observation);
+      if (invalidReason !== undefined) {
+        retryMessage = `${invalidReason} — try again.`;
         continue;
       }
       // Confirms exactly how the input was understood — not just that something was accepted —

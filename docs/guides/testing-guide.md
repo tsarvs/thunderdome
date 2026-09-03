@@ -22,7 +22,7 @@ file, which is the faster loop to use while actively writing code.
 
 ## 2. Unit tests vs. integration tests
 
-These two terms describe *how much* of the system a test exercises at once — think of it as a
+These two terms describe _how much_ of the system a test exercises at once — think of it as a
 dial, not a strict binary, but the two ends of that dial behave differently enough to be worth
 naming separately.
 
@@ -37,7 +37,7 @@ For example, `rockPaperScissors.parseConfig({ totalRounds: 4 })` is a plain func
 an input, get back a `Result`, check it's what you expected. No Docker, no network, no other part
 of the codebase involved — a unit test.
 
-**An integration test** checks that several pieces actually work correctly *together* — the thing
+**An integration test** checks that several pieces actually work correctly _together_ — the thing
 a unit test, by design, never proves. Two well-tested functions can each work perfectly in
 isolation and still fail the moment they're wired together (a mismatched assumption about what one
 hands the other, a real network call that behaves differently than a fake one did). Integration
@@ -45,16 +45,16 @@ tests are slower (they touch real infrastructure — here, that's Docker) and a 
 wider area to investigate — but they're the only kind of test that can catch a wiring mistake
 between two otherwise-correct pieces.
 
-Neither kind replaces the other. A healthy test suite has *many* fast unit tests covering every
-function's own logic in detail, plus a *smaller* number of integration tests confirming the real
+Neither kind replaces the other. A healthy test suite has _many_ fast unit tests covering every
+function's own logic in detail, plus a _smaller_ number of integration tests confirming the real
 pieces genuinely fit together — this repo's own test suite is shaped exactly that way (§3).
 
 ## 3. This repo's two testing tiers
 
-| Tier            | What it exercises                                                          | How fast   | Real example in this repo                                                                                     |
-| --------------- | --------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
-| Unit test       | One `GameDefinition` method, or one pure function, called directly          | Instant    | `games/rock-paper-scissors/test/game.test.ts` — calls `rockPaperScissors.parseConfig()`/`.resolve()`/etc. directly against hand-built state, with **zero** Docker involved |
-| Integration test | A real bot's Docker container, driven through the real wire protocol       | Seconds    | `bots/rock-paper-scissors/*/smoke-test.mjs` and [`docs/guides/examples/counter-bot/smoke-test.mjs`](examples/counter-bot/smoke-test.mjs) — builds a real image, starts a real container via `@thunderdome/runtime`, and drives it through a scripted `init`/`observation`/`action` exchange |
+| Tier             | What it exercises                                                    | How fast | Real example in this repo                                                                                                                                                                      |
+| ---------------- | -------------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit test        | One `GameDefinition` method, or one pure function, called directly   | Instant  | `games/rock-paper-scissors/test/game.test.ts` — calls `rockPaperScissors.parseConfig()`/`.resolve()`/etc. directly against hand-built state, with **zero** Docker involved                     |
+| Integration test | A real bot's Docker container, driven through the real wire protocol | Seconds  | `bots/rock-paper-scissors/*/smoke-test.mjs` — builds a real image, starts a real container via `@thunderdome/runtime`, and drives it through a scripted `init`/`observation`/`action` exchange |
 
 Every package under `packages/` and `games/` has a `test/` directory of unit tests, run by
 `yarn test` (Vitest) — these are what CI runs on every change and what you should be running
@@ -131,20 +131,34 @@ target.
 
 That's the entire loop this repo's whole unit-test suite is built from — every `test/*.test.ts`
 file in `packages/` and `games/` is the same three ingredients (`describe`, `it`, `expect`)
-repeated against different functions.  [`game-authoring-guide.md`](game-authoring-guide.md) §11
+repeated against different functions. [`game-authoring-guide.md`](game-authoring-guide.md) §11
 lists, concretely, everything a new game's own test suite should cover.
 
 ## 5. Writing (or extending) an integration test
 
-Integration tests in this repo follow [`docs/guides/examples/counter-bot/smoke-test.mjs`](examples/counter-bot/README.md)'s
-pattern: build the bot's Docker image, then drive it through a real container using
-`@thunderdome/runtime`'s primitives (`DockerBotProcess`/`BotLifecycle`) with a scripted sequence of
-observations, asserting the bot's replies match what you expect. Its own README spells out the
-exact steps (build → sanity-check by hand → run the smoke test) and is the right template to copy
-when your own bot needs one — you're not expected to write this kind of test from scratch.
+Integration tests in this repo all follow the same pattern: build the bot's Docker image, then
+drive it through a real container using `@thunderdome/runtime`'s primitives
+(`DockerBotProcess`/`BotLifecycle`) with a scripted sequence of observations, asserting the bot's
+replies match what you expect. Any bot's own `smoke-test.mjs` (e.g.
+[`bots/rock-paper-scissors/only-rock/smoke-test.mjs`](../../bots/rock-paper-scissors/only-rock/smoke-test.mjs))
+is the right template to copy when your own bot needs one — you're not expected to write this kind
+of test from scratch.
+
+To actually run one, from the repo root, with Docker running (§3): build the bot's image (the tag
+its own `smoke-test.mjs` expects is named in a comment at the top of that file), then run the
+script with plain `node` — it isn't wired into `yarn test`, since it needs Docker rather than
+just Vitest:
+
+```bash
+docker build -t thunderdome-only-rock bots/rock-paper-scissors/only-rock
+node bots/rock-paper-scissors/only-rock/smoke-test.mjs
+```
+
+Every bot under `bots/` follows this same two-command pattern — swap in that bot's own directory
+(and the image tag its `smoke-test.mjs` names) to run any other one, including your own.
 
 You generally only need to write a new integration test when you're building something that
-*talks to Docker directly* — a new bot, or a change to `@thunderdome/runtime` itself. A new game or
+_talks to Docker directly_ — a new bot, or a change to `@thunderdome/runtime` itself. A new game or
 tournament format's correctness is proven by its unit tests (§4) plus actually running it for real
 (`yarn thunderdome match run`/`tournament run`) — see
 [`game-authoring-guide.md`](game-authoring-guide.md) §12.
@@ -155,5 +169,5 @@ This repo doesn't chase a coverage percentage. Instead, for any new behavior, as
 distinct cases, and does a test exist for each one?** For `GameDefinition.parseConfig`, that's
 "valid input," "invalid input," and "input relying on a default." For `resolve()`, that's one test
 per distinct outcome the game can reach (Connect Four's suite has one test per win direction, plus
-a draw — `game-authoring-guide.md` §11). A single happy-path test proves the feature *can* work; it
-takes the edge cases and error cases to prove it reliably *does*.
+a draw — `game-authoring-guide.md` §11). A single happy-path test proves the feature _can_ work; it
+takes the edge cases and error cases to prove it reliably _does_.

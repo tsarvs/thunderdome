@@ -120,6 +120,18 @@ export interface GameDefinition<TConfig, TState, TObservation, TAction, TResult>
     describeObservation(observation: TObservation): string;
     parseInput(raw: string): TAction | undefined;
     /**
+     * Optional: catches an action that parsed fine but isn't legal right now — e.g. a raise
+     * outside the observation's own min/max — using only what `TObservation` already reveals to
+     * this participant (no access to the full `TState`, same constraint as `parseInput`). Return
+     * a human-readable reason to have the CLI reprompt with it instead of forwarding the action;
+     * return `undefined` to let it through. `validateAction` still re-checks against the
+     * authoritative `TState` afterward regardless — this only exists so a human's out-of-range
+     * input gets a retry instead of being treated as a no-show and forfeiting the match (a bot's
+     * own equivalent mistake has no such recovery, by design: see `onMissingAction`). Omit if
+     * every parseable action for this game is always legal whenever it's offered.
+     */
+    validateInput?(action: TAction, observation: TObservation): string | undefined;
+    /**
      * Optional: confirms the action `parseInput` just accepted, printed immediately after —
      * e.g. "Passed: 2C 5C TH" — before the next observation's prompt. Lets a human verify their
      * input was understood as intended (not just that *something* was accepted), which matters
@@ -127,5 +139,16 @@ export interface GameDefinition<TConfig, TState, TObservation, TAction, TResult>
      * action. Omit if the next prompt already makes the outcome obvious on its own.
      */
     describeAction?(action: TAction): string;
+
+    /**
+     * Optional: narrates a round's events for a human bystander — called once per resolved
+     * round with that round's `events` and the human's own participant id, even on a round
+     * where it isn't their turn (see `RunMatchArgs.onRoundResolved`, match-runner.ts). This is
+     * the only way a human ever learns what happened in a round they weren't asked to act in —
+     * `describeObservation` only ever fires on their own turn, which never comes again once
+     * they're eliminated from the match (e.g. busted out of a poker hand they went all-in on).
+     * Return `undefined` for a round with nothing worth narrating.
+     */
+    describeRoundEvents?(events: RoundEvent[], youParticipantId: string): string | undefined;
   };
 }

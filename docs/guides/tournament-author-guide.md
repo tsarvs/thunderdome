@@ -16,20 +16,21 @@ see §3 for how it fits the same `TournamentFormat` contract as the other two. W
 yet: anything beyond these three (pool-then-elimination, ...) — see
 [`tournament-format-authoring-guide.md`](tournament-format-authoring-guide.md) if you want to build
 one. This guide documents what's real, using Rock-Paper-Scissors (still the running example
-throughout) — Connect Four is the platform's other real game (`docs/guides/README.md`) and fits
-every piece below identically, just without its own worked example here yet.
+throughout) — Connect Four and Texas Hold'em are the platform's two other real games without a
+proven tournament format yet (`docs/guides/README.md`), and fit every piece below identically,
+just without their own worked example here.
 
 ## 1. The five pieces of a tournament
 
 A tournament is the combination of:
 
-| Piece               | What it is                                                                | Status                                                                                                                     |
-| ------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| **Game**            | Which game, which version, and that game's own config                     | Real — `rock-paper-scissors`, `{ totalRounds, onMissingAction }`                                                           |
-| **Roster**          | Which bots (from the bot registry) are competing                          | Real — `@thunderdome/registry`'s `scanBots`/`scanGames`                                                                    |
+| Piece               | What it is                                                                | Status                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Game**            | Which game, which version, and that game's own config                     | Real — `rock-paper-scissors`, `{ totalRounds, onMissingAction }`                                                                |
+| **Roster**          | Which bots (from the bot registry) are competing                          | Real — `@thunderdome/registry`'s `scanBots`/`scanGames`                                                                         |
 | **Format**          | How matchups are generated and standings computed                         | Real for round robin, single elimination, and Swiss league — `@thunderdome/tournament-formats`; pool-then-elimination not built |
-| **Seed**            | The one entropy boundary this tournament's reproducibility traces back to | Real — `@thunderdome/rng`                                                                                                  |
-| **Resource limits** | Per-game CPU/memory/timeout ceilings                                      | Partially real — `GameDefinition.resourceLimits` exists; runtime enforcement is per-match, not tournament-level yet        |
+| **Seed**            | The one entropy boundary this tournament's reproducibility traces back to | Real — `@thunderdome/rng`                                                                                                       |
+| **Resource limits** | Per-game CPU/memory/timeout ceilings                                      | Partially real — `GameDefinition.resourceLimits` exists; runtime enforcement is per-match, not tournament-level yet             |
 
 None of these are new concepts invented for this guide — they're exactly
 `docs/architecture.md`'s mental model: **Games + Tournaments + Bots → Matches → Match

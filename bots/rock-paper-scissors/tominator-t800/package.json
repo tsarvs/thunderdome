@@ -1,0 +1,16 @@
+{
+  "name": "tominator-t800",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@thunderdome/bot-sdk": "file:./vendor/thunderdome-bot-sdk.tgz"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.0",
+    "typescript": "^5.6.3"
+  }
+}

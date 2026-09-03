@@ -58,12 +58,28 @@ export interface RunMatchArgs<TConfig, TState, TObservation, TAction, TResult> {
   matchDeadlineMs: number;
   /** Injectable clock, for deterministic tests of the above; defaults to `Date.now`. */
   now?: () => number;
+  /**
+   * Optional: called once per round, right after `resolve()` produces it — the seam a caller
+   * (e.g. the CLI's human-play mode) uses to observe every round's events live, not just the
+   * final aggregated `MatchOutcome.events` returned once the whole match ends. Never called for
+   * a round that ends in forfeit (no `resolve()` ever runs for one).
+   */
+  onRoundResolved?: (events: RoundEvent[]) => void;
 }
 
 export async function runMatch<TConfig, TState, TObservation, TAction, TResult>(
   args: RunMatchArgs<TConfig, TState, TObservation, TAction, TResult>,
 ): Promise<MatchOutcome<TResult>> {
-  const { game, config, participantIds, rng, collector, defaultDeadlineMs, matchDeadlineMs } = args;
+  const {
+    game,
+    config,
+    participantIds,
+    rng,
+    collector,
+    defaultDeadlineMs,
+    matchDeadlineMs,
+    onRoundResolved,
+  } = args;
   const now = args.now ?? Date.now;
   const matchStartedAt = now();
 
@@ -147,6 +163,7 @@ export async function runMatch<TConfig, TState, TObservation, TAction, TResult>(
 
     const outcome = game.resolve({ state, actions, rng });
     events.push(outcome.events);
+    onRoundResolved?.(outcome.events);
     state = outcome.nextState;
     roundId += 1;
   }

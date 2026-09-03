@@ -37,16 +37,19 @@ BOT_DIRS=(
   "bots/rock-paper-scissors/only-scissors"
   "bots/rock-paper-scissors/copycat-rps"
   "bots/rock-paper-scissors/random-rps"
-  "bots/rock-paper-scissors/t800"
-  "bots/rock-paper-scissors/t1000"
-  "bots/rock-paper-scissors/tx"
+  "bots/rock-paper-scissors/tominator-t800"
+  "bots/rock-paper-scissors/tominator-t1000"
+  "bots/rock-paper-scissors/tominator-tx"
   "bots/connect-four/leftmost-connect-four"
   "bots/connect-four/random-connect-four"
   "bots/card-game-hearts/random-hearts"
   "bots/card-game-hearts/lowest-card-hearts"
   "bots/card-game-hearts/point-dodger-hearts"
   "bots/card-game-hearts/tominator-t1"
-  "bots/card-game-hearts/tominator-t2"
+  "bots/card-game-hearts/tominator-t101"
+  "bots/poker-texas-hold-em/random-poker"
+  "bots/poker-texas-hold-em/calling-station-poker"
+  "bots/poker-texas-hold-em/tight-poker"
 )
 
 for dir in "${BOT_DIRS[@]}"; do

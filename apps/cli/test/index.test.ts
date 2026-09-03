@@ -88,7 +88,7 @@ describe('thunderdome CLI', () => {
       error.mockRestore();
     });
 
-    it("exits 1 when --as collides with any of the given bot ids", async () => {
+    it('exits 1 when --as collides with any of the given bot ids', async () => {
       const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       const code = await run(['play', 'only-rock', 'only-paper', '--as', 'only-paper']);
       expect(code).toBe(1);

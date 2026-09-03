@@ -304,6 +304,7 @@ export async function runHumanMatch(args: RunHumanMatchArgs): Promise<SingleMatc
   } = args;
   const roster = [humanParticipantId, ...botParticipantIds];
   const matchRng = createRng(deriveSeed(tournamentSeed, 'match', matchId));
+  const writeStream = output ?? process.stdout;
 
   const lifecycles = new Map<string, BotLifecycle>();
   const collector = new TerminalHumanCollector({
@@ -361,6 +362,15 @@ export async function runHumanMatch(args: RunHumanMatchArgs): Promise<SingleMatc
       collector,
       defaultDeadlineMs: 5_000,
       matchDeadlineMs: HUMAN_MATCH_DEADLINE_MS,
+      // Narrates every round live — including ones where it isn't the human's turn — so a
+      // human still learns what happened even once they're no longer ever asked to act again
+      // (e.g. busted out of the hand they just went all-in on).
+      onRoundResolved: (events) => {
+        const line = game.humanInterface?.describeRoundEvents?.(events, humanParticipantId);
+        if (line !== undefined) {
+          writeStream.write(`${line}\n`);
+        }
+      },
     });
 
     const matchEndPayload =

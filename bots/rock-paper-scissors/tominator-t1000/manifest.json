@@ -1,0 +1,18 @@
+{
+  "id": "tominator-t1000",
+  "name": "T-1000",
+  "version": "1.0.0",
+  "game": "rock-paper-scissors",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom.sarver@7factor.io"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "A red-herring/research/exploit/reevaluate/defense state machine over a 300-round match: baits naive opponent detectors, exploits while a signal or recent win rate holds up, and falls back to research (or defense, late and confidently ahead) once it stops working."
+}

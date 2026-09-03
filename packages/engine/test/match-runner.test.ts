@@ -1,5 +1,5 @@
 import { createRng } from '@thunderdome/rng';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   runMatch,
   type ActionCollector,
@@ -144,6 +144,41 @@ describe('runMatch: sequential single-actor game', () => {
     expect(outcome.events.length).toBeGreaterThan(1);
     // Only the active participant is ever asked, never both.
     expect(collector.calls.every((c) => c.required)).toBe(true);
+  });
+
+  it('calls onRoundResolved once per resolved round, with that round’s own events', async () => {
+    const collector = new ScriptedCollector(() => ({ ok: true, action: { increment: 2 } }));
+    const resolvedRounds: unknown[][] = [];
+    const outcome = await runMatch({
+      game: makeRaceGame(4),
+      config: undefined,
+      participantIds: ['p1', 'p2'],
+      rng,
+      collector,
+      defaultDeadlineMs: 1000,
+      matchDeadlineMs: 60_000,
+      onRoundResolved: (events) => resolvedRounds.push(events),
+    });
+
+    expect(resolvedRounds).toEqual(outcome.events);
+  });
+
+  it('never calls onRoundResolved for a round that ends in forfeit', async () => {
+    const collector = new ScriptedCollector(() => ({ ok: false, reason: 'timeout' }));
+    const onRoundResolved = vi.fn();
+    const outcome = await runMatch({
+      game: makeRaceGame(4),
+      config: undefined,
+      participantIds: ['p1', 'p2'],
+      rng,
+      collector,
+      defaultDeadlineMs: 1000,
+      matchDeadlineMs: 60_000,
+      onRoundResolved,
+    });
+
+    expect(outcome.status).toBe('forfeit');
+    expect(onRoundResolved).not.toHaveBeenCalled();
   });
 });
 

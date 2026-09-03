@@ -1,0 +1,17 @@
+{
+  "id": "poker-texas-hold-em",
+  "name": "Texas Hold Em",
+  "version": "0.1.0",
+  "entryPackage": "@thunderdome/game-poker-texas-hold-em",
+  "protocolVersion": "^1.0",
+  "minParticipants": 2,
+  "maxParticipants": 10,
+  "deterministic": false,
+  "maintainers": [
+    {
+      "name": "Tom Sarver",
+      "contact": "tom@tomsarver.dev"
+    }
+  ],
+  "description": "Good Ol' Fashioned Texas Hold Em."
+}

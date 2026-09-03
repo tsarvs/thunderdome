@@ -1,0 +1,18 @@
+{
+  "id": "calling-station-poker",
+  "name": "Calling Station Poker",
+  "version": "0.1.0",
+  "game": "poker-texas-hold-em",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Never folds or raises: checks when possible, otherwise calls (capped at its own stack). A fixed, deterministic baseline to measure other poker bots against."
+}

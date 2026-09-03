@@ -1,7 +1,7 @@
 import { runBot } from '@thunderdome/bot-sdk';
 
 /**
- * Tominator T1 — a bot for the "card-game-hearts" game.
+ * The T-1 — a standard bot for the "card-game-hearts" game.
  */
 
 type Suit = 'clubs' | 'diamonds' | 'hearts' | 'spades';

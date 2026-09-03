@@ -15,8 +15,9 @@ bias toward any language or any game, sits the **Engine** — judge, executioner
 in the wasteland every contender obeys without question.
 
 **The state of the empire, as chronicled this cycle:** the wire protocol, the Docker-forged cage
-every bot fights inside, the one true game engine, three blood-sworn arenas
-(Rock-Paper-Scissors, Connect Four, and the 4-seat trick-taking gauntlet of Hearts), the registry
+every bot fights inside, the one true game engine, four blood-sworn arenas
+(Rock-Paper-Scissors, Connect Four, the 4-seat trick-taking gauntlet of Hearts, and the no-limit
+felt of Texas Hold'em), the registry
 that remembers every name ever entered, a command to summon a single match between registered
 champions (`yarn thunderdome match run`), a full tournament ringmaster — round robin's gauntlet,
 single elimination's guillotine, and Swiss league's cumulative-score tables all now law
@@ -170,8 +171,9 @@ yarn thunderdome --help
 yarn thunderdome match run only-rock only-paper --config '{"totalRounds":3}'   # one real match
 yarn thunderdome tournament run only-rock only-paper only-scissors --game-config '{"totalRounds":3}'   # a real round-robin tournament, see apps/cli/README.md
 yarn thunderdome match run leftmost-connect-four random-connect-four   # the second game, Connect Four
-yarn thunderdome match run random-hearts lowest-card-hearts point-dodger-hearts tominator-t2   # the third game, Hearts (exactly 4 seats)
-yarn thunderdome play tx --game-config '{"totalRounds":10}'   # step into the ring yourself, see apps/cli/README.md
+yarn thunderdome match run random-hearts lowest-card-hearts point-dodger-hearts tominator-t101   # the third game, Hearts (exactly 4 seats)
+yarn thunderdome match run random-poker calling-station-poker --config '{"startingStack":500,"totalHands":5,"matchFormat":"fixedHands"}'   # the fourth game, Texas Hold'em
+yarn thunderdome play tominator-tx --game-config '{"totalRounds":10}'   # step into the ring yourself, see apps/cli/README.md
 yarn thunderdome cleanup   # force-remove any leftover bot containers, if you ever need to
 ```
 

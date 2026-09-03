@@ -1,0 +1,18 @@
+{
+  "id": "random-poker",
+  "name": "Random Poker",
+  "version": "0.1.0",
+  "game": "poker-texas-hold-em",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Picks uniformly at random among whatever actions are currently legal (fold/check/call/raise/allIn), with a uniformly random raise amount, seeded from the match's rngSeed."
+}
