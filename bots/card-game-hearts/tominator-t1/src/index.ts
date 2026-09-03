@@ -1,4 +1,4 @@
-import { runBot } from '@thunderdome/bot-sdk';
+import { runBot } from '@thunderdome/bot-sdk-js';
 
 /**
  * The T-1 — a standard bot for the "card-game-hearts" game.

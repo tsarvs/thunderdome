@@ -63,14 +63,16 @@ packages/protocol           wire protocol: envelope types, JSON Schema, validato
 packages/rng                seeded PRNG + deterministic seed derivation
 packages/engine             GameDefinition contract, match runner, tournament orchestrator
 packages/runtime            Docker bot execution, resource limits, forfeit handling
-packages/bot-sdk            TypeScript SDK for bot authors; bot manifest schema; runBot() protocol client
+packages/bot-sdk-js         TypeScript SDK for bot authors; bot manifest schema; runBot() protocol client
+packages/bot-sdk-python     Python SDK for bot authors; run_bot() protocol client (no packaging —
+                             vendored by copying its one file into a bot's own directory)
 packages/game-sdk           helpers for game authors; game manifest schema
 packages/registry           filesystem scan + validation of bot/game manifests
 packages/tournament-formats concrete TournamentFormat implementations (round robin, single elimination, Swiss league)
 packages/tournament-store   persisted TournamentRecord read/write — one JSON file per tournament, no database
 games/<game-id>             game rule implementations (reviewed, run in-process)
 bots/<game-id>/<bot-id>     bot submissions, grouped by game (any language, Docker-only, untrusted)
-tools/boundary-check        CI enforcement of the platform/competitor boundary
+ci/tools/boundary-check     CI enforcement of the platform/competitor boundary
 docs/                       architecture, ADRs, author guides
 ```
 

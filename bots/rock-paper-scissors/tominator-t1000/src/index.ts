@@ -5,10 +5,10 @@
  * whenever a signal or recent win rate says it's working; falling back to RESEARCH (or, late and
  * confidently ahead, DEFENSE) once a losing streak says it isn't.
  *
- * All NDJSON wire-protocol handling lives in @thunderdome/bot-sdk's runBot() — see
+ * All NDJSON wire-protocol handling lives in @thunderdome/bot-sdk-js's runBot() — see
  * docs/guides/bot-author-guide.md.
  */
-import { runBot } from '@thunderdome/bot-sdk';
+import { runBot } from '@thunderdome/bot-sdk-js';
 
 type RpsChoice = 'rock' | 'paper' | 'scissors';
 

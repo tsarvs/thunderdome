@@ -1,0 +1,19 @@
+{
+  "id": "tactical-connect-four",
+  "name": "Tactical Connect Four",
+  "version": "1.0.0",
+  "game": "connect-four",
+  "author": {
+    "name": "Thunderdome Maintainers",
+    "contact": "maintainers@example.com"
+  },
+  "runtime": {
+    "language": "other",
+    "languageVersion": "3.12"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Plays an immediate winning move when one is available, otherwise blocks the opponent's immediate winning move, otherwise prefers the column closest to center. Pure Python, zero dependencies — uses thunderdome_bot_sdk (packages/bot-sdk-python), the Python analog of @thunderdome/bot-sdk-js."
+}

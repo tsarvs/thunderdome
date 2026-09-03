@@ -13,7 +13,7 @@ plus [`protocol-reference.md`](protocol-reference.md) document the same three th
 observation, action) a dedicated section would.
 
 **Status check first:** the protocol (`docs/adr/0002-universal-bot-protocol.md`), the Docker
-runtime (`docs/adr/0003-docker-bot-isolation.md`), and `@thunderdome/bot-sdk` (both the manifest
+runtime (`docs/adr/0003-docker-bot-isolation.md`), and `@thunderdome/bot-sdk-js` (both the manifest
 schema and the developer-facing `runBot()` protocol client) are all implemented and tested today,
 and identical regardless of which game you're writing for. So is the bot registry and the
 `match run`/`play`/`tournament run` CLI — see
@@ -32,7 +32,9 @@ assumes you already have them working.
 ## Quickstart checklist
 
 1. Run `yarn scaffold:bot <game-id> <your-bot-id>` for a working starting point (already using
-   `@thunderdome/bot-sdk`'s `runBot()`, §4) rather than writing the protocol plumbing by hand.
+   `@thunderdome/bot-sdk-js`'s `runBot()`, §4) rather than writing the protocol plumbing by hand.
+   `scaffold:bot` only generates TS/JS bots today — a Python bot starts from `thunderdome_bot_sdk`
+   (§4) instead, e.g. `bots/connect-four/tactical-connect-four/` as a working example to copy.
 2. Replace the scaffolded `decideAction()` with your actual strategy — §2 explains what you always
    receive and return conceptually; §9/§10/§11 give the exact types for Rock-Paper-Scissors/
    Hearts/Texas Hold'em.
@@ -75,7 +77,7 @@ Every game hands your bot exactly three things, all funneled through the same me
   must exactly match what that game's own `validateAction` expects; a malformed or game-illegal
   action is rejected the same way a missing one is.
 
-None of this is boilerplate you need to reimplement per game — `@thunderdome/bot-sdk`'s
+None of this is boilerplate you need to reimplement per game — `@thunderdome/bot-sdk-js`'s
 `runBot()` (§4) already handles the entire receive-observation/send-action loop for you. The only
 genuinely game-specific work you'll ever do is writing a `decideAction()` function against that
 one game's config/observation/action shapes — see §9 (Rock-Paper-Scissors) or §10 (Hearts) for
@@ -141,12 +143,12 @@ real numbers filled in.
 
 ## 4. Writing your bot: a complete example
 
-**If you're writing a TypeScript or JavaScript bot, use `@thunderdome/bot-sdk`'s `runBot()`** —
+**If you're writing a TypeScript or JavaScript bot, use `@thunderdome/bot-sdk-js`'s `runBot()`** —
 it's the exact protocol plumbing this section walks through by hand, already written, tested, and
 used by every real bot on the platform. With it, your entire bot is just:
 
 ```ts
-import { runBot } from '@thunderdome/bot-sdk';
+import { runBot } from '@thunderdome/bot-sdk-js';
 
 function decideAction(observation) {
   return { choice: 'rock' }; // whatever your game's Action shape is — see §9/§10/§11
@@ -155,14 +157,34 @@ function decideAction(observation) {
 runBot({ decideAction });
 ```
 
-Since `bots/**` isn't a Yarn workspace member, a real dependency on `@thunderdome/bot-sdk` means
+Since `bots/**` isn't a Yarn workspace member, a real dependency on `@thunderdome/bot-sdk-js` means
 vendoring a built tarball into your bot's own directory rather than a live workspace link — see
-[`scripts/pack-bot-sdk.sh`](../../scripts/pack-bot-sdk.sh), or any real bot under `bots/`, for the
+[`scripts/pack-bot-sdk-js.sh`](../../scripts/pack-bot-sdk-js.sh), or any real bot under `bots/`, for the
 `vendor/`, `package.json`, and Dockerfile pattern this requires (§6 shows the Dockerfile side).
 
+**If you're writing a Python bot, use `thunderdome_bot_sdk`'s `run_bot()`** — the same protocol
+plumbing, translated idiomatically rather than a hand-rolled reimplementation:
+
+```python
+from thunderdome_bot_sdk import run_bot
+
+def decide_action(observation):
+    return {"choice": "rock"}  # whatever your game's Action shape is — see §9/§10/§11
+
+run_bot(decide_action)
+```
+
+`thunderdome_bot_sdk.py` lives at [`packages/bot-sdk-python`](../../packages/bot-sdk-python) —
+read its own `README.md` for the full API (including the `on_init` hook for seeding your own PRNG
+from `rngSeed`). Same vendoring story as `@thunderdome/bot-sdk-js`, but simpler: there's no build
+step or package format, so vendoring is a straight file copy —
+[`scripts/vendor-python-bot-sdk.sh`](../../scripts/vendor-python-bot-sdk.sh) does it, or see
+`bots/connect-four/tactical-connect-four/` for the pattern end to end.
+
 The rest of this section walks through implementing the same protocol by hand, in plain JS with
-zero dependencies — useful if you're writing a bot in a language other than TS/JS, or you just
-want to understand what `runBot()` is doing under the hood. It splits cleanly into two pieces:
+zero dependencies — useful if you're writing a bot in a language with no SDK of its own yet (i.e.
+anything other than TS/JS or Python), or you just want to understand what `runBot()`/`run_bot()`
+is doing under the hood. It splits cleanly into two pieces:
 generic protocol plumbing (framing, the init/ready handshake, match-end shutdown) that has zero
 knowledge of any particular game, and your actual strategy (one function: given this round's
 observation, what's your action?). The worked example below plays whatever beats the opponent's
@@ -244,8 +266,8 @@ A few things worth noticing, all still true no matter which game you're targetin
 
 ## 5. The manifest
 
-Every bot needs a `manifest.json` describing it (validated by `@thunderdome/bot-sdk`'s
-`BotManifestSchema` — see `packages/bot-sdk/src/manifest.ts` for the authoritative schema):
+Every bot needs a `manifest.json` describing it (validated by `@thunderdome/bot-sdk-js`'s
+`BotManifestSchema` — see `packages/bot-sdk-js/src/manifest.ts` for the authoritative schema):
 
 ```json
 {
@@ -293,7 +315,7 @@ COPY harness.mjs strategy.mjs index.mjs ./
 ENTRYPOINT ["node", "index.mjs"]
 ```
 
-**Plain JavaScript using `@thunderdome/bot-sdk`'s `runBot()`** (most real reference bots use this
+**Plain JavaScript using `@thunderdome/bot-sdk-js`'s `runBot()`** (most real reference bots use this
 shape — e.g. `bots/card-game-hearts/lowest-card-hearts/Dockerfile`):
 
 ```dockerfile
@@ -334,7 +356,7 @@ ENTRYPOINT ["node", "dist/index.js"]
 
 `yarn scaffold:bot <game-id> <your-bot-id> --lang ts` generates the TypeScript form; the default
 (no `--lang`, or `--lang js`) generates the plain-JS form. Either way, run
-`./scripts/pack-bot-sdk.sh` afterward to populate `vendor/` and generate `package-lock.json`.
+`./scripts/pack-bot-sdk-js.sh` afterward to populate `vendor/` and generate `package-lock.json`.
 
 ## 7. Testing your bot locally
 
@@ -371,7 +393,7 @@ than only ever reading it off a final tally. Type `quit` any time to stop early.
 ## 8. Submitting your bot
 
 Open a PR that touches only `bots/<game-id>/<your-bot-id>/` — mechanically enforced by
-`tools/boundary-check` (`docs/adr/0007-repository-enforcement.md`), which also checks that your
+`ci/tools/boundary-check` (`docs/adr/0007-repository-enforcement.md`), which also checks that your
 manifest's `game` field agrees with the game you're grouped under. There's no separate
 registration step: the bot registry (`@thunderdome/registry`) is a pure filesystem scan of
 `manifest.json` files, so the moment your PR merges, your bot is discoverable and playable via
@@ -580,7 +602,7 @@ fully-observable, single-action-shape game:
   crosses `config.pointLimit` (lowest score wins).
 
 Everything else — the NDJSON wire framing, the init/ready handshake, `stdout` being
-protocol-only, `seq` strictly increasing, using `@thunderdome/bot-sdk`'s `runBot()` — is identical
+protocol-only, `seq` strictly increasing, using `@thunderdome/bot-sdk-js`'s `runBot()` — is identical
 to every other game on the platform (§1-§8 above).
 
 ### The contract
@@ -772,7 +794,7 @@ The only Hearts-specific part of `decideAction()` is branching on `observation.p
 simplest possible real bot (`bots/card-game-hearts/lowest-card-hearts/index.mjs`), in full:
 
 ```js
-import { runBot } from '@thunderdome/bot-sdk';
+import { runBot } from '@thunderdome/bot-sdk-js';
 
 function byRankAscending(a, b) {
   return a.rank - b.rank;
@@ -869,7 +891,7 @@ surface of any game on the platform so far:
   you have bet," the same reasoning Connect Four uses for having no sensible stand-in move.
 
 Everything else — the NDJSON wire framing, the init/ready handshake, `stdout` being
-protocol-only, `seq` strictly increasing, using `@thunderdome/bot-sdk`'s `runBot()` — is identical
+protocol-only, `seq` strictly increasing, using `@thunderdome/bot-sdk-js`'s `runBot()` — is identical
 to every other game on the platform (§1-§8 above).
 
 ### The contract

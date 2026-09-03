@@ -3,7 +3,7 @@
  * potential opponent patterns. Make educated guesses about 10% of the time, and if we get a lead,
  * then we go back to random as a way to continue to keep our score ahead.
  */
-import { runBot } from '@thunderdome/bot-sdk';
+import { runBot } from '@thunderdome/bot-sdk-js';
 
 type RpsChoice = 'rock' | 'paper' | 'scissors';
 

@@ -5,7 +5,7 @@
 ## Scope
 
 - [ ] This PR touches exactly one of: a single `bots/<game-id>/<bot-id>/` directory, `games/**`,
-      or platform code (`apps/**`, `packages/**`, `tools/**`, root config) — not a mix, unless a
+      or platform code (`apps/**`, `packages/**`, `ci/**`, root config) — not a mix, unless a
       maintainer has applied the `maintainer-override` label.
 - [ ] If this PR adds or changes a `manifest.json`, its `id` matches the containing directory
       name, and (for bots) its `game` field matches the `bots/<game-id>/` it's grouped under.

@@ -10,7 +10,7 @@ import {
   SwissLeagueConfigSchema,
   swissLeagueFormat,
   type SwissLeaguePublicStandingsEntry,
-} from '../src/swiss-league.js';
+} from '../src/index.js';
 
 const rng = createRng(Buffer.alloc(16, 3));
 

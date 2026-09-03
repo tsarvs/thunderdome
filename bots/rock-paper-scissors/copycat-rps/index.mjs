@@ -3,11 +3,11 @@
  * first round when there's no history yet.
  *
  * All of the NDJSON wire-protocol handling (replying to "init", reading "observation", exiting
- * on "match-end") lives in @thunderdome/bot-sdk's runBot() — see
+ * on "match-end") lives in @thunderdome/bot-sdk-js's runBot() — see
  * docs/guides/bot-author-guide.md for the full protocol walkthrough. This file only needs
  * to answer one question: decideAction().
  */
-import { runBot } from '@thunderdome/bot-sdk';
+import { runBot } from '@thunderdome/bot-sdk-js';
 
 /**
  * Decide this round's action.

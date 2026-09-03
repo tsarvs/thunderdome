@@ -7,7 +7,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@thunderdome/bot-sdk": "file:./vendor/thunderdome-bot-sdk.tgz"
+    "@thunderdome/bot-sdk-js": "file:./vendor/thunderdome-bot-sdk-js.tgz"
   },
   "devDependencies": {
     "@types/node": "^25.0.0",

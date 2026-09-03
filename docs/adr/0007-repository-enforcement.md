@@ -28,11 +28,11 @@ that specific gap.
 
 ### CI boundary-check as a required, mechanical gate
 
-`tools/boundary-check`, run in CI as a required status check (`.github/workflows/boundary-check.yml`),
+`ci/tools/boundary-check`, run in CI as a required status check (`.github/workflows/boundary-check.yml`),
 inspects the PR's actual changed-file list and enforces:
 
 1. A PR touching any `bots/**` path must not also touch any non-bot path (`packages/**`,
-   `apps/**`, `games/**`, `tools/**`, root config), **unless** a maintainer applies a
+   `apps/**`, `games/**`, `ci/**`, root config), **unless** a maintainer applies a
    `maintainer-override` label. Label application is gated by GitHub's own collaborator-permission
    model, so a fork-based competitor cannot self-apply it — no extra actor-identity check is
    needed in the script itself.
@@ -67,5 +67,5 @@ but branch protection itself cannot be configured before that.
   before it ever reaches human review.
 - Maintainers retain an explicit, audited escape hatch (`maintainer-override`) for legitimate
   cross-cutting platform PRs, without weakening the default for competitor submissions.
-- `tools/boundary-check` is a real, independently testable package (own Vitest suite) — the
+- `ci/tools/boundary-check` is a real, independently testable package (own Vitest suite) — the
   enforcement logic is not "a shell script nobody has tests for."

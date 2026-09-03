@@ -4,7 +4,7 @@ Competitor-owned code, grouped by game: `bots/<game-id>/<bot-id>/`. Each bot dir
 self-contained unit — any language, its own `Dockerfile`, never imported by the platform, never a
 Yarn workspace member (see `docs/adr/0001-monorepo-and-boundary.md`). A submission touches
 exactly one `bots/<game-id>/<bot-id>/` directory — mechanically enforced by
-`tools/boundary-check`, which also checks that a bot's manifest's `game` field agrees with the
+`ci/tools/boundary-check`, which also checks that a bot's manifest's `game` field agrees with the
 game it's grouped under.
 
 New to Node, Docker, or dev environments in general? Read
@@ -34,6 +34,7 @@ strategies actually trying to win — read them for strategy ideas, not API plum
 | [`rock-paper-scissors/only-scissors`](rock-paper-scissors/only-scissors/)       | Rock Paper Scissors | TypeScript | Always plays `scissors`, no matter what.                                                                     |
 | [`connect-four/leftmost-connect-four`](connect-four/leftmost-connect-four/)     | Connect Four        | JavaScript | Always drops into the lowest-indexed column that still has room, ignoring the board entirely.                |
 | [`connect-four/random-connect-four`](connect-four/random-connect-four/)        | Connect Four        | JavaScript | Picks a uniformly random legal column each turn, PRNG seeded from the match's `rngSeed`.                     |
+| [`connect-four/tactical-connect-four`](connect-four/tactical-connect-four/)    | Connect Four        | Python     | Plays an immediate winning move when one exists, otherwise blocks the opponent's immediate winning move, otherwise prefers the column closest to center. Uses `thunderdome_bot_sdk`, the Python analog of `@thunderdome/bot-sdk-js`. |
 | [`card-game-hearts/random-hearts`](card-game-hearts/random-hearts/)            | Hearts              | JavaScript | Uniformly random pass/play every turn, seeded from the match's `rngSeed`.                                    |
 | [`card-game-hearts/lowest-card-hearts`](card-game-hearts/lowest-card-hearts/)  | Hearts              | JavaScript | Always plays/passes by raw rank, ignoring the trick, hearts, or scores entirely.                             |
 | [`card-game-hearts/point-dodger-hearts`](card-game-hearts/point-dodger-hearts/) | Hearts              | JavaScript | Sheds dangerous cards when passing, leads safe non-point cards, ducks under the trick's current winner when it can, and dumps its most dangerous card when void in the led suit. |
@@ -63,19 +64,30 @@ image, then `node <bot>/smoke-test.mjs` from the repo root; any bot's own `smoke
 working template for the pattern (e.g.
 [`rock-paper-scissors/only-rock/smoke-test.mjs`](rock-paper-scissors/only-rock/smoke-test.mjs)).
 
-All eighteen depend on `@thunderdome/bot-sdk`'s `runBot()` for the NDJSON wire-protocol handling
-(replying to `init`, reading `observation`, exiting on `match-end`) — each bot's own file is just a
-`decideAction()` (and, for `random-rps`/`tominator-t800`/`tominator-t1000`/`tominator-tx`/
-`random-connect-four`/`random-hearts`/`random-poker`,
-an `onInit` hook to seed its PRNG from the match's `rngSeed`). Since `bots/**` isn't a Yarn
-workspace member, that dependency is a vendored tarball rather than a live workspace link: each bot
-has its own `package.json`, `package-lock.json`, and `vendor/thunderdome-bot-sdk.tgz`, produced by
-[`scripts/pack-bot-sdk.sh`](../scripts/README.md#pack-bot-sdksh). The `only-*` bots, every
+Every JS/TS bot depends on `@thunderdome/bot-sdk-js`'s `runBot()` for the NDJSON wire-protocol
+handling (replying to `init`, reading `observation`, exiting on `match-end`) — each bot's own file
+is just a `decideAction()` (and, for `random-rps`/`tominator-t800`/`tominator-t1000`/
+`tominator-tx`/`random-connect-four`/`random-hearts`/`random-poker`, an `onInit` hook to seed its
+PRNG from the match's `rngSeed`). `tactical-connect-four` is the one Python bot, and depends on
+the Python analog instead: [`packages/bot-sdk-python`](../packages/bot-sdk-python)'s `run_bot()`
+— same contract, same NDJSON wire protocol
+([`docs/guides/protocol-reference.md`](../docs/guides/protocol-reference.md)), just a `decide_action()`
+in place of `decideAction()`.
+
+Since `bots/**` isn't a Yarn workspace member and has no package registry to install from
+(neither npm nor Python's), a real dependency on either SDK means vendoring it directly into the
+bot's own directory rather than a live workspace link or an installed package. For
+`@thunderdome/bot-sdk-js` that's a packed tarball: each JS/TS bot has its own `package.json`,
+`package-lock.json`, and `vendor/thunderdome-bot-sdk-js.tgz`, produced by
+[`scripts/pack-bot-sdk-js.sh`](../scripts/README.md#pack-bot-sdk-jssh). `thunderdome_bot_sdk.py` has no
+build step or packaging format to speak of — vendoring it is a straight file copy, produced by
+[`scripts/vendor-python-bot-sdk.sh`](../scripts/vendor-python-bot-sdk.sh). The `only-*` bots, every
 `tominator-*` bot, and `tight-poker` additionally show the shape of a TypeScript bot: their own
 `tsconfig.json` and a multi-stage `Dockerfile` that compiles TS in a build stage and ships only the
 resulting JS plus production `node_modules` — no build tooling ends up in the runtime image.
-Every other bot listed above is plain JS with no build step at all — just an `index.mjs` (or
-`index.js`) shipped directly into the image.
+Every other JS/TS bot is plain JS with no build step at all — just an `index.mjs` (or `index.js`)
+shipped directly into the image. `tactical-connect-four` has no build step either — just
+`thunderdome_bot_sdk.py` and its own `bot.py`, copied straight into a `python:3.12-alpine` image.
 
 Want to watch them actually play each other? `yarn thunderdome match run <botId> <botId>
 [...moreBotIds]` runs a real match between registry-resolved bots through the real engine and

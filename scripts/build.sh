@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Yarn Classic's `workspaces run` does not guarantee topological order, and several packages
-# import another workspace's compiled output (tools/boundary-check <- bot-sdk/game-sdk;
+# import another workspace's compiled output (ci/tools/boundary-check <- bot-sdk-js/game-sdk;
 # games/rock-paper-scissors, games/connect-four <- engine <- rng) — so dependencies are built
 # explicitly before the packages that import them.
 INDEPENDENT_PACKAGES=(
@@ -13,7 +13,7 @@ INDEPENDENT_PACKAGES=(
   "@thunderdome/runtime"
   "@thunderdome/tournament-formats"
   "@thunderdome/tournament-store"
-  "@thunderdome/bot-sdk"
+  "@thunderdome/bot-sdk-js"
   "@thunderdome/game-sdk"
   "@thunderdome/registry"
   "@thunderdome/cli"

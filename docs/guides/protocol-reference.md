@@ -1,10 +1,10 @@
 # Protocol Reference
 
 A precise reference for the wire protocol every bot container speaks, regardless of language or
-game. If you're writing a bot in TypeScript, use `@thunderdome/bot-sdk`'s `runBot()`
+game. If you're writing a bot in TypeScript, use `@thunderdome/bot-sdk-js`'s `runBot()`
 (`docs/guides/bot-author-guide.md` walks through it) and you'll rarely need this document —
 it handles everything here for you. This guide is for implementing a bot client from scratch in
-a language `@thunderdome/bot-sdk` doesn't cover, or for understanding exactly what's on the wire
+a language `@thunderdome/bot-sdk-js` doesn't cover, or for understanding exactly what's on the wire
 when debugging.
 
 The full decision record and reasoning behind everything here is
@@ -315,5 +315,5 @@ documentation of intent.
 - `docs/adr/0002-universal-bot-protocol.md` — the full design and alternatives considered
 - `docs/adr/0004-deterministic-randomness.md` — the seed-derivation scheme `rngSeed` comes from
 - [`security-model.md`](security-model.md) — the forfeit-reason taxonomy in context, and what triggers each one
-- [`bot-author-guide.md`](bot-author-guide.md) — using `@thunderdome/bot-sdk` instead of implementing this by hand
+- [`bot-author-guide.md`](bot-author-guide.md) — using `@thunderdome/bot-sdk-js` instead of implementing this by hand
 - `packages/protocol/src/messages.ts` — the actual zod schemas this reference describes
