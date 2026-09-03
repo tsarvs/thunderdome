@@ -55,7 +55,7 @@ describe('removeThunderdomeContainers', () => {
     const getContainer = vi.fn().mockReturnValue({ remove });
     const docker = { getContainer } as unknown as Docker;
 
-    await removeThunderdomeContainers(
+    const outcome = await removeThunderdomeContainers(
       [
         { id: 'abc123', matchId: 'm1', participantId: 'p1', state: 'running' },
         { id: 'def456', matchId: 'm2', participantId: 'p2', state: 'exited' },
@@ -67,19 +67,39 @@ describe('removeThunderdomeContainers', () => {
     expect(getContainer).toHaveBeenCalledWith('def456');
     expect(remove).toHaveBeenCalledWith({ force: true, v: true });
     expect(remove).toHaveBeenCalledTimes(2);
+    expect(outcome).toEqual({ removedCount: 2, failures: [] });
   });
 
-  it('does not throw if a container is already gone', async () => {
-    const remove = vi.fn().mockRejectedValue(new Error('no such container'));
+  it('counts an already-gone container (a 404 from the daemon) as removed, not a failure', async () => {
+    const notFound = Object.assign(new Error('no such container'), { statusCode: 404 });
+    const remove = vi.fn().mockRejectedValue(notFound);
     const getContainer = vi.fn().mockReturnValue({ remove });
     const docker = { getContainer } as unknown as Docker;
 
-    await expect(
-      removeThunderdomeContainers(
-        [{ id: 'abc123', matchId: 'm1', participantId: 'p1', state: 'running' }],
-        docker,
-      ),
-    ).resolves.toBeUndefined();
+    const outcome = await removeThunderdomeContainers(
+      [{ id: 'abc123', matchId: 'm1', participantId: 'p1', state: 'running' }],
+      docker,
+    );
+
+    expect(outcome).toEqual({ removedCount: 1, failures: [] });
+  });
+
+  it('reports a genuine removal failure instead of silently swallowing it', async () => {
+    const remove = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('container is restarting'), { statusCode: 409 }));
+    const getContainer = vi.fn().mockReturnValue({ remove });
+    const docker = { getContainer } as unknown as Docker;
+
+    const outcome = await removeThunderdomeContainers(
+      [{ id: 'abc123', matchId: 'm1', participantId: 'p1', state: 'running' }],
+      docker,
+    );
+
+    expect(outcome).toEqual({
+      removedCount: 0,
+      failures: [{ id: 'abc123', reason: 'container is restarting' }],
+    });
   });
 });
 
@@ -121,7 +141,7 @@ describe('removeThunderdomeImages', () => {
     const getImage = vi.fn().mockReturnValue({ remove });
     const docker = { getImage } as unknown as Docker;
 
-    await removeThunderdomeImages(
+    const outcome = await removeThunderdomeImages(
       [
         { id: 'sha256:abc123', tags: ['thunderdome-bot-tominator-t1:latest'] },
         { id: 'sha256:def456', tags: ['thunderdome-bot-random-hearts:latest'] },
@@ -133,15 +153,34 @@ describe('removeThunderdomeImages', () => {
     expect(getImage).toHaveBeenCalledWith('sha256:def456');
     expect(remove).toHaveBeenCalledWith({ force: true });
     expect(remove).toHaveBeenCalledTimes(2);
+    expect(outcome).toEqual({ removedCount: 2, failures: [] });
   });
 
-  it('does not throw if an image is already gone', async () => {
-    const remove = vi.fn().mockRejectedValue(new Error('no such image'));
+  it('counts an already-gone image (a 404 from the daemon) as removed, not a failure', async () => {
+    const notFound = Object.assign(new Error('no such image'), { statusCode: 404 });
+    const remove = vi.fn().mockRejectedValue(notFound);
     const getImage = vi.fn().mockReturnValue({ remove });
     const docker = { getImage } as unknown as Docker;
 
-    await expect(
-      removeThunderdomeImages([{ id: 'sha256:abc123', tags: [] }], docker),
-    ).resolves.toBeUndefined();
+    const outcome = await removeThunderdomeImages([{ id: 'sha256:abc123', tags: [] }], docker);
+
+    expect(outcome).toEqual({ removedCount: 1, failures: [] });
+  });
+
+  it('reports a genuine removal failure instead of silently swallowing it', async () => {
+    const remove = vi.fn().mockRejectedValue(
+      Object.assign(new Error('image is being used by a running container'), {
+        statusCode: 409,
+      }),
+    );
+    const getImage = vi.fn().mockReturnValue({ remove });
+    const docker = { getImage } as unknown as Docker;
+
+    const outcome = await removeThunderdomeImages([{ id: 'sha256:abc123', tags: [] }], docker);
+
+    expect(outcome).toEqual({
+      removedCount: 0,
+      failures: [{ id: 'sha256:abc123', reason: 'image is being used by a running container' }],
+    });
   });
 });

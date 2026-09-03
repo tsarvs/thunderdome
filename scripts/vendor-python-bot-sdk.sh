@@ -19,6 +19,7 @@ SOURCE="packages/bot-sdk-python/thunderdome_bot_sdk.py"
 
 BOT_DIRS=(
   "bots/connect-four/tactical-connect-four"
+  "bots/stock-market/news-reaction-stock-market"
 )
 
 for dir in "${BOT_DIRS[@]}"; do

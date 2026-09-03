@@ -160,7 +160,10 @@ docker ps
 ### 4. Clone and bootstrap
 
 ```bash
+# download the repo
 git clone <this-repo-url>
+
+# install dependencies and build the CLI
 cd thunderdome
 fnm use --install-if-missing   # or your version manager's equivalent — see step 1
 npm install -g yarn@1.22.22    # if you don't already have this exact Yarn version
@@ -169,14 +172,28 @@ yarn build
 yarn lint
 yarn typecheck
 yarn test
+
+# other helpful commands:
 yarn thunderdome --help
-yarn thunderdome match run only-rock only-paper --config '{"totalRounds":3}'   # one real match
-yarn thunderdome tournament run only-rock only-paper only-scissors --game-config '{"totalRounds":3}'   # a real round-robin tournament, see apps/cli/README.md
-yarn thunderdome match run leftmost-connect-four random-connect-four   # the second game, Connect Four
-yarn thunderdome match run random-hearts lowest-card-hearts point-dodger-hearts tominator-t101   # the third game, Hearts (exactly 4 seats)
-yarn thunderdome match run random-poker calling-station-poker --config '{"startingStack":500,"totalHands":5,"matchFormat":"fixedHands"}'   # the fourth game, Texas Hold'em
-yarn thunderdome play tominator-tx --game-config '{"totalRounds":10}'   # step into the ring yourself, see apps/cli/README.md
-yarn thunderdome cleanup   # force-remove any leftover bot containers, if you ever need to
+
+# running bot vs bot matches
+yarn thunderdome match run only-rock only-paper --config '{"totalRounds":300}'
+yarn thunderdome match run leftmost-connect-four random-connect-four
+yarn thunderdome match run random-hearts lowest-card-hearts point-dodger-hearts tominator-t101   # requires ecatly 4 seats
+yarn thunderdome match run random-poker calling-station-poker --config '{"startingStack":500,"totalHands":5,"matchFormat":"fixedHands"}'
+yarn thunderdome match run random-stock-market buy-and-hold-stock-market momentum-stock-market mean-reversion-stock-market --config '{"rounds":20}'
+
+# play bots yourself
+yarn thunderdome play tominator-tx --game-config '{"totalRounds":10}'
+
+# running tournaments
+yarn thunderdome tournament list   # list all previous tournaments
+yarn thunderdome tournament inspect d92ae42a-cd34-461a-a791-669b17b6c33d   # inspect a specific tournament
+yarn thunderdome tournament replay d92ae42a-cd34-461a-a791-669b17b6c33d   # replay a specific tournament
+yarn thunderdome tournament run only-rock only-paper only-scissors --game-config '{"totalRounds":3}'   # a real round-robin tournament
+
+# clean up any leftover bot containers
+yarn thunderdome cleanup
 ```
 
 ## Taking your place among legends

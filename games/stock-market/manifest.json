@@ -1,0 +1,18 @@
+{
+  "id": "stock-market",
+  "name": "Stock Market",
+  "version": "0.1.0",
+  "entryPackage": "@thunderdome/game-stock-market",
+  "protocolVersion": "^1.0",
+  "minParticipants": 2,
+  "maxParticipants": 10,
+  "deterministic": false,
+  "supportedTournamentFormats": ["round-robin"],
+  "maintainers": [
+    {
+      "name": "Tom Sarver",
+      "contact": "tom@tomsarver.dev"
+    }
+  ],
+  "description": "A turn-based simulated stock market: every bot trades one stock over a fixed number of rounds, trying to end with the highest portfolio value."
+}

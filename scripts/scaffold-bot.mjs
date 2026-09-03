@@ -165,6 +165,28 @@ interface Observation {
  * card happens on every other turn. */
 type Action = { type: 'pass'; cards: [Card, Card, Card] } | { type: 'play'; card: Card };
 `,
+  'stock-market': `
+interface Observation {
+  round: number;
+  totalRounds: number;
+  portfolio: {
+    cash: number;
+    shares: number;
+    value: number;
+  };
+  market: {
+    price: number;
+    priceHistory: number[];
+    lastRoundVolume: { sharesBought: number; sharesSold: number; netDemand: number } | null;
+  };
+  event: {
+    type: string;
+    description: string;
+  };
+}
+
+type Action = { action: 'BUY' | 'SELL'; quantity: number } | { action: 'HOLD' };
+`,
 };
 
 console.log(`Scaffolding bots/${gameId}/${botId}/ ("${title}", ${lang})...`);

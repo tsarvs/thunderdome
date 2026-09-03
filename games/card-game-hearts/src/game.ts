@@ -1,4 +1,10 @@
-import { type Card, cardId, containsCard, removeCards, sortCards } from '@thunderdome/deck-of-cards';
+import {
+  type Card,
+  cardId,
+  containsCard,
+  removeCards,
+  sortCards,
+} from '@thunderdome/deck-of-cards';
 import {
   err,
   ok,

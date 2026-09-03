@@ -21,6 +21,31 @@ export interface ThunderdomeContainerInfo {
   state: string;
 }
 
+export interface RemovalFailure {
+  id: string;
+  reason: string;
+}
+
+/** `removedCount` includes anything that was already gone by the time removal ran (a 404 from
+ * the daemon) — that's a success from the caller's perspective, not a failure. Only `failures`
+ * are genuine: the daemon rejected the removal for some other reason (most commonly a transient
+ * one, e.g. the container's own teardown hadn't fully released its resources yet), and the
+ * resource is still actually present. */
+export interface RemovalOutcome {
+  removedCount: number;
+  failures: RemovalFailure[];
+}
+
+function isNotFoundError(error: unknown): boolean {
+  return (
+    typeof error === 'object' && error !== null && 'statusCode' in error && error.statusCode === 404
+  );
+}
+
+function reasonOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /** Every container this platform has ever created that the daemon still knows about — running
  * or already exited, from this process or a different one entirely. */
 export async function listThunderdomeContainers(
@@ -41,21 +66,32 @@ export async function listThunderdomeContainers(
 /** Force-removes every listed container, and along with it any anonymous volume Docker attached
  * to that container (`v: true`) — bots never mount named/bind volumes (`Binds: []` in
  * docker-config.ts), so an anonymous volume from a bot image's own `VOLUME` instruction is the
- * only kind of volume a bot container could have. Best-effort: one already gone by the time this
- * runs (e.g. removed by something else in the meantime) is not an error. */
+ * only kind of volume a bot container could have. One already gone by the time this runs (e.g.
+ * removed by something else in the meantime) counts as removed, not a failure — but any other
+ * rejection from the daemon (most commonly transient: the container's own teardown hadn't fully
+ * released its resources yet) is reported back rather than silently swallowed, so a caller can
+ * retry instead of wrongly believing everything is gone. */
 export async function removeThunderdomeContainers(
   infos: readonly ThunderdomeContainerInfo[],
   docker: Docker = new Docker(),
-): Promise<void> {
+): Promise<RemovalOutcome> {
+  const failures: RemovalFailure[] = [];
+  let removedCount = 0;
   await Promise.all(
     infos.map(async (info) => {
       try {
         await docker.getContainer(info.id).remove({ force: true, v: true });
-      } catch {
-        // Already gone — fine.
+        removedCount += 1;
+      } catch (error) {
+        if (isNotFoundError(error)) {
+          removedCount += 1;
+          return;
+        }
+        failures.push({ id: info.id, reason: reasonOf(error) });
       }
     }),
   );
+  return { removedCount, failures };
 }
 
 export interface ThunderdomeImageInfo {
@@ -80,20 +116,30 @@ export async function listThunderdomeImages(
   }));
 }
 
-/** Force-removes every listed image. Best-effort: one already gone, or still referenced by a
- * container this call didn't know about, is not an error — callers should remove containers
- * first (see `runCleanupCommand`) so that's not the common case. */
+/** Force-removes every listed image. One already gone by the time this runs counts as removed,
+ * not a failure. Anything else the daemon rejects — most commonly "still referenced by a
+ * container this call didn't know about" (callers should remove containers first; see
+ * `runCleanupCommand`) — is reported back rather than silently swallowed, so a caller can retry
+ * instead of wrongly believing everything is gone. */
 export async function removeThunderdomeImages(
   infos: readonly ThunderdomeImageInfo[],
   docker: Docker = new Docker(),
-): Promise<void> {
+): Promise<RemovalOutcome> {
+  const failures: RemovalFailure[] = [];
+  let removedCount = 0;
   await Promise.all(
     infos.map(async (info) => {
       try {
         await docker.getImage(info.id).remove({ force: true });
-      } catch {
-        // Already gone, or still in use — fine, best-effort.
+        removedCount += 1;
+      } catch (error) {
+        if (isNotFoundError(error)) {
+          removedCount += 1;
+          return;
+        }
+        failures.push({ id: info.id, reason: reasonOf(error) });
       }
     }),
   );
+  return { removedCount, failures };
 }

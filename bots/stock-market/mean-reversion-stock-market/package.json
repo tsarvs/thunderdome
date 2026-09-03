@@ -1,0 +1,9 @@
+{
+  "name": "mean-reversion-stock-market",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@thunderdome/bot-sdk-js": "file:./vendor/thunderdome-bot-sdk-js.tgz"
+  }
+}

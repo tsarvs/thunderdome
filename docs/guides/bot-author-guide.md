@@ -8,9 +8,9 @@ game (the exact shape of what you receive and what you send back) live in their 
 end: [§9 Rock-Paper-Scissors specifics](#9-rock-paper-scissors-specifics),
 [§10 Hearts specifics](#10-hearts-specifics), and
 [§11 Texas Hold'em specifics](#11-texas-holdem-specifics). Building a bot for a game without its
-own section here (Connect Four, or one you're authoring yourself)? That game's own `src/types.ts`
-plus [`protocol-reference.md`](protocol-reference.md) document the same three things (config,
-observation, action) a dedicated section would.
+own section here (Connect Four, Stock Market, or one you're authoring yourself)? That game's own
+`src/types.ts` plus [`protocol-reference.md`](protocol-reference.md) document the same three
+things (config, observation, action) a dedicated section would.
 
 **Status check first:** the protocol (`docs/adr/0002-universal-bot-protocol.md`), the Docker
 runtime (`docs/adr/0003-docker-bot-isolation.md`), and `@thunderdome/bot-sdk-js` (both the manifest
@@ -18,12 +18,13 @@ schema and the developer-facing `runBot()` protocol client) are all implemented 
 and identical regardless of which game you're writing for. So is the bot registry and the
 `match run`/`play`/`tournament run` CLI — see
 [`tournament-author-guide.md`](tournament-author-guide.md) for round robin, single elimination,
-and Swiss league. Four games have real, playable bots today: Rock-Paper-Scissors (2 players,
+and Swiss league. Five games have real, playable bots today: Rock-Paper-Scissors (2 players,
 simultaneous, fully observable), Connect Four (2 players, sequential, fully observable — no
 dedicated bot-author section yet, see above), Hearts (4 players, hidden information, two action
-shapes), and Texas Hold'em (2-10 players, hidden information, no-limit betting). Where this guide
-describes something that doesn't exist yet, it says so explicitly rather than pretending
-otherwise.
+shapes), Texas Hold'em (2-10 players, hidden information, no-limit betting), and Stock Market
+(2-10 players, simultaneous, a hidden fundamental value instead of hidden cards — no dedicated
+bot-author section yet either). Where this guide describes something that doesn't exist yet, it
+says so explicitly rather than pretending otherwise.
 
 **New to Node, Docker, or dev environments in general?**
 [`getting-started.md`](getting-started.md) explains those from first principles before this guide

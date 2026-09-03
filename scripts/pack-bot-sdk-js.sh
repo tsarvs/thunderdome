@@ -51,6 +51,11 @@ BOT_DIRS=(
   "bots/poker-texas-hold-em/random-poker"
   "bots/poker-texas-hold-em/calling-station-poker"
   "bots/poker-texas-hold-em/tight-poker"
+  "bots/stock-market/random-stock-market"
+  "bots/stock-market/buy-and-hold-stock-market"
+  "bots/stock-market/momentum-stock-market"
+  "bots/stock-market/mean-reversion-stock-market"
+  "bots/stock-market/target-allocation-stock-market"
 )
 
 for dir in "${BOT_DIRS[@]}"; do
