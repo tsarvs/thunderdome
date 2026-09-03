@@ -5,7 +5,7 @@ import {
   shuffle,
   sortCards,
   standardDeck,
-} from '@thunderdome/card-kit';
+} from '@thunderdome/deck-of-cards';
 import type { Rng } from '@thunderdome/engine';
 import type { HeartsState, HeartsTrick, PassDirection } from './types.js';
 

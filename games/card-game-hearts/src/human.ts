@@ -1,4 +1,4 @@
-import { cardId, parseCardId, sortCards, type Card } from '@thunderdome/card-kit';
+import { cardId, parseCardId, sortCards, type Card } from '@thunderdome/deck-of-cards';
 import { passTargetIndex } from './rules.js';
 import type { HeartsAction, HeartsObservation } from './types.js';
 

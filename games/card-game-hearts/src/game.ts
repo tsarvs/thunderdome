@@ -1,4 +1,4 @@
-import { type Card, cardId, containsCard, removeCards, sortCards } from '@thunderdome/card-kit';
+import { type Card, cardId, containsCard, removeCards, sortCards } from '@thunderdome/deck-of-cards';
 import {
   err,
   ok,

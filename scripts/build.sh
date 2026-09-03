@@ -8,7 +8,7 @@ set -euo pipefail
 INDEPENDENT_PACKAGES=(
   "@thunderdome/protocol"
   "@thunderdome/rng"
-  "@thunderdome/card-kit"
+  "@thunderdome/deck-of-cards"
   "@thunderdome/engine"
   "@thunderdome/runtime"
   "@thunderdome/tournament-formats"

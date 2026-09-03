@@ -19,7 +19,7 @@ Classic's `workspaces run` doesn't guarantee topological order — see `scripts/
 | [`registry`](registry/)                                   | Filesystem scan and validation of bot and game manifests — how the CLI resolves a bot/game id to real code.                                                                            | `bot-sdk-js`, `game-sdk` |
 | [`tournament-formats`](tournament-formats/)               | Concrete `TournamentFormat` implementations: round robin and single elimination.                                                                                                       | `engine`                 |
 | [`tournament-store`](tournament-store/)                   | Persisted `TournamentRecord` read/write — one JSON file per tournament, no database.                                                                                                   | `engine`                 |
-| [`game-dev-toolkit/card-kit`](game-dev-toolkit/card-kit/) | Shared card/deck/trick primitives for card games — currently backs `games/card-game-hearts`.                                                                                           | `rng`                    |
+| [`game-dev-toolkit/deck-of-cards`](game-dev-toolkit/deck-of-cards/) | Shared card/deck/trick primitives for card games — currently backs `games/card-game-hearts` and `games/poker-texas-hold-em`. | `rng`                    |
 
 `game-dev-toolkit/*` is its own workspace glob in the root `package.json` (a toolkit family rather
 than a single package), separate from the flat `packages/*` glob the rest of this directory uses.

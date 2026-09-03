@@ -28,7 +28,7 @@ formats, maintainers), and a `dist/` produced by `yarn build`.
 
 Every game depends on `@thunderdome/engine` for the `GameDefinition` contract it implements, plus
 whatever else its rules need — `card-game-hearts` and `poker-texas-hold-em` also pull in
-[`@thunderdome/card-kit`](../packages/game-dev-toolkit/card-kit/) for shared card/deck
+[`@thunderdome/deck-of-cards`](../packages/game-dev-toolkit/deck-of-cards/) for shared card/deck
 primitives. See [`packages/README.md`](../packages/README.md) for what each of those packages
 actually provides.
 

@@ -1,4 +1,4 @@
-import { type Card, cardId, containsCard, parseCardId, standardDeck } from '@thunderdome/card-kit';
+import { type Card, cardId, containsCard, parseCardId, standardDeck } from '@thunderdome/deck-of-cards';
 import { createRng } from '@thunderdome/rng';
 import { describe, expect, it } from 'vitest';
 import { hearts } from '../src/game.js';

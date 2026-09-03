@@ -1,4 +1,4 @@
-import { cardId } from '@thunderdome/card-kit';
+import { cardId } from '@thunderdome/deck-of-cards';
 import { describe, expect, it } from 'vitest';
 import { dealNewHand } from '../src/deal.js';
 import { nextButton, preflopFirstToActIndex } from '../src/table.js';

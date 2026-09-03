@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@thunderdome/card-kit": "^0.1.0",
+    "@thunderdome/deck-of-cards": "^0.1.0",
     "@thunderdome/engine": "^0.1.0",
     "zod": "^3.23.8"
   }
