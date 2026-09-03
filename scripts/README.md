@@ -79,25 +79,32 @@ every method, in the same order the scaffold's TODO comments reference.
 
 ## scaffold-bot.mjs
 
-Generates a new `bots/<game-id>/<bot-id>/` directory — a starter bot on `@thunderdome/bot-sdk-js`'s
-`runBot()`, structured like `bots/rock-paper-scissors/only-rock` (TypeScript, the default) or
-`bots/connect-four/random-connect-four` (`--lang js`). Works for any game, including one you just
-scaffolded above. It also adds the new bot directory to `pack-bot-sdk-js.sh`'s `BOT_DIRS` array.
-(There's no scaffold for a Python bot yet — start from `packages/bot-sdk-python` and
-`bots/connect-four/tactical-connect-four/` instead; see `docs/guides/bot-author-guide.md` §4.)
+Generates a new `bots/<game-id>/<bot-id>/` directory — a starter bot structured like
+`bots/rock-paper-scissors/only-rock` (`--lang ts`, the default), `bots/connect-four/random-connect-four`
+(`--lang js`), or `bots/connect-four/tactical-connect-four` (`--lang python`). Works for any game,
+including one you just scaffolded above.
+
+- `ts`/`js` bots are built on `@thunderdome/bot-sdk-js`'s `runBot()`; the script also adds the new
+  bot directory to `pack-bot-sdk-js.sh`'s `BOT_DIRS` array so `./scripts/pack-bot-sdk-js.sh` (below)
+  vendors it.
+- `python` bots are built on `thunderdome_bot_sdk`'s `run_bot()` — the script copies
+  `packages/bot-sdk-python/thunderdome_bot_sdk.py` straight into the new bot's directory, so
+  there's no separate vendoring step needed before the first `docker build`. It also adds the new
+  bot directory to `vendor-python-bot-sdk.sh`'s `BOT_DIRS` array, so re-running that script later
+  keeps this bot's copy in sync if `packages/bot-sdk-python` changes.
 
 ```bash
 node scripts/scaffold-bot.mjs card-game-hearts my-first-hearts-bot
-./scripts/pack-bot-sdk-js.sh   # vendors @thunderdome/bot-sdk-js in and generates package-lock.json
+./scripts/pack-bot-sdk-js.sh   # ts/js only — vendors @thunderdome/bot-sdk-js and generates package-lock.json
 ```
 
-Then fill in the real `Observation`/`Action` shapes and `decideAction()` — see
+Then fill in the real `Observation`/`Action` shapes and `decideAction()`/`decide_action()` — see
 [`docs/guides/bot-author-guide.md`](../docs/guides/bot-author-guide.md) for the wire protocol
 walkthrough (game-agnostic throughout §1-§8; §10 has Hearts' own `Observation`/`Action` shapes for
 this example).
 
-The script also adds your bot to `pack-bot-sdk-js.sh`'s `BOT_DIRS` array so you can run it locally —
-but if you're submitting a community bot PR, `ci/tools/boundary-check` requires that PR to touch only
-`bots/<game-id>/<bot-id>/**` (`docs/adr/0007-repository-enforcement.md`), so revert that one edit
-(`git checkout -- scripts/pack-bot-sdk-js.sh`) before committing; a maintainer adds it to `BOT_DIRS`
-permanently when merging.
+If you're submitting a community bot PR, `ci/tools/boundary-check` requires that PR to touch only
+`bots/<game-id>/<bot-id>/**` (`docs/adr/0007-repository-enforcement.md`), so revert the `BOT_DIRS`
+edit the script made — `git checkout -- scripts/pack-bot-sdk-js.sh` (ts/js) or
+`git checkout -- scripts/vendor-python-bot-sdk.sh` (python) — before committing; a maintainer adds
+your bot to `BOT_DIRS` permanently when merging.

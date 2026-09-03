@@ -1,18 +1,20 @@
 #!/usr/bin/env node
 /**
- * Scaffolds a new bots/<game-id>/<bot-id>/ directory — a starter bot using @thunderdome/bot-sdk-js's
- * runBot() (see docs/guides/bot-author-guide.md), with a decideAction() left as a TODO for
- * whatever game it's targeting. Works for any game, not just ones scaffolded by
+ * Scaffolds a new bots/<game-id>/<bot-id>/ directory — a starter bot using, depending on
+ * --lang, @thunderdome/bot-sdk-js's runBot() (ts/js) or thunderdome_bot_sdk's run_bot()
+ * (python) — see docs/guides/bot-author-guide.md — with a decideAction()/decide_action() left
+ * as a TODO for whatever game it's targeting. Works for any game, not just ones scaffolded by
  * scripts/scaffold-game.mjs.
  *
  * Usage:
- *   node scripts/scaffold-bot.mjs <game-id> <bot-id> [--name "Display Name"] [--lang ts|js]
+ *   node scripts/scaffold-bot.mjs <game-id> <bot-id> [--name "Display Name"] [--lang ts|js|python]
  *     [--author-name "Name"] [--author-contact "email"]
  *
  * Example:
  *   node scripts/scaffold-bot.mjs card-game-hearts my-first-hearts-bot
+ *   node scripts/scaffold-bot.mjs connect-four my-first-python-bot --lang python
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   assertKebabCase,
@@ -32,7 +34,7 @@ const args = parseArgs(process.argv.slice(2), {
 
 if (!args.gameId || !args.botId) {
   console.error(
-    'Usage: node scripts/scaffold-bot.mjs <game-id> <bot-id> [--name "Display Name"] [--lang ts|js] ...',
+    'Usage: node scripts/scaffold-bot.mjs <game-id> <bot-id> [--name "Display Name"] [--lang ts|js|python] ...',
   );
   process.exit(1);
 }
@@ -43,8 +45,8 @@ assertKebabCase(gameId, 'game-id');
 assertKebabCase(botId, 'bot-id');
 
 const lang = args.lang ?? 'ts';
-if (lang !== 'ts' && lang !== 'js') {
-  throw new Error(`--lang must be "ts" or "js", got "${lang}"`);
+if (lang !== 'ts' && lang !== 'js' && lang !== 'python') {
+  throw new Error(`--lang must be "ts", "js", or "python", got "${lang}"`);
 }
 
 const title = args.name ?? kebabToTitle(botId);
@@ -167,6 +169,9 @@ type Action = { type: 'pass'; cards: [Card, Card, Card] } | { type: 'play'; card
 
 console.log(`Scaffolding bots/${gameId}/${botId}/ ("${title}", ${lang})...`);
 
+const runtime =
+  lang === 'python' ? { language: 'other', languageVersion: '3.12' } : { language: 'node' };
+
 writeScaffoldFile(
   join(botDir, 'manifest.json'),
   `${JSON.stringify(
@@ -176,7 +181,7 @@ writeScaffoldFile(
       version: '0.1.0',
       game: gameId,
       author: { name: authorName, contact: authorContact },
-      runtime: { language: 'node' },
+      runtime,
       interface: { transport: 'stdio' },
       protocolVersion: '^1.0',
       description: `TODO: describe ${title}'s strategy.`,
@@ -294,7 +299,7 @@ function decideAction(_observation: Observation): Action {
 runBot<Observation, Action>({ decideAction });
 `,
   );
-} else {
+} else if (lang === 'js') {
   writeScaffoldFile(
     join(botDir, 'package.json'),
     `${JSON.stringify(
@@ -342,30 +347,114 @@ function decideAction(_observation) {
 runBot({ decideAction });
 `,
   );
+} else {
+  // python — no package manager, no build step: thunderdome_bot_sdk.py is copied straight into
+  // the bot's own directory (see packages/bot-sdk-python/README.md for why bots/** vendors it
+  // this way instead of a pip install), so the scaffold is immediately buildable with no
+  // separate vendoring step required first.
+  const sdkSource = readFileSync(
+    join(REPO_ROOT, 'packages', 'bot-sdk-python', 'thunderdome_bot_sdk.py'),
+    'utf8',
+  );
+  writeScaffoldFile(join(botDir, 'thunderdome_bot_sdk.py'), sdkSource);
+
+  writeScaffoldFile(
+    join(botDir, 'Dockerfile'),
+    `FROM python:3.12-alpine
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1
+COPY thunderdome_bot_sdk.py bot.py ./
+ENTRYPOINT ["python3", "bot.py"]
+`,
+  );
+
+  const pyTypesComment = knownGameTypes
+    ? `See games/${gameId}/src/types.ts for the exact Observation/Action shapes (Python has no\nstatic types to fill in here, but the same fields apply).`
+    : `See games/${gameId}/src/types.ts (if defined in this repo) for the exact Observation/Action\nshapes, or your game's own docs otherwise.`;
+
+  writeScaffoldFile(
+    join(botDir, 'bot.py'),
+    `#!/usr/bin/env python3
+"""${title} — a starter bot for the "${gameId}" game.
+
+${pyTypesComment}
+
+All of the NDJSON wire-protocol handling (replying to "init", reading "observation", exiting on
+"match-end") lives in thunderdome_bot_sdk's run_bot() — see docs/guides/bot-author-guide.md §4.
+This file only needs to decide each turn's action.
+
+If your strategy needs its own randomness, seed a PRNG from the \`rngSeed\` run_bot() hands you
+via \`on_init\` — never an unseeded random.Random() (docs/adr/0004-deterministic-randomness.md).
+"""
+from thunderdome_bot_sdk import run_bot
+
+
+def decide_action(observation):
+    # TODO: implement your strategy.
+    raise NotImplementedError('decide_action() is not implemented yet')
+
+
+run_bot(decide_action)
+`,
+  );
 }
 
-writeScaffoldFile(
-  join(botDir, 'vendor', '.gitkeep'),
-  `This directory holds a vendored @thunderdome/bot-sdk-js tarball, generated by
+let step2;
+if (lang === 'ts') {
+  step2 = knownGameTypes
+    ? `  2. Implement decideAction() in bots/${gameId}/${botId}/src/index.ts — its Observation/Action
+     types are already filled in for "${gameId}".`
+    : `  2. Fill in the Observation/Action types and decideAction() in
+     bots/${gameId}/${botId}/src/index.ts`;
+} else if (lang === 'js') {
+  step2 = `  2. Fill in the Observation/Action types and decideAction() in
+     bots/${gameId}/${botId}/index.mjs`;
+} else {
+  step2 = `  2. Implement decide_action() in bots/${gameId}/${botId}/bot.py`;
+}
+
+if (lang === 'python') {
+  const vendorPythonBotSdkPath = join(REPO_ROOT, 'scripts', 'vendor-python-bot-sdk.sh');
+  insertIntoBashArray(vendorPythonBotSdkPath, 'BOT_DIRS', `bots/${gameId}/${botId}`);
+
+  console.log(`
+Next steps:
+  1. docker build -t thunderdome-${botId} bots/${gameId}/${botId}
+${step2}
+  3. yarn thunderdome match run ${botId} <another-bot-id> --config '{}'
+     (see docs/guides/bot-author-guide.md §7-8 for the full loop, including smoke-test.mjs)
+
+thunderdome_bot_sdk.py was copied into bots/${gameId}/${botId}/ as a starting point — no separate
+vendoring step needed before your first build. This bot was also added to
+scripts/vendor-python-bot-sdk.sh's BOT_DIRS array, so re-running that script later (if
+packages/bot-sdk-python ever changes) will keep this bot's copy in sync.
+
+IMPORTANT if you're submitting this as a community bot PR: ci/tools/boundary-check (CI) requires a
+bot PR to touch only bots/${gameId}/${botId}/** (docs/adr/0007-repository-enforcement.md). The
+edit this script just made to scripts/vendor-python-bot-sdk.sh is a platform-file change that will
+fail that check if you commit it. Revert it before committing:
+    git checkout -- scripts/vendor-python-bot-sdk.sh
+A maintainer will add your bot to BOT_DIRS separately when merging (or apply the
+"maintainer-override" label if this really is a maintainer-authored reference bot meant to keep
+that edit).
+`);
+} else {
+  const packBotSdkJsPath = join(REPO_ROOT, 'scripts', 'pack-bot-sdk-js.sh');
+
+  writeScaffoldFile(
+    join(botDir, 'vendor', '.gitkeep'),
+    `This directory holds a vendored @thunderdome/bot-sdk-js tarball, generated by
 scripts/pack-bot-sdk-js.sh — see that script's own comments for why bots/** vendors a tarball
 instead of depending on the workspace package directly. Run it (from the repo root) to populate
 this directory and generate a matching package-lock.json:
 
     ./scripts/pack-bot-sdk-js.sh
 `,
-);
+  );
 
-const packBotSdkJsPath = join(REPO_ROOT, 'scripts', 'pack-bot-sdk-js.sh');
-insertIntoBashArray(packBotSdkJsPath, 'BOT_DIRS', `bots/${gameId}/${botId}`);
+  insertIntoBashArray(packBotSdkJsPath, 'BOT_DIRS', `bots/${gameId}/${botId}`);
 
-const step2 =
-  lang === 'ts' && knownGameTypes
-    ? `  2. Implement decideAction() in bots/${gameId}/${botId}/src/index.ts — its Observation/Action
-     types are already filled in for "${gameId}".`
-    : `  2. Fill in the Observation/Action types and decideAction() in
-     bots/${gameId}/${botId}/${lang === 'ts' ? 'src/index.ts' : 'index.mjs'}`;
-
-console.log(`
+  console.log(`
 Next steps:
   1. ./scripts/pack-bot-sdk-js.sh   # vendors @thunderdome/bot-sdk-js into bots/${gameId}/${botId}/
                                   # and generates its package-lock.json (requires network access)
@@ -384,3 +473,4 @@ A maintainer will add your bot to BOT_DIRS separately when merging (or apply the
 "maintainer-override" label if this really is a maintainer-authored reference bot meant to keep
 that edit).
 `);
+}

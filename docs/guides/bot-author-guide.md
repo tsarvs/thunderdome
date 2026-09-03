@@ -31,10 +31,10 @@ assumes you already have them working.
 
 ## Quickstart checklist
 
-1. Run `yarn scaffold:bot <game-id> <your-bot-id>` for a working starting point (already using
-   `@thunderdome/bot-sdk-js`'s `runBot()`, §4) rather than writing the protocol plumbing by hand.
-   `scaffold:bot` only generates TS/JS bots today — a Python bot starts from `thunderdome_bot_sdk`
-   (§4) instead, e.g. `bots/connect-four/tactical-connect-four/` as a working example to copy.
+1. Run `yarn scaffold:bot <game-id> <your-bot-id>` for a working starting point rather than
+   writing the protocol plumbing by hand — `--lang ts` (the default), `js`, or `python` (§4),
+   already using `@thunderdome/bot-sdk-js`'s `runBot()` (TS/JS) or `thunderdome_bot_sdk`'s
+   `run_bot()` (Python, `thunderdome_bot_sdk.py` copied straight into your bot's own directory).
 2. Replace the scaffolded `decideAction()` with your actual strategy — §2 explains what you always
    receive and return conceptually; §9/§10/§11 give the exact types for Rock-Paper-Scissors/
    Hearts/Texas Hold'em.
