@@ -1,10 +1,4 @@
-import {
-  type Card,
-  cardId,
-  containsCard,
-  parseCardId,
-  standardDeck,
-} from '@thunderdome/card-kit';
+import { type Card, cardId, containsCard, parseCardId, standardDeck } from '@thunderdome/card-kit';
 import { createRng } from '@thunderdome/rng';
 import { describe, expect, it } from 'vitest';
 import { hearts } from '../src/game.js';
@@ -469,13 +463,17 @@ describe('hearts.validateAction', () => {
   });
 
   it('rejects a pass with a duplicate card', () => {
-    const state = passingState({ hands: { alice: cards('2C', '5H', '9D'), bob: [], carol: [], dave: [] } });
+    const state = passingState({
+      hands: { alice: cards('2C', '5H', '9D'), bob: [], carol: [], dave: [] },
+    });
     const action = { type: 'pass', cards: [card('2C'), card('2C'), card('5H')] };
     expect(hearts.validateAction(state, 'alice', action).ok).toBe(false);
   });
 
   it('rejects a pass of a card not in hand', () => {
-    const state = passingState({ hands: { alice: cards('2C', '5H', '9D'), bob: [], carol: [], dave: [] } });
+    const state = passingState({
+      hands: { alice: cards('2C', '5H', '9D'), bob: [], carol: [], dave: [] },
+    });
     expect(
       hearts.validateAction(state, 'alice', { type: 'pass', cards: cards('2C', '5H', 'AS') }).ok,
     ).toBe(false);
@@ -494,7 +492,9 @@ describe('hearts.validateAction', () => {
 
   it('rejects a play submitted during the passing phase', () => {
     const state = passingState({ hands: { alice: cards('2C'), bob: [], carol: [], dave: [] } });
-    expect(hearts.validateAction(state, 'alice', { type: 'play', card: card('2C') }).ok).toBe(false);
+    expect(hearts.validateAction(state, 'alice', { type: 'play', card: card('2C') }).ok).toBe(
+      false,
+    );
   });
 
   it('rejects playing a card not in hand', () => {
@@ -503,7 +503,9 @@ describe('hearts.validateAction', () => {
       currentTrick: { leaderId: 'alice', plays: [] },
       currentPlayerIndex: 0,
     });
-    expect(hearts.validateAction(state, 'alice', { type: 'play', card: card('5H') }).ok).toBe(false);
+    expect(hearts.validateAction(state, 'alice', { type: 'play', card: card('5H') }).ok).toBe(
+      false,
+    );
   });
 
   it('rejects an off-suit play when able to follow', () => {
@@ -524,7 +526,9 @@ describe('hearts.validateAction', () => {
       currentPlayerIndex: 0,
       tricksCompleted: 1,
     });
-    expect(hearts.validateAction(state, 'alice', { type: 'play', card: card('5H') }).ok).toBe(false);
+    expect(hearts.validateAction(state, 'alice', { type: 'play', card: card('5H') }).ok).toBe(
+      false,
+    );
     expect(hearts.validateAction(state, 'alice', { type: 'play', card: card('KS') }).ok).toBe(true);
   });
 
@@ -565,7 +569,9 @@ describe('hearts.validateAction', () => {
       currentPlayerIndex: 0,
       tricksCompleted: 0,
     });
-    expect(hearts.validateAction(state, 'alice', { type: 'play', card: card('5H') }).ok).toBe(false);
+    expect(hearts.validateAction(state, 'alice', { type: 'play', card: card('5H') }).ok).toBe(
+      false,
+    );
     expect(hearts.validateAction(state, 'alice', { type: 'play', card: card('2C') }).ok).toBe(true);
   });
 });
@@ -628,7 +634,11 @@ describe('hearts.resolve', () => {
     expect(rightResult.nextState.hands.alice?.map(cardId).sort()).toEqual(['2C', '7C', '8C']); // from bob
 
     const acrossState = makeState(2); // hand 2 => 'across'
-    const acrossResult = hearts.resolve({ state: acrossState, actions: actionsFor(acrossState), rng });
+    const acrossResult = hearts.resolve({
+      state: acrossState,
+      actions: actionsFor(acrossState),
+      rng,
+    });
     expect(acrossResult.nextState.hands.alice?.map(cardId).sort()).toEqual(['9C', 'JC', 'TC']); // from carol
   });
 
@@ -832,7 +842,11 @@ describe('hearts.getResult / hearts.getStandingOutcomes', () => {
   it('ranks a fully decisive result 1/2/3/4 with a single winner and the rest losses', () => {
     const state = { ...initialState(), scores: { alice: 40, bob: 60, carol: 20, dave: 80 } };
     const result = hearts.getResult(state);
-    expect(result).toEqual({ participantIds: PARTICIPANT_IDS, scores: state.scores, handsPlayed: 1 });
+    expect(result).toEqual({
+      participantIds: PARTICIPANT_IDS,
+      scores: state.scores,
+      handsPlayed: 1,
+    });
     expect(hearts.getStandingOutcomes(result)).toEqual([
       { participantId: 'alice', rank: 2, score: 40, outcome: 'loss' },
       { participantId: 'bob', rank: 3, score: 60, outcome: 'loss' },
@@ -848,9 +862,18 @@ describe('hearts.getResult / hearts.getStandingOutcomes', () => {
       handsPlayed: 1,
     };
     const outcomes = hearts.getStandingOutcomes(result);
-    expect(outcomes.find((o) => o.participantId === 'alice')).toMatchObject({ rank: 1, outcome: 'draw' });
-    expect(outcomes.find((o) => o.participantId === 'bob')).toMatchObject({ rank: 1, outcome: 'draw' });
-    expect(outcomes.find((o) => o.participantId === 'carol')).toMatchObject({ rank: 3, outcome: 'loss' });
+    expect(outcomes.find((o) => o.participantId === 'alice')).toMatchObject({
+      rank: 1,
+      outcome: 'draw',
+    });
+    expect(outcomes.find((o) => o.participantId === 'bob')).toMatchObject({
+      rank: 1,
+      outcome: 'draw',
+    });
+    expect(outcomes.find((o) => o.participantId === 'carol')).toMatchObject({
+      rank: 3,
+      outcome: 'loss',
+    });
   });
 
   it('reports a 4-way draw when every score ties', () => {
@@ -870,10 +893,22 @@ describe('hearts.getResult / hearts.getStandingOutcomes', () => {
       handsPlayed: 1,
     };
     const outcomes = hearts.getStandingOutcomes(result);
-    expect(outcomes.find((o) => o.participantId === 'alice')).toMatchObject({ rank: 1, outcome: 'win' });
-    expect(outcomes.find((o) => o.participantId === 'bob')).toMatchObject({ rank: 2, outcome: 'loss' });
-    expect(outcomes.find((o) => o.participantId === 'carol')).toMatchObject({ rank: 2, outcome: 'loss' });
-    expect(outcomes.find((o) => o.participantId === 'dave')).toMatchObject({ rank: 4, outcome: 'loss' });
+    expect(outcomes.find((o) => o.participantId === 'alice')).toMatchObject({
+      rank: 1,
+      outcome: 'win',
+    });
+    expect(outcomes.find((o) => o.participantId === 'bob')).toMatchObject({
+      rank: 2,
+      outcome: 'loss',
+    });
+    expect(outcomes.find((o) => o.participantId === 'carol')).toMatchObject({
+      rank: 2,
+      outcome: 'loss',
+    });
+    expect(outcomes.find((o) => o.participantId === 'dave')).toMatchObject({
+      rank: 4,
+      outcome: 'loss',
+    });
   });
 });
 

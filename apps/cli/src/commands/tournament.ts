@@ -110,7 +110,10 @@ function withAllBotsDefaults(formatConfigRaw: unknown): unknown {
  * participant count, as Hearts has). A variable-count game, or an already-explicit `tableSize`,
  * is left alone — the latter case falls through to the format's own required-field error.
  */
-function withSwissLeagueTableSizeDefault(formatConfigRaw: unknown, gameEntry: GameRegistryEntry): unknown {
+function withSwissLeagueTableSizeDefault(
+  formatConfigRaw: unknown,
+  gameEntry: GameRegistryEntry,
+): unknown {
   if (
     typeof formatConfigRaw !== 'object' ||
     formatConfigRaw === null ||
@@ -206,7 +209,9 @@ function printSingleEliminationStandingsEntries(
   });
 }
 
-function printSwissLeagueStandingsEntries(entries: readonly SwissLeaguePublicStandingsEntry[]): void {
+function printSwissLeagueStandingsEntries(
+  entries: readonly SwissLeaguePublicStandingsEntry[],
+): void {
   entries.forEach((entry, index) => {
     console.log(
       `${String(index + 1)}. ${entry.participantId} — ${entry.averageScore.toFixed(2)} avg pts ` +

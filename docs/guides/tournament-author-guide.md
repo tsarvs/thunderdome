@@ -24,13 +24,13 @@ just without their own worked example here.
 
 A tournament is the combination of:
 
-| Piece               | What it is                                                                | Status                                                                                                                     |
-| ------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| **Game**            | Which game, which version, and that game's own config                     | Real — `rock-paper-scissors`, `{ totalRounds, onMissingAction }`                                                           |
-| **Roster**          | Which bots (from the bot registry) are competing                          | Real — `@thunderdome/registry`'s `scanBots`/`scanGames`                                                                    |
+| Piece               | What it is                                                                | Status                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Game**            | Which game, which version, and that game's own config                     | Real — `rock-paper-scissors`, `{ totalRounds, onMissingAction }`                                                                |
+| **Roster**          | Which bots (from the bot registry) are competing                          | Real — `@thunderdome/registry`'s `scanBots`/`scanGames`                                                                         |
 | **Format**          | How matchups are generated and standings computed                         | Real for round robin, single elimination, and Swiss league — `@thunderdome/tournament-formats`; pool-then-elimination not built |
-| **Seed**            | The one entropy boundary this tournament's reproducibility traces back to | Real — `@thunderdome/rng`                                                                                                  |
-| **Resource limits** | Per-game CPU/memory/timeout ceilings                                      | Partially real — `GameDefinition.resourceLimits` exists; runtime enforcement is per-match, not tournament-level yet        |
+| **Seed**            | The one entropy boundary this tournament's reproducibility traces back to | Real — `@thunderdome/rng`                                                                                                       |
+| **Resource limits** | Per-game CPU/memory/timeout ceilings                                      | Partially real — `GameDefinition.resourceLimits` exists; runtime enforcement is per-match, not tournament-level yet             |
 
 None of these are new concepts invented for this guide — they're exactly
 `docs/architecture.md`'s mental model: **Games + Tournaments + Bots → Matches → Match

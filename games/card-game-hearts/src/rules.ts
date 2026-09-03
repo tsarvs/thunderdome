@@ -58,7 +58,10 @@ export function passTargetIndex(
  * `state.currentPlayerIndex`).
  */
 export function legalPlaysFor(state: HeartsState, participantId: string): Card[] {
-  if (state.phase !== 'playing' || state.participantIds[state.currentPlayerIndex] !== participantId) {
+  if (
+    state.phase !== 'playing' ||
+    state.participantIds[state.currentPlayerIndex] !== participantId
+  ) {
     return [];
   }
   const hand = state.hands[participantId] ?? [];

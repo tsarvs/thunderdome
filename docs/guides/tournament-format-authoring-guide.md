@@ -1,8 +1,8 @@
 # Tournament Format Authoring Guide
 
 This is a different guide from [`tournament-author-guide.md`](tournament-author-guide.md): that
-one is for *configuring and running* a tournament in a format that already exists. This one is for
-*building a brand new format* — the step-by-step path from "I want a Swiss-style or
+one is for _configuring and running_ a tournament in a format that already exists. This one is for
+_building a brand new format_ — the step-by-step path from "I want a Swiss-style or
 pool-then-elimination bracket" to a real, tested, runnable `--tournament-config
 '{"format":"my-new-format"}'`.
 
@@ -38,7 +38,12 @@ interface TournamentFormat<TFormatConfig, TFormatState, TStandings> {
     standings: TStandings;
     match: MatchDescriptor;
     record: MatchRecord;
-  }): { formatState: TFormatState; standings: TStandings; readyMatches: MatchDescriptor[]; notices?: string[] };
+  }): {
+    formatState: TFormatState;
+    standings: TStandings;
+    readyMatches: MatchDescriptor[];
+    notices?: string[];
+  };
   isComplete(args: { formatState: TFormatState; standings: TStandings }): boolean;
   getPublicStandings(standings: TStandings): unknown;
 }
@@ -48,8 +53,8 @@ Read [`tournament-author-guide.md`](tournament-author-guide.md) §3 before writi
 walks through exactly how round robin and single elimination implement this **incremental pull
 model** (unlock the matches that are ready to play now; unlock more once results come back), which
 is the one genuinely non-obvious idea here. Your new format needs to fit the same shape: it's never
-handed a full schedule up front, and it never runs a match itself — it only ever decides *which*
-matches are ready and *how* results roll up into standings.
+handed a full schedule up front, and it never runs a match itself — it only ever decides _which_
+matches are ready and _how_ results roll up into standings.
 
 `TFormatConfig`/`TFormatState`/`TStandings` are entirely yours, exactly like a `GameDefinition`'s
 type parameters (`game-authoring-guide.md` §1) — the engine only ever touches them through these
@@ -58,13 +63,12 @@ five methods.
 ## 2. Decide what your format actually needs to be different
 
 Before writing anything, be concrete about what round robin, single elimination, and Swiss league
-*don't* already do that your format needs. This determines almost everything else:
+_don't_ already do that your format needs. This determines almost everything else:
 
 - **Do matches happen between exactly 2 participants, or N?** Round robin and single elimination
   are both hardcoded to 2-participant pairings; Swiss league plays N-participant tables (Hearts'
   4-player hands) — see `swiss-league.ts`'s own top comment for why that generalization was
-  needed, and copy its `MatchDescriptor` construction if your format also needs tables larger than
-  2.
+  needed, and copy its `MatchDescriptor` construction if your format also needs tables larger than 2.
 - **Does round N depend on round N-1's results, or is the whole schedule knowable up front?**
   Round robin's `initialize` computes every pairing immediately (a schedule known in full from the
   roster alone); single elimination and Swiss league both only know their first round up front and
@@ -84,7 +88,7 @@ Before writing anything, be concrete about what round robin, single elimination,
   inventing a new one.
 
 If the answer to all of the above matches an existing format exactly, you don't need a new format
-— you need a new *config option* on an existing one (e.g. `bestOf`).
+— you need a new _config option_ on an existing one (e.g. `bestOf`).
 
 ## 3. Scaffold the file
 

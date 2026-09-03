@@ -1,4 +1,9 @@
-import { runTournament, type MatchDescriptor, type MatchRecord, type RosterEntry } from '@thunderdome/engine';
+import {
+  runTournament,
+  type MatchDescriptor,
+  type MatchRecord,
+  type RosterEntry,
+} from '@thunderdome/engine';
 import { createRng } from '@thunderdome/rng';
 import { describe, expect, it } from 'vitest';
 import {
@@ -15,7 +20,10 @@ function roster(...ids: string[]): RosterEntry[] {
 
 /** A full table result, Hearts-shaped: lower `score` is better, `rank` derived the same way
  * `card-game-hearts`'s own `getStandingOutcomes` computes it (1 + how many others scored lower). */
-function tableRecord(match: MatchDescriptor, scoreByParticipant: Record<string, number>): MatchRecord {
+function tableRecord(
+  match: MatchDescriptor,
+  scoreByParticipant: Record<string, number>,
+): MatchRecord {
   const scoreOf = (id: string) => scoreByParticipant[id] ?? 0;
   return {
     matchId: match.matchId,
@@ -23,8 +31,7 @@ function tableRecord(match: MatchDescriptor, scoreByParticipant: Record<string, 
       participantId,
       score: scoreOf(participantId),
       rank:
-        1 +
-        match.participantIds.filter((other) => scoreOf(other) < scoreOf(participantId)).length,
+        1 + match.participantIds.filter((other) => scoreOf(other) < scoreOf(participantId)).length,
     })),
   };
 }
@@ -59,7 +66,11 @@ describe('swissLeagueFormat.parseConfig', () => {
 describe('swissLeagueFormat.initialize', () => {
   it('throws when the roster is smaller than tableSize', () => {
     expect(() =>
-      swissLeagueFormat.initialize({ roster: roster('a', 'b'), config: { tableSize: 4, rounds: 1 }, rng }),
+      swissLeagueFormat.initialize({
+        roster: roster('a', 'b'),
+        config: { tableSize: 4, rounds: 1 },
+        rng,
+      }),
     ).toThrow('at least 4 participants');
   });
 
@@ -77,12 +88,12 @@ describe('swissLeagueFormat.initialize', () => {
     expect(readyMatches).toHaveLength(1);
     expect(table.participantIds).toHaveLength(4);
     const seated = new Set(table.participantIds);
-    const satOut = ['a', 'b', 'c', 'd', 'e'].find(id => !seated.has(id));
+    const satOut = ['a', 'b', 'c', 'd', 'e'].find((id) => !seated.has(id));
     if (satOut === undefined) {
       throw new Error('expected exactly one participant to sit out');
     }
     expect(formatState.sitOutCount[satOut]).toBe(1);
-    expect(notices?.some(notice => notice.includes('sit'))).toBe(true);
+    expect(notices?.some((notice) => notice.includes('sit'))).toBe(true);
   });
 
   it('builds one table per tableSize-sized group, covering every participant exactly once', () => {
@@ -107,10 +118,17 @@ describe('swissLeagueFormat.initialize', () => {
     expect(Object.keys(formatState.tiebreakRank).sort()).toEqual(
       ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].sort(),
     );
-    expect(new Set(Object.values(formatState.tiebreakRank))).toEqual(new Set([0, 1, 2, 3, 4, 5, 6, 7]));
+    expect(new Set(Object.values(formatState.tiebreakRank))).toEqual(
+      new Set([0, 1, 2, 3, 4, 5, 6, 7]),
+    );
 
     for (const id of allSeated) {
-      expect(standings[id]).toEqual({ participantId: id, cumulativeScore: 0, tablesPlayed: 0, tablesWon: 0 });
+      expect(standings[id]).toEqual({
+        participantId: id,
+        cumulativeScore: 0,
+        tablesPlayed: 0,
+        tablesWon: 0,
+      });
     }
     expect(notices).toHaveLength(1);
   });
@@ -134,7 +152,10 @@ describe('swissLeagueFormat.recordResult', () => {
       formatState: initial.formatState,
       standings: initial.standings,
       match: table1,
-      record: tableRecord(table1, Object.fromEntries(table1.participantIds.map((id, i) => [id, i]))),
+      record: tableRecord(
+        table1,
+        Object.fromEntries(table1.participantIds.map((id, i) => [id, i])),
+      ),
     });
     expect(afterTable1.readyMatches).toEqual([]); // table2 hasn't reported yet
     expect(afterTable1.formatState.tablesRemainingInRound).toBe(1);
@@ -144,7 +165,10 @@ describe('swissLeagueFormat.recordResult', () => {
       formatState: afterTable1.formatState,
       standings: afterTable1.standings,
       match: table2,
-      record: tableRecord(table2, Object.fromEntries(table2.participantIds.map((id, i) => [id, i]))),
+      record: tableRecord(
+        table2,
+        Object.fromEntries(table2.participantIds.map((id, i) => [id, i])),
+      ),
     });
     expect(afterTable2.readyMatches).toHaveLength(2); // round 2's tables unlocked
     expect(afterTable2.formatState.roundsCompleted).toBe(1);
@@ -291,9 +315,11 @@ describe('swissLeagueFormat.getPublicStandings', () => {
       b: { participantId: 'b', cumulativeScore: 15, tablesPlayed: 2, tablesWon: 0 },
     };
 
-    const result = swissLeagueFormat.getPublicStandings(standings) as SwissLeaguePublicStandingsEntry[];
-    expect(result.map(entry => entry.participantId)).toEqual(['a', 'b']);
-    expect(result.map(entry => entry.averageScore)).toEqual([5, 7.5]);
+    const result = swissLeagueFormat.getPublicStandings(
+      standings,
+    ) as SwissLeaguePublicStandingsEntry[];
+    expect(result.map((entry) => entry.participantId)).toEqual(['a', 'b']);
+    expect(result.map((entry) => entry.averageScore)).toEqual([5, 7.5]);
   });
 
   it('sorts a participant who never got seated (tablesPlayed 0) last, not tied-for-best', () => {
@@ -302,8 +328,10 @@ describe('swissLeagueFormat.getPublicStandings', () => {
       b: { participantId: 'b', cumulativeScore: 0, tablesPlayed: 0, tablesWon: 0 },
     };
 
-    const result = swissLeagueFormat.getPublicStandings(standings) as SwissLeaguePublicStandingsEntry[];
-    expect(result.map(entry => entry.participantId)).toEqual(['a', 'b']);
+    const result = swissLeagueFormat.getPublicStandings(
+      standings,
+    ) as SwissLeaguePublicStandingsEntry[];
+    expect(result.map((entry) => entry.participantId)).toEqual(['a', 'b']);
     expect(result[1]?.averageScore).toBe(Infinity);
   });
 });
@@ -365,7 +393,7 @@ describe('swissLeagueFormat + runTournament (end to end)', () => {
       config: { tableSize: 4, rounds: 6 },
       roster: roster(...participantIds),
       rng,
-      runMatch: match => {
+      runMatch: (match) => {
         matchesRun += 1;
         return Promise.resolve(tableRecord(match, {}));
       },
@@ -378,7 +406,7 @@ describe('swissLeagueFormat + runTournament (end to end)', () => {
       outcome.standings,
     ) as SwissLeaguePublicStandingsEntry[];
     const tablesPlayedByParticipant = new Map(
-      publicStandings.map(entry => [entry.participantId, entry.tablesPlayed]),
+      publicStandings.map((entry) => [entry.participantId, entry.tablesPlayed]),
     );
     expect([...tablesPlayedByParticipant.values()].reduce((sum, n) => sum + n, 0)).toBe(24);
     // Fair rotation: over 6 rounds x 2 sit-outs/round = 12 total sit-outs across 6 participants,

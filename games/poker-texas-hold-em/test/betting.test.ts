@@ -6,14 +6,19 @@ describe('applyPlayerAction — fold', () => {
   it('marks the player folded and drops them from playersToAct without moving chips', () => {
     const state = pokerState({
       currentBet: 20,
-      players: { alice: player({ committedThisStreet: 0 }), bob: player({ committedThisStreet: 20 }) },
+      players: {
+        alice: player({ committedThisStreet: 0 }),
+        bob: player({ committedThisStreet: 20 }),
+      },
       playersToAct: ['alice'],
     });
     const result = applyPlayerAction(state, 'alice', { type: 'fold' });
     expect(result.state.players.alice?.folded).toBe(true);
     expect(result.state.playersToAct).toEqual([]);
     expect(result.state.stacks.alice).toBe(state.stacks.alice);
-    expect(result.events).toEqual([{ type: 'action', participantIds: ['alice'], data: { action: 'fold' } }]);
+    expect(result.events).toEqual([
+      { type: 'action', participantIds: ['alice'], data: { action: 'fold' } },
+    ]);
   });
 });
 
@@ -101,7 +106,11 @@ describe('applyPlayerAction — raise', () => {
 
 describe('applyPlayerAction — allIn', () => {
   it('behaves like a call (no reopen) when the all-in amount does not exceed currentBet', () => {
-    const state = pokerState({ currentBet: 100, stacks: { alice: 40, bob: 1000 }, playersToAct: ['alice'] });
+    const state = pokerState({
+      currentBet: 100,
+      stacks: { alice: 40, bob: 1000 },
+      playersToAct: ['alice'],
+    });
     const result = applyPlayerAction(state, 'alice', { type: 'allIn' });
     expect(result.state.currentBet).toBe(100);
     expect(result.state.players.alice?.committed).toBe(40);

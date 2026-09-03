@@ -30,17 +30,17 @@ today.
 
 ## Commands
 
-| Command              | Status                                                                                           |
-| -------------------- | ------------------------------------------------------------------------------------------------ |
-| `match run`          | Real — runs one match between two or more bots. See below.                                       |
+| Command              | Status                                                                                                      |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `match run`          | Real — runs one match between two or more bots. See below.                                                  |
 | `play`               | Real — a human, typing into this terminal, plays one interactive match against one or more bots. See below. |
-| `tournament run`     | Real — runs a round-robin or single-elimination tournament among two or more bots. See below.    |
-| `tournament list`    | Real — lists persisted tournament records. See below.                                            |
-| `tournament inspect` | Real — prints one persisted tournament's details and final standings. See below.                 |
-| `tournament replay`  | Real — replays a persisted tournament's matches purely from its record, no Docker. See below.    |
-| `cleanup`            | Real — force-removes any leftover Thunderdome bot containers. See below.                         |
-| `games`              | Stub — prints "not yet implemented"                                                              |
-| `bots`               | Stub — prints "not yet implemented"                                                              |
+| `tournament run`     | Real — runs a round-robin or single-elimination tournament among two or more bots. See below.               |
+| `tournament list`    | Real — lists persisted tournament records. See below.                                                       |
+| `tournament inspect` | Real — prints one persisted tournament's details and final standings. See below.                            |
+| `tournament replay`  | Real — replays a persisted tournament's matches purely from its record, no Docker. See below.               |
+| `cleanup`            | Real — force-removes any leftover Thunderdome bot containers. See below.                                    |
+| `games`              | Stub — prints "not yet implemented"                                                                         |
+| `bots`               | Stub — prints "not yet implemented"                                                                         |
 
 ## `match run`
 
@@ -190,7 +190,7 @@ Every prompt includes the card-notation legend and a format example with a real,
 card substituted in, and every accepted action is echoed back immediately (`Passed: 9C QC 2D`,
 `Played: 4D`, ...) — via the optional `humanInterface.describeAction` hook
 (`packages/engine/src/types.ts`) — so you can confirm your input was understood as intended before
-the match moves on, not just that *something* was accepted. An unparseable line reprompts with an
+the match moves on, not just that _something_ was accepted. An unparseable line reprompts with an
 explicit "Sorry, I didn't understand that — try again." rather than silently repeating the same
 block.
 

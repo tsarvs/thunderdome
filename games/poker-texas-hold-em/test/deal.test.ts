@@ -13,7 +13,15 @@ function stacksOf(participantIds: readonly string[], amount: number): Record<str
 
 describe('dealNewHand', () => {
   it('deals 2 unique hole cards per seat with no duplicates across the whole deal', () => {
-    const dealt = dealNewHand(FOUR_PLAYERS, stacksOf(FOUR_PLAYERS, 1000), new Set(), null, 0, testConfig(), rng());
+    const dealt = dealNewHand(
+      FOUR_PLAYERS,
+      stacksOf(FOUR_PLAYERS, 1000),
+      new Set(),
+      null,
+      0,
+      testConfig(),
+      rng(),
+    );
     const dealtCardIds = [
       ...Object.values(dealt.players).flatMap((player) => player.holeCards.map(cardId)),
       ...dealt.remainingBoardCards.map(cardId),
@@ -25,7 +33,15 @@ describe('dealNewHand', () => {
   });
 
   it('picks a random button from the active roster on the very first hand', () => {
-    const dealt = dealNewHand(FOUR_PLAYERS, stacksOf(FOUR_PLAYERS, 1000), new Set(), null, 0, testConfig(), rng());
+    const dealt = dealNewHand(
+      FOUR_PLAYERS,
+      stacksOf(FOUR_PLAYERS, 1000),
+      new Set(),
+      null,
+      0,
+      testConfig(),
+      rng(),
+    );
     expect(FOUR_PLAYERS).toContain(dealt.buttonParticipantId);
   });
 
@@ -46,7 +62,15 @@ describe('dealNewHand', () => {
 
   it('heads-up: the button posts the small blind, the other seat posts the big blind', () => {
     const config = testConfig({ smallBlind: 10, bigBlind: 20 });
-    const dealt = dealNewHand(TWO_PLAYERS, stacksOf(TWO_PLAYERS, 1000), new Set(), 'bob', 1, config, rng());
+    const dealt = dealNewHand(
+      TWO_PLAYERS,
+      stacksOf(TWO_PLAYERS, 1000),
+      new Set(),
+      'bob',
+      1,
+      config,
+      rng(),
+    );
     const [button, other] = dealt.seatOrder;
     expect(button).toBeDefined();
     expect(other).toBeDefined();
@@ -58,7 +82,15 @@ describe('dealNewHand', () => {
 
   it('3+ handed: seats 1 and 2 (not the button) post the blinds', () => {
     const config = testConfig({ smallBlind: 5, bigBlind: 10 });
-    const dealt = dealNewHand(FOUR_PLAYERS, stacksOf(FOUR_PLAYERS, 1000), new Set(), 'alice', 1, config, rng());
+    const dealt = dealNewHand(
+      FOUR_PLAYERS,
+      stacksOf(FOUR_PLAYERS, 1000),
+      new Set(),
+      'alice',
+      1,
+      config,
+      rng(),
+    );
     const [button, sb, bb, utg] = dealt.seatOrder;
     expect(dealt.players[button ?? '']?.committed).toBe(0);
     expect(dealt.players[sb ?? '']?.committed).toBe(5);
@@ -95,13 +127,29 @@ describe('dealNewHand', () => {
   });
 
   it('sets actingIndex as a one-before pointer to the true preflop first-to-act seat', () => {
-    const dealt = dealNewHand(FOUR_PLAYERS, stacksOf(FOUR_PLAYERS, 1000), new Set(), 'alice', 1, testConfig(), rng());
+    const dealt = dealNewHand(
+      FOUR_PLAYERS,
+      stacksOf(FOUR_PLAYERS, 1000),
+      new Set(),
+      'alice',
+      1,
+      testConfig(),
+      rng(),
+    );
     const n = dealt.seatOrder.length;
     expect((dealt.actingIndex + 1) % n).toBe(preflopFirstToActIndex(n));
   });
 
   it('emits hand-started and blinds-posted events', () => {
-    const dealt = dealNewHand(TWO_PLAYERS, stacksOf(TWO_PLAYERS, 1000), new Set(), 'bob', 1, testConfig(), rng());
+    const dealt = dealNewHand(
+      TWO_PLAYERS,
+      stacksOf(TWO_PLAYERS, 1000),
+      new Set(),
+      'bob',
+      1,
+      testConfig(),
+      rng(),
+    );
     expect(dealt.events.map((event) => event.type)).toEqual(['hand-started', 'blinds-posted']);
   });
 });

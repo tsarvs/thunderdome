@@ -4,7 +4,11 @@
 // per game-authoring-guide.md §11's "build state directly" convention.
 import { parseCardId, type Card } from '@thunderdome/card-kit';
 import { createRng, type Rng } from '@thunderdome/rng';
-import type { PokerPlayerHandState, PokerTexasHoldEmConfig, PokerTexasHoldEmState } from '../src/types.js';
+import type {
+  PokerPlayerHandState,
+  PokerTexasHoldEmConfig,
+  PokerTexasHoldEmState,
+} from '../src/types.js';
 
 export function rng(seed = 1): Rng {
   return createRng(Buffer.alloc(16, seed));
@@ -56,8 +60,7 @@ export function player(overrides?: Partial<PokerPlayerHandState>): PokerPlayerHa
 export function pokerState(overrides?: Partial<PokerTexasHoldEmState>): PokerTexasHoldEmState {
   const participantIds = overrides?.participantIds ?? ['alice', 'bob'];
   const seatOrder = overrides?.seatOrder ?? participantIds;
-  const players =
-    overrides?.players ?? Object.fromEntries(seatOrder.map((id) => [id, player()]));
+  const players = overrides?.players ?? Object.fromEntries(seatOrder.map((id) => [id, player()]));
   return {
     participantIds,
     config: testConfig(),

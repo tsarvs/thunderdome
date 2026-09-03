@@ -1,5 +1,9 @@
 import type { RoundEvent } from '@thunderdome/engine';
-import type { PokerPlayerHandState, PokerTexasHoldEmAction, PokerTexasHoldEmState } from './types.js';
+import type {
+  PokerPlayerHandState,
+  PokerTexasHoldEmAction,
+  PokerTexasHoldEmState,
+} from './types.js';
 
 export interface AppliedAction {
   state: PokerTexasHoldEmState;
@@ -104,7 +108,11 @@ export function applyPlayerAction(
       } else {
         playersToAct = playersToAct.filter((id) => id !== participantId);
       }
-      events.push({ type: 'action', participantIds: [participantId], data: { action: 'allIn', amount } });
+      events.push({
+        type: 'action',
+        participantIds: [participantId],
+        data: { action: 'allIn', amount },
+      });
       break;
     }
   }

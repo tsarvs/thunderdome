@@ -2,12 +2,12 @@
 
 Dev tooling that isn't a workspace package in its own right.
 
-| Script               | What it does                                                                                                                                                                             |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `build.sh`           | The root `yarn build`'s implementation — builds every workspace package in dependency order (see its own comments; Yarn Classic's `workspaces run` doesn't guarantee topological order). |
-| `pack-bot-sdk.sh`    | Builds `@thunderdome/bot-sdk` and vendors it into every bot that depends on it. See below.                                                                                               |
-| `scaffold-game.mjs`  | Generates a new `games/<game-id>/` workspace package — a minimal but real, working `GameDefinition`. See below.                                                                          |
-| `scaffold-bot.mjs`   | Generates a new `bots/<game-id>/<bot-id>/` directory — a starter bot on `@thunderdome/bot-sdk`. See below.                                                                                |
+| Script              | What it does                                                                                                                                                                             |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build.sh`          | The root `yarn build`'s implementation — builds every workspace package in dependency order (see its own comments; Yarn Classic's `workspaces run` doesn't guarantee topological order). |
+| `pack-bot-sdk.sh`   | Builds `@thunderdome/bot-sdk` and vendors it into every bot that depends on it. See below.                                                                                               |
+| `scaffold-game.mjs` | Generates a new `games/<game-id>/` workspace package — a minimal but real, working `GameDefinition`. See below.                                                                          |
+| `scaffold-bot.mjs`  | Generates a new `bots/<game-id>/<bot-id>/` directory — a starter bot on `@thunderdome/bot-sdk`. See below.                                                                               |
 
 Running a real match between bots from `/bots` is now `yarn thunderdome match run <botId>
 <botId>` (`apps/cli/src/commands/match.ts`) — the registry-backed successor to what used

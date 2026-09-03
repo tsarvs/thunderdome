@@ -15,7 +15,7 @@ A **repository** ("repo") is just a folder of files — code, docs, config — t
 is ever truly lost and everyone working on the project can merge their changes together safely.
 "Cloning" a repo means downloading your own copy of it, history and all.
 
-This particular repo is a **monorepo**: instead of one project living in one repo, it's *many*
+This particular repo is a **monorepo**: instead of one project living in one repo, it's _many_
 related projects (the game engine, the CLI, each individual game, each individual bot) living
 together in one repo, so they can share code and be tested together. `packages/README.md`,
 `games/README.md`, and `bots/README.md` each describe one slice of it.
@@ -33,7 +33,7 @@ on one version can break on another. This repo pins an exact version (`.node-ver
 `25`) so that "works on my machine" actually means "works on everyone's machine." A **version
 manager** like [`fnm`](https://github.com/Schniz/fnm) lets you have several Node versions
 installed side by side and switch between them per-project automatically — that's why the root
-README recommends installing Node *through* fnm rather than downloading it directly from
+README recommends installing Node _through_ fnm rather than downloading it directly from
 nodejs.org.
 
 ## 3. What is Yarn, and how is it different from `npm`?
@@ -75,7 +75,7 @@ That sandboxing is exactly why this repo needs it: every bot match actually runs
 Docker container, with no exceptions and no "trust me, it's fine" shortcut — see
 [`docs/adr/0003-docker-bot-isolation.md`](../adr/0003-docker-bot-isolation.md) for the full
 reasoning. This also means Docker isn't optional tooling you can skip — anything that runs a real
-match (`yarn thunderdome match run`, the runtime's own tests) needs Docker actually *running*
+match (`yarn thunderdome match run`, the runtime's own tests) needs Docker actually _running_
 (not just installed) in the background, the same way a database needs to be running before an app
 that talks to it will work. `docker ps` (root README §3) is how you check that it is.
 
@@ -113,14 +113,14 @@ Once your dev environment is working (`yarn build && yarn lint && yarn typecheck
 pass, and `yarn thunderdome --help` prints usage), pick the guide that matches what you actually
 want to build:
 
-| I want to...                                                     | Start here                                                                          |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| Write a bot that plays an existing game                            | [`bot-author-guide.md`](bot-author-guide.md)                                        |
-| Understand automated testing, or write my first test                | [`testing-guide.md`](testing-guide.md)                                              |
-| Build a brand new game from scratch                                 | [`game-authoring-guide.md`](game-authoring-guide.md)                                |
-| Make a game nice to actually play as a human, or improve one already built | [`human-friendly-games-guide.md`](human-friendly-games-guide.md)                    |
-| Build a brand new tournament format (like Swiss)                    | [`tournament-format-authoring-guide.md`](tournament-format-authoring-guide.md)      |
-| Configure and run an existing tournament                            | [`tournament-author-guide.md`](tournament-author-guide.md)                          |
+| I want to...                                                               | Start here                                                                     |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Write a bot that plays an existing game                                    | [`bot-author-guide.md`](bot-author-guide.md)                                   |
+| Understand automated testing, or write my first test                       | [`testing-guide.md`](testing-guide.md)                                         |
+| Build a brand new game from scratch                                        | [`game-authoring-guide.md`](game-authoring-guide.md)                           |
+| Make a game nice to actually play as a human, or improve one already built | [`human-friendly-games-guide.md`](human-friendly-games-guide.md)               |
+| Build a brand new tournament format (like Swiss)                           | [`tournament-format-authoring-guide.md`](tournament-format-authoring-guide.md) |
+| Configure and run an existing tournament                                   | [`tournament-author-guide.md`](tournament-author-guide.md)                     |
 
 Every one of those guides assumes you've read this page (or already know its contents) — none of
 them re-explain what Node, Docker, or a dev environment are.

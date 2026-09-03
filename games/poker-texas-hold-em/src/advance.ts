@@ -4,7 +4,10 @@ import { awardPotToSoleWinner, doShowdown } from './showdown.js';
 import { postflopFirstToActIndex } from './table.js';
 import type { BettingStreet, PokerTexasHoldEmState } from './types.js';
 
-function mapValues<T, U>(record: Readonly<Record<string, T>>, fn: (value: T) => U): Record<string, U> {
+function mapValues<T, U>(
+  record: Readonly<Record<string, T>>,
+  fn: (value: T) => U,
+): Record<string, U> {
   return Object.fromEntries(Object.entries(record).map(([key, value]) => [key, fn(value)]));
 }
 
@@ -47,7 +50,10 @@ function dealNextStreetWithBetting(
 
 /** No more betting is possible this hand (at most one live player isn't all-in) — deal every
  * remaining street's cards straight through to the river with no betting in between. */
-function runOutRemainingStreets(state: PokerTexasHoldEmState, events: RoundEvent[]): PokerTexasHoldEmState {
+function runOutRemainingStreets(
+  state: PokerTexasHoldEmState,
+  events: RoundEvent[],
+): PokerTexasHoldEmState {
   let working = state;
   while (working.street !== 'river') {
     working = dealNextStreetWithBetting(working, events);
@@ -131,7 +137,11 @@ function advanceToNextActor(state: PokerTexasHoldEmState): PokerTexasHoldEmState
  * `settleHandEnd`), since a fresh deal can itself already be un-actionable (e.g. a short-stacked
  * blind posts all-in against another short-stacked blind).
  */
-export function advance(state: PokerTexasHoldEmState, rng: Rng, events: RoundEvent[]): PokerTexasHoldEmState {
+export function advance(
+  state: PokerTexasHoldEmState,
+  rng: Rng,
+  events: RoundEvent[],
+): PokerTexasHoldEmState {
   let working = state;
   for (;;) {
     const nonFolded = working.seatOrder.filter((id) => working.players[id]?.folded !== true);

@@ -70,8 +70,16 @@ export interface RunMatchArgs<TConfig, TState, TObservation, TAction, TResult> {
 export async function runMatch<TConfig, TState, TObservation, TAction, TResult>(
   args: RunMatchArgs<TConfig, TState, TObservation, TAction, TResult>,
 ): Promise<MatchOutcome<TResult>> {
-  const { game, config, participantIds, rng, collector, defaultDeadlineMs, matchDeadlineMs, onRoundResolved } =
-    args;
+  const {
+    game,
+    config,
+    participantIds,
+    rng,
+    collector,
+    defaultDeadlineMs,
+    matchDeadlineMs,
+    onRoundResolved,
+  } = args;
   const now = args.now ?? Date.now;
   const matchStartedAt = now();
 

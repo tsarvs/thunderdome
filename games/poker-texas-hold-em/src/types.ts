@@ -20,7 +20,8 @@ export const PokerTexasHoldEmConfigSchema = z
     path: ['bigBlind'],
   })
   .refine((config) => config.startingStack >= config.bigBlind * 2, {
-    message: 'startingStack must be at least 2x bigBlind so every seat can post a blind and still have chips left to play',
+    message:
+      'startingStack must be at least 2x bigBlind so every seat can post a blind and still have chips left to play',
     path: ['startingStack'],
   });
 export type PokerTexasHoldEmConfig = z.infer<typeof PokerTexasHoldEmConfigSchema>;

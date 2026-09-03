@@ -58,7 +58,8 @@ const testParticipantCount = Math.min(Math.max(minParticipants, 2), NAME_POOL.le
 const testParticipantIds = NAME_POOL.slice(0, testParticipantCount);
 
 const maintainerName = args['maintainer-name'] ?? gitConfig('user.name') ?? 'Your Name';
-const maintainerContact = args['maintainer-contact'] ?? gitConfig('user.email') ?? 'you@example.com';
+const maintainerContact =
+  args['maintainer-contact'] ?? gitConfig('user.email') ?? 'you@example.com';
 
 const gameDir = join(REPO_ROOT, 'games', id);
 assertTargetIsFresh(gameDir, 'games/<game-id>');

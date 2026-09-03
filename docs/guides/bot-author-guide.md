@@ -91,7 +91,12 @@ what follows):
 ```ts
 interface Envelope<TPayload = unknown> {
   protocolVersion: string; // "1.0" today
-  type: 'init' | 'observation' | 'action' | 'match-end' | /* a few more, rarely needed — see protocol-reference.md */ string;
+  type:
+    | 'init'
+    | 'observation'
+    | 'action'
+    | 'match-end'
+    | /* a few more, rarely needed — see protocol-reference.md */ string;
   matchId: string;
   roundId?: number; // present on round-scoped messages only
   seq: number; // per-direction monotonic counter, starting at 0
@@ -589,7 +594,7 @@ interface HeartsConfig {
 ```
 
 Handed to you (opaque, informational) in `init`'s `payload.config`. Lower is better in Hearts —
-`pointLimit` is the *ceiling* a score has to cross to end the match, not a target to race toward.
+`pointLimit` is the _ceiling_ a score has to cross to end the match, not a target to race toward.
 
 **Cards, on the wire** — a plain object, never a compact string like `"QS"`:
 
@@ -601,7 +606,7 @@ interface Card {
 ```
 
 (The compact `"QS"`/`"TH"` string form only exists in `thunderdome play`'s terminal text UI for a
-*human* typing commands. A bot's `Card` objects on the wire are never strings.)
+_human_ typing commands. A bot's `Card` objects on the wire are never strings.)
 
 **Observation** — what you receive:
 
@@ -719,7 +724,10 @@ round (the other 3 don't hear anything until it's their turn):
       "phase": "playing",
       "handNumber": 0,
       "passDirection": "left",
-      "hand": [{ "suit": "clubs", "rank": 9 }, { "suit": "diamonds", "rank": 4 }],
+      "hand": [
+        { "suit": "clubs", "rank": 9 },
+        { "suit": "diamonds", "rank": 4 }
+      ],
       "handSizes": { "your-bot-id": 2, "p2": 3, "p3": 3, "p4": 3 },
       "heartsBroken": true,
       "tricksCompleted": 11,

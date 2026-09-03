@@ -113,13 +113,17 @@ function buildRoundTables(args: {
 }): { tables: MatchDescriptor[]; sitOuts: string[] } {
   const { round, participantIds, standings, tiebreakRank, sitOutCount, tableSize } = args;
 
-  const sitOuts = chooseSitOuts(participantIds, sitOutCount, tiebreakRank, participantIds.length % tableSize);
+  const sitOuts = chooseSitOuts(
+    participantIds,
+    sitOutCount,
+    tiebreakRank,
+    participantIds.length % tableSize,
+  );
   const sitOutSet = new Set(sitOuts);
-  const active = participantIds.filter(id => !sitOutSet.has(id));
+  const active = participantIds.filter((id) => !sitOutSet.has(id));
 
   const sorted = active.sort((a, b) => {
-    const scoreDiff =
-      (standings[a]?.cumulativeScore ?? 0) - (standings[b]?.cumulativeScore ?? 0);
+    const scoreDiff = (standings[a]?.cumulativeScore ?? 0) - (standings[b]?.cumulativeScore ?? 0);
     return scoreDiff !== 0 ? scoreDiff : (tiebreakRank[a] ?? 0) - (tiebreakRank[b] ?? 0);
   });
 
@@ -134,7 +138,10 @@ function buildRoundTables(args: {
   return { tables, sitOuts };
 }
 
-function nextSitOutCount(current: Record<string, number>, sitOuts: readonly string[]): Record<string, number> {
+function nextSitOutCount(
+  current: Record<string, number>,
+  sitOuts: readonly string[],
+): Record<string, number> {
   const next = { ...current };
   for (const id of sitOuts) {
     next[id] = (next[id] ?? 0) + 1;
@@ -280,7 +287,8 @@ export const swissLeagueFormat: TournamentFormat<
         ...entry,
         // A participant who never got seated (only possible with a very short tournament) sorts
         // last, not tied-for-best-at-0 — Infinity is never actually "the best average."
-        averageScore: entry.tablesPlayed > 0 ? entry.cumulativeScore / entry.tablesPlayed : Infinity,
+        averageScore:
+          entry.tablesPlayed > 0 ? entry.cumulativeScore / entry.tablesPlayed : Infinity,
       }))
       .sort(
         (a, b) =>

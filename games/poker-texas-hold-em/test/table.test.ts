@@ -52,7 +52,9 @@ describe('nextButton', () => {
   // Busting 3 of 4 still lets the button wrap back around to itself (the one remaining active
   // seat) — only busting every seat, the current button included, leaves no candidate at all.
   it('throws when every participant, including the current button, has busted', () => {
-    expect(() => nextButton(ALICE_BOB_CAROL_DAVE, 'alice', new Set(ALICE_BOB_CAROL_DAVE))).toThrow();
+    expect(() =>
+      nextButton(ALICE_BOB_CAROL_DAVE, 'alice', new Set(ALICE_BOB_CAROL_DAVE)),
+    ).toThrow();
   });
 });
 

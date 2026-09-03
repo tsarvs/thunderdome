@@ -10,7 +10,10 @@ export function awardPotToSoleWinner(
   winnerId: string,
   events: RoundEvent[],
 ): PokerTexasHoldEmState {
-  const potTotal = state.seatOrder.reduce((sum, id) => sum + (state.players[id]?.committed ?? 0), 0);
+  const potTotal = state.seatOrder.reduce(
+    (sum, id) => sum + (state.players[id]?.committed ?? 0),
+    0,
+  );
   const stacks = { ...state.stacks, [winnerId]: (state.stacks[winnerId] ?? 0) + potTotal };
   const summary: PokerHandSummary = {
     handNumber: state.handNumber,
@@ -29,7 +32,10 @@ export function awardPotToSoleWinner(
  * unreachable — real play can't actually produce one (the last aggressor at any layer with real
  * chips in it is never the one who folds into their own bet), but nothing here depends on that.
  */
-export function doShowdown(state: PokerTexasHoldEmState, events: RoundEvent[]): PokerTexasHoldEmState {
+export function doShowdown(
+  state: PokerTexasHoldEmState,
+  events: RoundEvent[],
+): PokerTexasHoldEmState {
   const committed = Object.fromEntries(
     state.seatOrder.map((id) => [id, state.players[id]?.committed ?? 0]),
   );
@@ -48,7 +54,11 @@ export function doShowdown(state: PokerTexasHoldEmState, events: RoundEvent[]): 
     }
     const rank = bestHand([...player.holeCards, ...state.board]);
     handsByParticipant.set(id, rank);
-    showdownReveals.push({ participantId: id, holeCards: player.holeCards, category: rank.category });
+    showdownReveals.push({
+      participantId: id,
+      holeCards: player.holeCards,
+      category: rank.category,
+    });
   }
 
   const winningsByParticipant = new Map<string, number>();

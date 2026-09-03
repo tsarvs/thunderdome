@@ -33,7 +33,9 @@ export function kebabToTitle(id) {
 
 export function gitConfig(key) {
   try {
-    return execFileSync('git', ['config', key], { cwd: REPO_ROOT, encoding: 'utf8' }).trim() || undefined;
+    return (
+      execFileSync('git', ['config', key], { cwd: REPO_ROOT, encoding: 'utf8' }).trim() || undefined
+    );
   } catch {
     return undefined;
   }

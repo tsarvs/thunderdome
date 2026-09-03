@@ -1,7 +1,7 @@
 # Making a Game Human-Friendly (and Other Ways to Develop It Further)
 
 This guide is for taking a game that already works — its `GameDefinition` is implemented, bots can
-play it, `match run` and `tournament run` both function — and making it *better*: pleasant for an
+play it, `match run` and `tournament run` both function — and making it _better_: pleasant for an
 actual human to sit down and play, and easier to keep improving over time. If you haven't
 implemented a `GameDefinition` yet, start with
 [`game-authoring-guide.md`](game-authoring-guide.md) first; this guide assumes that part is done.
@@ -120,7 +120,7 @@ humanInterface: { describeObservation, parseInput, describeAction },
 
 Printed immediately after a valid input is accepted, before the next prompt — Hearts uses this for
 `Passed: 9C QC 2D` and `Played: 4D`. This matters most when your notation is dense enough that a
-typo could silently parse into a *different, still-valid* action rather than failing to parse at
+typo could silently parse into a _different, still-valid_ action rather than failing to parse at
 all (e.g. typing `9D` instead of `9C` — both are legal card tokens, just not the one you meant).
 Rock-Paper-Scissors skips `describeAction` entirely — its next prompt already restates your last
 choice as part of the round recap, so a separate confirmation would be redundant. Omit it when your
@@ -140,7 +140,7 @@ Here's the exact path, following the pattern above:
    see `game-authoring-guide.md` §4), plus whose turn it is and the column-number legend, ending in
    a prompt like `Drop in which column? (0-6)`.
 3. **Write `parseInput`**: parse a bare integer, trim whitespace, return `undefined` for anything
-   that isn't a valid integer in range — don't re-check whether the column is *currently* full
+   that isn't a valid integer in range — don't re-check whether the column is _currently_ full
    here; that's `validateAction`'s job, and returning a well-formed-but-illegal action is fine
    (the CLI/engine already handles a rejected action the same way it handles a bot's illegal move).
 4. **Wire it into `GameDefinition`**: add `humanInterface: { describeObservation, parseInput }` next
@@ -165,17 +165,17 @@ roughly in order of how self-contained they are:
 - **Add more reference bots.** A game with only one or two reference bots (`bots/<game-id>/`) is
   hard for a newcomer to learn from by comparison, and hides "what does a genuinely different
   strategy look like" questions your game design might not have considered. `yarn scaffold:bot
-  <game-id> <bot-id>` (see `bots/README.md`) gets you a working starting point in seconds — start
+<game-id> <bot-id>` (see `bots/README.md`) gets you a working starting point in seconds — start
   from `random-<game-id>` and `lowest-card-hearts`-style "obviously not optimal but a real
   baseline" strategies before attempting something sophisticated.
 - **Add or tune `resourceLimits`.** If your game's bots need meaningfully more (or less) time per
   turn than the `5000`ms/`128`MB/`0.5`-CPU convention every real game currently uses
   (`game-authoring-guide.md` §8), that's a legitimate, game-specific decision — a card game with a
   larger search space than Rock-Paper-Scissors' single-choice-per-round might reasonably need
-  longer. Document *why* in a comment next to the value, the same way you'd document any other
+  longer. Document _why_ in a comment next to the value, the same way you'd document any other
   non-obvious constant.
 - **Tune your config's defaults.** `parseConfig`'s defaults (`game-authoring-guide.md` §9) are
-  often the single biggest lever on how a game *feels* without changing a single rule —
+  often the single biggest lever on how a game _feels_ without changing a single rule —
   Rock-Paper-Scissors' `totalRounds: 300` default exists specifically so a match has enough hands
   for an adaptive bot's strategy to actually show up in the result, rather than being decided by an
   early lucky streak. If playtesting (by hand, via `yarn thunderdome play`, or by watching several

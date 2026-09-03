@@ -22,7 +22,11 @@ function config(overrides?: Partial<Parameters<typeof pokerTexasHoldEm.parseConf
   return result.value;
 }
 
-function initialState(participantIds: string[], overrides?: Parameters<typeof config>[0], seed = 1) {
+function initialState(
+  participantIds: string[],
+  overrides?: Parameters<typeof config>[0],
+  seed = 1,
+) {
   return pokerTexasHoldEm.initialize({ config: config(overrides), participantIds, rng: rng(seed) });
 }
 
@@ -90,7 +94,10 @@ describe('pokerTexasHoldEm.initialize', () => {
     for (const id of TWO_PLAYERS) {
       expect(state.players[id]?.holeCards).toHaveLength(2);
     }
-    const totalCommitted = TWO_PLAYERS.reduce((sum, id) => sum + (state.players[id]?.committed ?? 0), 0);
+    const totalCommitted = TWO_PLAYERS.reduce(
+      (sum, id) => sum + (state.players[id]?.committed ?? 0),
+      0,
+    );
     expect(totalCommitted).toBe(15);
     expect(state.street).toBe('preflop');
     expect(state.matchComplete).toBe(false);
@@ -146,14 +153,20 @@ describe('pokerTexasHoldEm.validateAction', () => {
   it('rejects a raise below the minimum raise size unless it is an all-in', () => {
     const state = initialState(TWO_PLAYERS);
     const actor = actingParticipant(state);
-    expect(pokerTexasHoldEm.validateAction(state, actor, { type: 'raise', amount: 15 }).ok).toBe(false);
-    expect(pokerTexasHoldEm.validateAction(state, actor, { type: 'raise', amount: 20 }).ok).toBe(true);
+    expect(pokerTexasHoldEm.validateAction(state, actor, { type: 'raise', amount: 15 }).ok).toBe(
+      false,
+    );
+    expect(pokerTexasHoldEm.validateAction(state, actor, { type: 'raise', amount: 20 }).ok).toBe(
+      true,
+    );
   });
 
   it('rejects committing more than your stack', () => {
     const state = initialState(TWO_PLAYERS, { startingStack: 200 });
     const actor = actingParticipant(state);
-    expect(pokerTexasHoldEm.validateAction(state, actor, { type: 'raise', amount: 10_000 }).ok).toBe(false);
+    expect(
+      pokerTexasHoldEm.validateAction(state, actor, { type: 'raise', amount: 10_000 }).ok,
+    ).toBe(false);
   });
 
   it('rejects malformed actions', () => {
@@ -233,13 +246,18 @@ describe('pokerTexasHoldEm.resolve — betting progression', () => {
 describe('pokerTexasHoldEm — fixedHands format', () => {
   // getResult().handsPlayed is 1-indexed; state.handNumber itself stays 0-indexed.
   it('ends the match once totalHands hands have been played', () => {
-    let state = initialState(TWO_PLAYERS, { matchFormat: 'fixedHands', totalHands: 2, startingStack: 5000 });
+    let state = initialState(TWO_PLAYERS, {
+      matchFormat: 'fixedHands',
+      totalHands: 2,
+      startingStack: 5000,
+    });
     for (let hand = 0; hand < 2 && !pokerTexasHoldEm.isTerminal(state); hand += 1) {
       let guard = 0;
       while (!pokerTexasHoldEm.isTerminal(state) && guard < 20) {
         const actor = actingParticipant(state);
         const observation = pokerTexasHoldEm.getObservation(state, actor);
-        const action: PokerTexasHoldEmAction = observation.toCall === 0 ? { type: 'check' } : { type: 'call' };
+        const action: PokerTexasHoldEmAction =
+          observation.toCall === 0 ? { type: 'check' } : { type: 'call' };
         ({ nextState: state } = act(state, action));
         guard += 1;
         if (state.handNumber > hand) break;

@@ -93,7 +93,11 @@ function resolvePassing(
     // Deliberately omits which cards were passed — card contents aren't legitimately public
     // until played to a trick, so the event channel stays as conservative as getObservation.
     events: [
-      { type: 'cards-passed', participantIds: [...state.participantIds], data: { direction, passedTo } },
+      {
+        type: 'cards-passed',
+        participantIds: [...state.participantIds],
+        data: { direction, passedTo },
+      },
     ],
   };
 }
@@ -120,7 +124,11 @@ function resolvePlay(
   const plays = [...state.currentTrick.plays, { participantId, card }];
 
   const events: RoundEvent[] = [
-    { type: 'card-played', participantIds: [participantId], data: { card, trickPosition: plays.length } },
+    {
+      type: 'card-played',
+      participantIds: [participantId],
+      data: { card, trickPosition: plays.length },
+    },
   ];
 
   if (plays.length < 4) {
@@ -175,7 +183,12 @@ function resolvePlay(
 
   events.push({
     type: 'hand-scored',
-    data: { handNumber: state.handNumber, handPoints: finalHandPoints, shotTheMoon: shooterId, scores },
+    data: {
+      handNumber: state.handNumber,
+      handPoints: finalHandPoints,
+      shotTheMoon: shooterId,
+      scores,
+    },
   });
 
   if (matchComplete) {
@@ -235,7 +248,13 @@ export const hearts: GameDefinition<
 
   initialize({ participantIds, config, rng }) {
     const [a, b, c, d] = participantIds;
-    if (a === undefined || b === undefined || c === undefined || d === undefined || participantIds.length !== 4) {
+    if (
+      a === undefined ||
+      b === undefined ||
+      c === undefined ||
+      d === undefined ||
+      participantIds.length !== 4
+    ) {
       throw new Error(
         `card-game-hearts requires exactly 4 participants, got ${String(participantIds.length)}`,
       );
@@ -246,7 +265,13 @@ export const hearts: GameDefinition<
       scores[id] = 0;
     });
     const setup = dealNewHand(ids, 0, rng);
-    const state: HeartsState = { participantIds: ids, config, scores, matchComplete: false, ...setup };
+    const state: HeartsState = {
+      participantIds: ids,
+      config,
+      scores,
+      matchComplete: false,
+      ...setup,
+    };
     return state;
   },
 
@@ -339,7 +364,10 @@ export const hearts: GameDefinition<
       const hand = state.hands[participantId] ?? [];
       return { policy: 'substitute', action: { type: 'pass', cards: deterministicPass(hand) } };
     }
-    return { policy: 'substitute', action: { type: 'play', card: deterministicPlay(state, participantId) } };
+    return {
+      policy: 'substitute',
+      action: { type: 'play', card: deterministicPlay(state, participantId) },
+    };
   },
 
   isTerminal(state) {
@@ -347,7 +375,11 @@ export const hearts: GameDefinition<
   },
 
   getResult(state) {
-    return { participantIds: state.participantIds, scores: state.scores, handsPlayed: state.handNumber + 1 };
+    return {
+      participantIds: state.participantIds,
+      scores: state.scores,
+      handsPlayed: state.handNumber + 1,
+    };
   },
 
   getStandingOutcomes(result) {
@@ -359,7 +391,13 @@ export const hearts: GameDefinition<
     return ids.map((id) => {
       const rank = 1 + ids.filter((other) => scoreOf(other) < scoreOf(id)).length;
       const outcome: NonNullable<StandingOutcome['outcome']> =
-        bestIds.length > 1 ? (bestIds.includes(id) ? 'draw' : 'loss') : id === bestIds[0] ? 'win' : 'loss';
+        bestIds.length > 1
+          ? bestIds.includes(id)
+            ? 'draw'
+            : 'loss'
+          : id === bestIds[0]
+            ? 'win'
+            : 'loss';
       return { participantId: id, rank, score: scoreOf(id), outcome };
     });
   },

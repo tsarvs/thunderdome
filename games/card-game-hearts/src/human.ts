@@ -62,7 +62,9 @@ export function describeObservation(observation: HeartsObservation): string {
   const scoresLineWithYou = `  — you: ${String(observation.scores[observation.you] ?? 0)} (${handPointsOf(observation.you)} this hand)`;
   const scoresLinesForOthers = observation.participantIds
     .filter((id) => id !== observation.you)
-    .map((id) => `  — ${id}: ${String(observation.scores[id] ?? 0)} (${handPointsOf(id)} this hand)`);
+    .map(
+      (id) => `  — ${id}: ${String(observation.scores[id] ?? 0)} (${handPointsOf(id)} this hand)`,
+    );
   const trickLine =
     observation.currentTrick === null
       ? undefined
