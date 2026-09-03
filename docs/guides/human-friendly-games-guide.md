@@ -6,13 +6,15 @@ actual human to sit down and play, and easier to keep improving over time. If yo
 implemented a `GameDefinition` yet, start with
 [`game-authoring-guide.md`](game-authoring-guide.md) first; this guide assumes that part is done.
 
-**Status check first.** Two of the three real games support human play today — Rock-Paper-Scissors
-and Hearts both implement `GameDefinition.humanInterface`, so `yarn thunderdome play` works against
-either. **Connect Four does not yet** — `yarn thunderdome play leftmost-connect-four` gives a
-clear "this game doesn't support human play yet" error rather than a crash or a garbled prompt.
-That gap is real, self-contained, and doesn't require touching the CLI or engine at all — §2 below
-walks through closing it as a concrete, worked exercise, using Rock-Paper-Scissors and Hearts as
-the two existing references.
+**Status check first.** Three of the four real games support human play today —
+Rock-Paper-Scissors, Hearts, and Texas Hold'em all implement `GameDefinition.humanInterface`, so
+`yarn thunderdome play` works against any of them. **Connect Four does not yet** —
+`yarn thunderdome play leftmost-connect-four` gives a clear "this game doesn't support human play
+yet" error rather than a crash or a garbled prompt. That gap is real, self-contained, and doesn't
+require touching the CLI or engine at all — §2 below walks through closing it as a concrete,
+worked exercise, using Rock-Paper-Scissors and Hearts as the two existing references (Texas
+Hold'em's `src/human.ts` is a third, if you want a betting/multi-street example instead of a
+trick-taking one).
 
 ## 1. Why bother making a game human-playable at all?
 
@@ -167,7 +169,7 @@ roughly in order of how self-contained they are:
   from `random-<game-id>` and `lowest-card-hearts`-style "obviously not optimal but a real
   baseline" strategies before attempting something sophisticated.
 - **Add or tune `resourceLimits`.** If your game's bots need meaningfully more (or less) time per
-  turn than the `5000`ms/`128`MB/`0.5`-CPU convention both real games currently use
+  turn than the `5000`ms/`128`MB/`0.5`-CPU convention every real game currently uses
   (`game-authoring-guide.md` §8), that's a legitimate, game-specific decision — a card game with a
   larger search space than Rock-Paper-Scissors' single-choice-per-round might reasonably need
   longer. Document *why* in a comment next to the value, the same way you'd document any other

@@ -47,6 +47,9 @@ BOT_DIRS=(
   "bots/card-game-hearts/point-dodger-hearts"
   "bots/card-game-hearts/tominator-t1"
   "bots/card-game-hearts/tominator-t101"
+  "bots/poker-texas-hold-em/random-poker"
+  "bots/poker-texas-hold-em/calling-station-poker"
+  "bots/poker-texas-hold-em/tight-poker"
 )
 
 for dir in "${BOT_DIRS[@]}"; do

@@ -6,9 +6,17 @@ import type { AnyGameDefinition } from '../src/lib/match-execution.js';
 
 /** A minimal fake `GameDefinition` — only `humanInterface` and `id` matter to this collector. */
 function fakeGame(
-  options: { withHumanInterface?: boolean; withDescribeAction?: boolean } = {},
+  options: {
+    withHumanInterface?: boolean;
+    withDescribeAction?: boolean;
+    withValidateInput?: boolean;
+  } = {},
 ): AnyGameDefinition {
-  const { withHumanInterface = true, withDescribeAction = false } = options;
+  const {
+    withHumanInterface = true,
+    withDescribeAction = false,
+    withValidateInput = false,
+  } = options;
   return {
     id: 'fake-game',
     version: '1.0.0',
@@ -27,7 +35,19 @@ function fakeGame(
           humanInterface: {
             describeObservation: (observation: unknown) =>
               `prompt:${JSON.stringify(observation)}> `,
-            parseInput: (raw: string) => (raw === 'valid' ? { picked: raw } : undefined),
+            // "valid" always parses; "out-of-range" also parses (syntactically well-formed) but
+            // is rejected downstream by validateInput below — mirrors a raise amount that's a
+            // fine positive integer but outside the observation's min/max.
+            parseInput: (raw: string) =>
+              raw === 'valid' || raw === 'out-of-range' ? { picked: raw } : undefined,
+            ...(withValidateInput
+              ? {
+                  validateInput: (action: unknown) =>
+                    (action as { picked: string }).picked === 'out-of-range'
+                      ? 'that amount is outside the legal range'
+                      : undefined,
+                }
+              : {}),
             ...(withDescribeAction
               ? { describeAction: (action: unknown) => `confirmed:${JSON.stringify(action)}` }
               : {}),
@@ -114,6 +134,40 @@ describe('TerminalHumanCollector', () => {
     // Exactly once — never before the first attempt, since nothing has been rejected yet.
     expect(text().split(notice).length - 1).toBe(1);
     expect(text().indexOf(notice)).toBeLessThan(text().lastIndexOf('prompt:'));
+  });
+
+  it('reprompts with the reason on a well-formed but out-of-range action, instead of returning it', async () => {
+    const { output, text } = outputSink();
+    const collector = new TerminalHumanCollector({
+      humanParticipantId: 'you',
+      game: fakeGame({ withValidateInput: true }),
+      fallback: new FakeFallback(),
+      input: Readable.from(['out-of-range\n', 'valid\n']),
+      output,
+    });
+
+    const result = await collector.requestAction(BASE_ARGS);
+
+    expect(result).toEqual({ ok: true, action: { picked: 'valid' } });
+    expect(text()).toContain('that amount is outside the legal range — try again.');
+    // prompted twice: once before the out-of-range line, once more before the valid one
+    expect(text().split('prompt:').length - 1).toBe(2);
+  });
+
+  it('never calls validateInput when the game does not declare it', async () => {
+    const collector = new TerminalHumanCollector({
+      humanParticipantId: 'you',
+      game: fakeGame({ withValidateInput: false }),
+      fallback: new FakeFallback(),
+      input: Readable.from(['out-of-range\n']),
+      output: outputSink().output,
+    });
+
+    // With no validateInput declared, "out-of-range" parses successfully and is returned as-is —
+    // the fake game's own validateInput logic never runs to reject it.
+    const result = await collector.requestAction(BASE_ARGS);
+
+    expect(result).toEqual({ ok: true, action: { picked: 'out-of-range' } });
   });
 
   it("prints the game's describeAction confirmation immediately after a valid parse, with no stray blank line before it", async () => {

@@ -54,7 +54,7 @@ pieces genuinely fit together — this repo's own test suite is shaped exactly t
 | Tier            | What it exercises                                                          | How fast   | Real example in this repo                                                                                     |
 | --------------- | --------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
 | Unit test       | One `GameDefinition` method, or one pure function, called directly          | Instant    | `games/rock-paper-scissors/test/game.test.ts` — calls `rockPaperScissors.parseConfig()`/`.resolve()`/etc. directly against hand-built state, with **zero** Docker involved |
-| Integration test | A real bot's Docker container, driven through the real wire protocol       | Seconds    | `bots/rock-paper-scissors/*/smoke-test.mjs` and [`docs/guides/examples/counter-bot/smoke-test.mjs`](examples/counter-bot/smoke-test.mjs) — builds a real image, starts a real container via `@thunderdome/runtime`, and drives it through a scripted `init`/`observation`/`action` exchange |
+| Integration test | A real bot's Docker container, driven through the real wire protocol       | Seconds    | `bots/rock-paper-scissors/*/smoke-test.mjs` — builds a real image, starts a real container via `@thunderdome/runtime`, and drives it through a scripted `init`/`observation`/`action` exchange |
 
 Every package under `packages/` and `games/` has a `test/` directory of unit tests, run by
 `yarn test` (Vitest) — these are what CI runs on every change and what you should be running
@@ -136,12 +136,13 @@ lists, concretely, everything a new game's own test suite should cover.
 
 ## 5. Writing (or extending) an integration test
 
-Integration tests in this repo follow [`docs/guides/examples/counter-bot/smoke-test.mjs`](examples/counter-bot/README.md)'s
-pattern: build the bot's Docker image, then drive it through a real container using
-`@thunderdome/runtime`'s primitives (`DockerBotProcess`/`BotLifecycle`) with a scripted sequence of
-observations, asserting the bot's replies match what you expect. Its own README spells out the
-exact steps (build → sanity-check by hand → run the smoke test) and is the right template to copy
-when your own bot needs one — you're not expected to write this kind of test from scratch.
+Integration tests in this repo all follow the same pattern: build the bot's Docker image, then
+drive it through a real container using `@thunderdome/runtime`'s primitives
+(`DockerBotProcess`/`BotLifecycle`) with a scripted sequence of observations, asserting the bot's
+replies match what you expect. Any bot's own `smoke-test.mjs` (e.g.
+[`bots/rock-paper-scissors/only-rock/smoke-test.mjs`](../../bots/rock-paper-scissors/only-rock/smoke-test.mjs))
+is the right template to copy when your own bot needs one — you're not expected to write this kind
+of test from scratch.
 
 To actually run one, from the repo root, with Docker running (§3): build the bot's image (the tag
 its own `smoke-test.mjs` expects is named in a comment at the top of that file), then run the

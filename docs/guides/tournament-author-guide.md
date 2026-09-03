@@ -16,8 +16,9 @@ see §3 for how it fits the same `TournamentFormat` contract as the other two. W
 yet: anything beyond these three (pool-then-elimination, ...) — see
 [`tournament-format-authoring-guide.md`](tournament-format-authoring-guide.md) if you want to build
 one. This guide documents what's real, using Rock-Paper-Scissors (still the running example
-throughout) — Connect Four is the platform's other real game (`docs/guides/README.md`) and fits
-every piece below identically, just without its own worked example here yet.
+throughout) — Connect Four and Texas Hold'em are the platform's two other real games without a
+proven tournament format yet (`docs/guides/README.md`), and fit every piece below identically,
+just without their own worked example here.
 
 ## 1. The five pieces of a tournament
 

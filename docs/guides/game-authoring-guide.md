@@ -6,12 +6,16 @@ different job from the other two guides: a **bot author**
 author** ([`tournament-author-guide.md`](tournament-author-guide.md)) configures matchups between
 bots; a **game author** defines the rules those bots and tournaments run on top of.
 
-**Status check first.** Two real games exist today — Rock-Paper-Scissors
-(`games/rock-paper-scissors`, simultaneous, no hidden information) and Connect Four
-(`games/connect-four`, sequential single-mover turns, also no hidden information). Both implement
-exactly the interface this guide describes; neither needed an engine change to exist. A
-hidden-information game (each participant sees something different) is the one shape neither
-exercises yet — ADR-0005 covers how that would work, referenced below.
+**Status check first.** Four real games exist today; this guide deep-dives two of them —
+Rock-Paper-Scissors (`games/rock-paper-scissors`, simultaneous, no hidden information) and Connect
+Four (`games/connect-four`, sequential single-mover turns, also no hidden information) — since
+together they cover the two basic turn-taking shapes (§2) with nothing hidden to complicate the
+walkthrough. Both implement exactly the interface this guide describes; neither needed an engine
+change to exist. A hidden-information game (each participant sees something different, ADR-0005)
+is exercised by the other two instead: Hearts (`games/card-game-hearts`, 4 fixed seats) and Texas
+Hold'em (`games/poker-texas-hold-em`, 2-10 seats, real no-limit betting with side pots) — both real
+`GameDefinition`s too, just documented in [`bot-author-guide.md`](bot-author-guide.md) §10/§11 and
+their own `src/types.ts` instead of here (see [`README.md`](README.md) for the full roster).
 
 **New to Node/Docker/dev environments, or to this codebase generally?**
 [`getting-started.md`](getting-started.md) explains the tooling this guide assumes you already

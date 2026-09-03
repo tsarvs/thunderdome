@@ -1,0 +1,9 @@
+{
+  "name": "random-poker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@thunderdome/bot-sdk": "file:./vendor/thunderdome-bot-sdk.tgz"
+  }
+}

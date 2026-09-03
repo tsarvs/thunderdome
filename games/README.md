@@ -18,7 +18,8 @@ principles before either guide above assumes you already know them.
 | --------------------------------------------- | --------------------------------------- | ------- | ------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | [`rock-paper-scissors`](rock-paper-scissors/) | `@thunderdome/game-rock-paper-scissors` | 2       | No            | `round-robin`                       | Best-of-N Rock Paper Scissors — the platform's first vertical-slice game, simultaneous reveal each round.                                |
 | [`connect-four`](connect-four/)               | `@thunderdome/game-connect-four`        | 2       | Yes           | `round-robin`, `single-elimination` | Classic 7x6 Connect Four — the first sequential, no-hidden-information game.                                                             |
-| [`card-game-hearts`](card-game-hearts/)       | `@thunderdome/game-card-game-hearts`    | 4       | No            | —                                   | The classic 4-player trick-taking card game of Hearts — hidden information (each player's hand) and passing, unlike the other two games. |
+| [`card-game-hearts`](card-game-hearts/)       | `@thunderdome/game-card-game-hearts`    | 4       | No            | `swiss-league`                      | The classic 4-player trick-taking card game of Hearts — hidden information (each player's hand) and passing, unlike the other two games. |
+| [`poker-texas-hold-em`](poker-texas-hold-em/) | `@thunderdome/game-poker-texas-hold-em` | 2-10    | No            | —                                   | No-limit Texas Hold'em — the first variable-size table, hidden hole cards, and side-pot betting across multiple streets per hand.        |
 
 Each game directory is a standard workspace package shape: `src/` for the `GameDefinition`
 implementation, `test/` for its unit tests, `manifest.json` for the metadata
@@ -26,8 +27,8 @@ implementation, `test/` for its unit tests, `manifest.json` for the metadata
 formats, maintainers), and a `dist/` produced by `yarn build`.
 
 Every game depends on `@thunderdome/engine` for the `GameDefinition` contract it implements, plus
-whatever else its rules need — `card-game-hearts` also pulls in
-[`@thunderdome/card-kit`](../packages/game-dev-toolkit/card-kit/) for shared card/deck/trick
+whatever else its rules need — `card-game-hearts` and `poker-texas-hold-em` also pull in
+[`@thunderdome/card-kit`](../packages/game-dev-toolkit/card-kit/) for shared card/deck
 primitives. See [`packages/README.md`](../packages/README.md) for what each of those packages
 actually provides.
 

@@ -16,7 +16,7 @@ point (see the doc comment at the top of
 [`scripts/scaffold-bot.mjs`](../scripts/scaffold-bot.mjs) for every flag), then follow
 [`docs/guides/bot-author-guide.md`](../docs/guides/bot-author-guide.md) for the full contract,
 manifest, Dockerfile, and testing steps — game-agnostic throughout, with a dedicated section for
-each game's own specifics (Rock-Paper-Scissors, Hearts).
+each game's own specifics (Rock-Paper-Scissors, Hearts, Texas Hold'em).
 
 Two different kinds of bot live under `bots/`, and the distinction matters: **reference bots**
 exist to teach the wire protocol and SDK — deliberately simple, sometimes deliberately bad, so
@@ -37,6 +37,9 @@ strategies actually trying to win — read them for strategy ideas, not API plum
 | [`card-game-hearts/random-hearts`](card-game-hearts/random-hearts/)            | Hearts              | JavaScript | Uniformly random pass/play every turn, seeded from the match's `rngSeed`.                                    |
 | [`card-game-hearts/lowest-card-hearts`](card-game-hearts/lowest-card-hearts/)  | Hearts              | JavaScript | Always plays/passes by raw rank, ignoring the trick, hearts, or scores entirely.                             |
 | [`card-game-hearts/point-dodger-hearts`](card-game-hearts/point-dodger-hearts/) | Hearts              | JavaScript | Sheds dangerous cards when passing, leads safe non-point cards, ducks under the trick's current winner when it can, and dumps its most dangerous card when void in the led suit. |
+| [`poker-texas-hold-em/random-poker`](poker-texas-hold-em/random-poker/)        | Texas Hold Em       | JavaScript | Uniformly random choice among whatever's currently legal (fold/check/call/raise/allIn), with a uniformly random raise amount, PRNG seeded from the match's `rngSeed`. |
+| [`poker-texas-hold-em/calling-station-poker`](poker-texas-hold-em/calling-station-poker/) | Texas Hold Em | JavaScript | Never folds or raises: checks when possible, otherwise calls (capped at its own stack). No randomness at all. |
+| [`poker-texas-hold-em/tight-poker`](poker-texas-hold-em/tight-poker/)          | Texas Hold Em       | TypeScript | Bets/raises only with a good hand (a standard tight preflop range, or a made pair-or-better postflop) and never bluffs; calls a bet only when it's no more than the big blind. |
 
 ## Competitors
 
@@ -55,28 +58,29 @@ Both tables are one roster as far as the platform is concerned — nothing about
 split above is purely for a reader trying to figure out which bots to imitate versus which to
 actually try to beat.
 
-Each bot is verified against the real Docker runtime by its own `smoke-test.mjs` — see
-[`docs/guides/examples/counter-bot/README.md`](../docs/guides/examples/counter-bot/README.md) for
-the pattern they follow (build the image, then `node <bot>/smoke-test.mjs` from the repo root).
+Each bot is verified against the real Docker runtime by its own `smoke-test.mjs` — build the
+image, then `node <bot>/smoke-test.mjs` from the repo root; any bot's own `smoke-test.mjs` is a
+working template for the pattern (e.g.
+[`rock-paper-scissors/only-rock/smoke-test.mjs`](rock-paper-scissors/only-rock/smoke-test.mjs)).
 
-All fifteen depend on `@thunderdome/bot-sdk`'s `runBot()` for the NDJSON wire-protocol handling
+All eighteen depend on `@thunderdome/bot-sdk`'s `runBot()` for the NDJSON wire-protocol handling
 (replying to `init`, reading `observation`, exiting on `match-end`) — each bot's own file is just a
 `decideAction()` (and, for `random-rps`/`tominator-t800`/`tominator-t1000`/`tominator-tx`/
-`random-connect-four`/`random-hearts`,
+`random-connect-four`/`random-hearts`/`random-poker`,
 an `onInit` hook to seed its PRNG from the match's `rngSeed`). Since `bots/**` isn't a Yarn
 workspace member, that dependency is a vendored tarball rather than a live workspace link: each bot
 has its own `package.json`, `package-lock.json`, and `vendor/thunderdome-bot-sdk.tgz`, produced by
-[`scripts/pack-bot-sdk.sh`](../scripts/README.md#pack-bot-sdksh). The `only-*` bots and every
-`tominator-*` bot additionally show the shape of a TypeScript bot: their own `tsconfig.json` and a
-multi-stage `Dockerfile` that compiles TS in a build stage and ships only the resulting JS plus
-production `node_modules` — no build tooling ends up in the runtime image.
+[`scripts/pack-bot-sdk.sh`](../scripts/README.md#pack-bot-sdksh). The `only-*` bots, every
+`tominator-*` bot, and `tight-poker` additionally show the shape of a TypeScript bot: their own
+`tsconfig.json` and a multi-stage `Dockerfile` that compiles TS in a build stage and ships only the
+resulting JS plus production `node_modules` — no build tooling ends up in the runtime image.
 Every other bot listed above is plain JS with no build step at all — just an `index.mjs` (or
 `index.js`) shipped directly into the image.
 
 Want to watch them actually play each other? `yarn thunderdome match run <botId> <botId>
 [...moreBotIds]` runs a real match between registry-resolved bots through the real engine and
 runtime (building each bot's Docker image on demand) — 2 bot ids for Rock Paper Scissors or
-Connect Four, exactly 4 for Hearts. See
-[`docs/guides/bot-author-guide.md`](../docs/guides/bot-author-guide.md) §9/§10 for details.
+Connect Four, exactly 4 for Hearts, 2-10 for Texas Hold'em. See
+[`docs/guides/bot-author-guide.md`](../docs/guides/bot-author-guide.md) §9/§10/§11 for details.
 To play against 3 Hearts bots yourself instead of watching, see `yarn thunderdome play` in
 [`apps/cli/README.md`](../apps/cli/README.md#play).

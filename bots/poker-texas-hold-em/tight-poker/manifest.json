@@ -1,0 +1,18 @@
+{
+  "id": "tight-poker",
+  "name": "Tight Poker",
+  "version": "0.1.0",
+  "game": "poker-texas-hold-em",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Bets and raises only with a good hand (a standard tight preflop range, or a made pair-or-better postflop) and never bluffs; calls a bet only when it's cheap relative to the big blind."
+}

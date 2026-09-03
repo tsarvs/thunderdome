@@ -5,10 +5,11 @@ must speak, the manifest that describes it, the Docker image it ships in, and ho
 before submitting it. The process is identical no matter which game you're targeting — §1 through
 §8 are the same for every game on the platform. The handful of things that genuinely differ by
 game (the exact shape of what you receive and what you send back) live in their own section at the
-end: [§9 Rock-Paper-Scissors specifics](#9-rock-paper-scissors-specifics) and
-[§10 Hearts specifics](#10-hearts-specifics). Building a bot for a game without its own section
-here (Connect Four, or one you're authoring yourself)? That game's own `src/types.ts` plus
-[`protocol-reference.md`](protocol-reference.md) document the same three things (config,
+end: [§9 Rock-Paper-Scissors specifics](#9-rock-paper-scissors-specifics),
+[§10 Hearts specifics](#10-hearts-specifics), and
+[§11 Texas Hold'em specifics](#11-texas-holdem-specifics). Building a bot for a game without its
+own section here (Connect Four, or one you're authoring yourself)? That game's own `src/types.ts`
+plus [`protocol-reference.md`](protocol-reference.md) document the same three things (config,
 observation, action) a dedicated section would.
 
 **Status check first:** the protocol (`docs/adr/0002-universal-bot-protocol.md`), the Docker
@@ -17,11 +18,12 @@ schema and the developer-facing `runBot()` protocol client) are all implemented 
 and identical regardless of which game you're writing for. So is the bot registry and the
 `match run`/`play`/`tournament run` CLI — see
 [`tournament-author-guide.md`](tournament-author-guide.md) for round robin, single elimination,
-and Swiss league. Three games have real, playable bots today: Rock-Paper-Scissors (2 players,
+and Swiss league. Four games have real, playable bots today: Rock-Paper-Scissors (2 players,
 simultaneous, fully observable), Connect Four (2 players, sequential, fully observable — no
-dedicated bot-author section yet, see above), and Hearts (4 players, hidden information, two
-action shapes). Where this guide describes something that doesn't exist yet, it says so
-explicitly rather than pretending otherwise.
+dedicated bot-author section yet, see above), Hearts (4 players, hidden information, two action
+shapes), and Texas Hold'em (2-10 players, hidden information, no-limit betting). Where this guide
+describes something that doesn't exist yet, it says so explicitly rather than pretending
+otherwise.
 
 **New to Node, Docker, or dev environments in general?**
 [`getting-started.md`](getting-started.md) explains those from first principles before this guide
@@ -32,11 +34,12 @@ assumes you already have them working.
 1. Run `yarn scaffold:bot <game-id> <your-bot-id>` for a working starting point (already using
    `@thunderdome/bot-sdk`'s `runBot()`, §4) rather than writing the protocol plumbing by hand.
 2. Replace the scaffolded `decideAction()` with your actual strategy — §2 explains what you always
-   receive and return conceptually; §9/§10 give the exact types for Rock-Paper-Scissors/Hearts.
+   receive and return conceptually; §9/§10/§11 give the exact types for Rock-Paper-Scissors/
+   Hearts/Texas Hold'em.
 3. Fill in `manifest.json` (§5) and make sure your `Dockerfile` builds a self-contained image (§6).
 4. Test it — first via a scripted smoke test against your own container (§7,
    [`testing-guide.md`](testing-guide.md) if "integration test" is a new term to you), then for
-   real: `yarn thunderdome match run <your-bot-id> <opponent-id(s)>` (§9/§10 give the exact
+   real: `yarn thunderdome match run <your-bot-id> <opponent-id(s)>` (§9/§10/§11 give the exact
    number of opponents your game needs).
 5. Open a PR touching only `bots/<game-id>/<your-bot-id>/` (§8).
 
@@ -127,8 +130,9 @@ A few rules apply no matter which game you're playing:
 - **Exit promptly (exit code 0) once you receive `match-end`.** If you don't, the runtime closes
   your stdin, then escalates to `SIGTERM`, then `SIGKILL` (`docs/adr/0003-docker-bot-isolation.md`).
 
-§9 and §10 show the full, concrete message-by-message trace for a real Rock-Paper-Scissors match
-and a real Hearts hand respectively — the shapes above, with real numbers filled in.
+§9, §10, and §11 show the full, concrete message-by-message trace for a real Rock-Paper-Scissors
+match, a real Hearts hand, and a real Texas Hold'em hand respectively — the shapes above, with
+real numbers filled in.
 
 ## 4. Writing your bot: a complete example
 
@@ -140,7 +144,7 @@ used by every real bot on the platform. With it, your entire bot is just:
 import { runBot } from '@thunderdome/bot-sdk';
 
 function decideAction(observation) {
-  return { choice: 'rock' }; // whatever your game's Action shape is — see §9/§10
+  return { choice: 'rock' }; // whatever your game's Action shape is — see §9/§10/§11
 }
 
 runBot({ decideAction });
@@ -156,10 +160,8 @@ zero dependencies — useful if you're writing a bot in a language other than TS
 want to understand what `runBot()` is doing under the hood. It splits cleanly into two pieces:
 generic protocol plumbing (framing, the init/ready handshake, match-end shutdown) that has zero
 knowledge of any particular game, and your actual strategy (one function: given this round's
-observation, what's your action?). The working example — "Counter Bot," a Rock-Paper-Scissors bot
-that plays whatever beats the opponent's most recently revealed choice, or `rock` on the first
-round — is at [`docs/guides/examples/counter-bot/`](examples/counter-bot/); see its own
-[README](examples/counter-bot/README.md) for how to run it. The generic half:
+observation, what's your action?). The worked example below plays whatever beats the opponent's
+most recently revealed choice, or `rock` on the first round. The generic half:
 
 ```js
 // harness.mjs — copy this file as-is for a bot for a different game; nothing here is
@@ -258,7 +260,7 @@ Notes, true for any game:
 
 - `id` must be kebab-case and must match the bot's directory name once it's submitted.
 - `game` must match an existing game's id — today, one of `rock-paper-scissors`, `connect-four`,
-  or `card-game-hearts`.
+  `card-game-hearts`, or `poker-texas-hold-em`.
 - `interface.transport` must be `"stdio"` — that's the only transport the protocol supports today.
 - `resources` is optional and, if present, is a _request_, not an authority — the runtime clamps
   to platform-enforced hard caps regardless of what you ask for.
@@ -277,7 +279,7 @@ under those constraints (small memory footprint, no network calls, no writes out
 
 Three real shapes exist on the platform today, depending on your bot:
 
-**Zero-dependency, hand-rolled protocol (§4's Counter Bot):**
+**Zero-dependency, hand-rolled protocol (§4's worked example):**
 
 ```dockerfile
 FROM node:25-alpine
@@ -332,18 +334,19 @@ ENTRYPOINT ["node", "dist/index.js"]
 ## 7. Testing your bot locally
 
 Three levels, from narrowest to broadest — identical regardless of game, apart from how many
-opponent bot ids a real match needs (§9/§10 give the exact number and real bot ids to use).
+opponent bot ids a real match needs (§9/§10/§11 give the exact number and real bot ids to use).
 
 **In isolation, against a scripted observation sequence.** Exercise your bot's container directly
 with the same runtime primitives the platform itself uses (`@thunderdome/runtime`'s
 `DockerBotProcess`/`BotLifecycle`) — see
-[`examples/counter-bot/README.md`](examples/counter-bot/README.md) for the generic steps, or
 [`bots/card-game-hearts/point-dodger-hearts/smoke-test.mjs`](../../bots/card-game-hearts/point-dodger-hearts/smoke-test.mjs)
 for a worked example that scripts several distinct observations (leading, ducking, voiding,
-forced-to-win) and asserts the exact action back. Good template for your own bot regardless of
-game: swap in your image tag and whatever observation sequence exercises your strategy's branches.
-[`testing-guide.md`](testing-guide.md) explains what "integration test" means generally, if this
-is new to you.
+forced-to-win) and asserts the exact action back, or
+[`bots/poker-texas-hold-em/random-poker/smoke-test.mjs`](../../bots/poker-texas-hold-em/random-poker/smoke-test.mjs)
+for one that also checks the bot's own randomness is deterministic given the same `rngSeed`. Good
+template for your own bot regardless of game: swap in your image tag and whatever observation
+sequence exercises your strategy's branches. [`testing-guide.md`](testing-guide.md) explains what
+"integration test" means generally, if this is new to you.
 
 **Against real opponents, end to end.** `yarn thunderdome match run <botId> <botId>
 [...moreBotIds]` resolves every bot id and the game they share through the real bot/game registry
@@ -351,7 +354,7 @@ is new to you.
 manual `docker build` step first — and drives a real match through the generic engine
 (`@thunderdome/engine`'s `runMatch()`) and runtime, printing round results and final standings.
 How many bot ids you need depends entirely on the game (2 for Rock-Paper-Scissors or Connect Four,
-exactly 4 for Hearts) — §9/§10 give concrete commands.
+exactly 4 for Hearts, 2-10 for Texas Hold'em) — §9/§10/§11 give concrete commands.
 
 **Against yourself, by hand.** `yarn thunderdome play <botId> [...moreBotIds]` puts you in the
 ring instead of one of the bots — same registry resolution and real Docker match, but each
@@ -828,3 +831,281 @@ again." instead of silently repeating the prompt. Type `quit` (or `resign`) any 
 early instead of playing the whole match out. See
 [`apps/cli/README.md`](../../apps/cli/README.md#play) for the full CLI reference, including
 `--as` (your own participant id) and Ctrl+C behavior.
+
+## 11. Texas Hold'em specifics
+
+### What makes Texas Hold'em different
+
+Texas Hold'em is **2-10 players, hidden information, no-limit betting**, the richest action
+surface of any game on the platform so far:
+
+- The roster size is variable, not fixed like every other game (RPS/Connect Four are always 2,
+  Hearts is always 4) — your bot has to work correctly whether it's facing 1 opponent or 9.
+- Like Hearts, you only ever see your own 2 hole cards — everyone else's are hidden until a
+  showdown reveals them (and never at all if the hand ends by everyone-but-one folding).
+- Unlike Hearts' two action shapes, there are **five**: `fold`, `check`, `call`, `raise` (with an
+  `amount`), and `allIn`. Which ones are actually legal right now is state-dependent (you can't
+  `check` into a bet, you can't `call` with nothing to call) — `observation.legalActions` tells you
+  exactly which of the five apply this turn, advisory only (`validateAction` is the real
+  authority, same as `legalPlays` in Hearts).
+- A hand plays out over up to 4 **streets** (`preflop`, `flop`, `turn`, `river`) with a full round
+  of betting on each — `observation.street` and `observation.board` (0, 3, 4, or 5 community
+  cards) tell you where you are.
+- A match is many hands, like Hearts, but ends one of two ways depending on
+  `config.matchFormat`: `'elimination'` (hands repeat until only one participant still has chips —
+  the default) or `'fixedHands'` (play exactly `config.totalHands` hands, then rank by final chip
+  count). Either way, a hand can bust a participant down to 0 chips along the way; the match also
+  ends early if that ever leaves fewer than 2 players with chips to deal another hand to.
+- **A missing/invalid/timed-out action forfeits the whole match** — unlike Hearts, which
+  substitutes a legal card on your behalf. Texas Hold'em has no sensible stand-in for "what would
+  you have bet," the same reasoning Connect Four uses for having no sensible stand-in move.
+
+Everything else — the NDJSON wire framing, the init/ready handshake, `stdout` being
+protocol-only, `seq` strictly increasing, using `@thunderdome/bot-sdk`'s `runBot()` — is identical
+to every other game on the platform (§1-§8 above).
+
+### The contract
+
+**Config**:
+
+```ts
+interface PokerTexasHoldEmConfig {
+  matchFormat: 'elimination' | 'fixedHands'; // default: 'elimination'
+  totalHands: number; // only consulted when matchFormat === 'fixedHands'; default 10
+  startingStack: number; // chips every participant starts a match with; default 1000
+  smallBlind: number; // default 10
+  bigBlind: number; // must exceed smallBlind; default 20
+}
+```
+
+Handed to you (opaque, informational) in `init`'s `payload.config`.
+
+**Cards, on the wire** — the same plain object as Hearts, never a compact string like `"AS"`:
+
+```ts
+interface Card {
+  suit: 'clubs' | 'diamonds' | 'hearts' | 'spades';
+  rank: number; // 2..10, then 11=J, 12=Q, 13=K, 14=A
+}
+```
+
+**Observation** — what you receive, every time it's your turn to act:
+
+```ts
+interface PokerTexasHoldEmObservation {
+  you: string;
+  handNumber: number; // 0-based
+  street: 'preflop' | 'flop' | 'turn' | 'river';
+  board: Card[]; // community cards revealed so far — 0, 3, 4, or 5 of them
+  holeCards: [Card, Card]; // YOUR 2 hole cards — nobody else's ever appear here
+  pot: number; // everyone's total chips committed this hand so far, across all streets
+  yourStack: number; // chips NOT yet committed to this hand's pot
+  yourCommittedThisStreet: number;
+  toCall: number; // 0 means you can check
+  minRaiseTo: number | null; // the minimum legal `raise` amount; null if you have no chips left to raise with
+  maxRaiseTo: number; // your all-in amount — the max legal `raise` amount
+  smallBlind: number;
+  bigBlind: number;
+  buttonParticipantId: string;
+  opponents: {
+    participantId: string;
+    stack: number;
+    committed: number; // this opponent's total committed this hand so far
+    committedThisStreet: number;
+    folded: boolean;
+    allIn: boolean;
+    isButton: boolean;
+  }[]; // every other still-in-the-match participant, in seat order starting after you
+  legalActions: ('fold' | 'check' | 'call' | 'raise' | 'allIn')[]; // advisory — see above
+  lastHandSummary: {
+    handNumber: number;
+    winners: { participantId: string; amount: number }[];
+    reason: 'fold' | 'showdown';
+    showdown?: { participantId: string; holeCards: [Card, Card]; category: string }[]; // only present for reason === 'showdown'
+    board: Card[];
+  } | null; // null before the first hand's result exists
+}
+```
+
+`lastHandSummary` exists for the same reason Hearts' `lastTrick` does — a stateless bot process
+otherwise has no way to know what just happened before this turn's observation arrived.
+
+**Action** — a discriminated union; `legalActions` tells you which are legal this turn:
+
+```ts
+type PokerTexasHoldEmAction =
+  | { type: 'fold' }
+  | { type: 'check' }
+  | { type: 'call' }
+  | { type: 'raise'; amount: number } // "raise TO", not "raise BY" — see below
+  | { type: 'allIn' };
+```
+
+Two things worth knowing about `raise`: `amount` is the **total** you want
+`yourCommittedThisStreet` to become after the raise, not how much more you're adding — so opening
+the first bet of a street and reraising an existing bet use the exact same shape, just a bigger
+`amount`. And `allIn` is a convenience over `raise` with `amount` set to your entire stack — it
+saves you from having to know your own exact `yourStack`/`yourCommittedThisStreet` arithmetic just
+to shove; use it instead of computing `maxRaiseTo` yourself.
+
+### The wire protocol, concretely
+
+Here's an **observation** partway through a hand — the flop, facing a bet — and the **action**
+reply, from your bot's point of view (the concrete version of §3's generic envelope; `init`/`ready`
+are identical in shape to every other game, just with `"gameId": "poker-texas-hold-em"`):
+
+**Engine → you**:
+
+```json
+{
+  "protocolVersion": "1.0",
+  "type": "observation",
+  "matchId": "match-001",
+  "roundId": 6,
+  "seq": 7,
+  "sentAt": "2026-01-01T00:00:03.000Z",
+  "payload": {
+    "state": {
+      "you": "your-bot-id",
+      "handNumber": 0,
+      "street": "flop",
+      "board": [
+        { "suit": "clubs", "rank": 9 },
+        { "suit": "diamonds", "rank": 4 },
+        { "suit": "hearts", "rank": 2 }
+      ],
+      "holeCards": [
+        { "suit": "spades", "rank": 14 },
+        { "suit": "spades", "rank": 13 }
+      ],
+      "pot": 140,
+      "yourStack": 400,
+      "yourCommittedThisStreet": 0,
+      "toCall": 40,
+      "minRaiseTo": 80,
+      "maxRaiseTo": 440,
+      "smallBlind": 10,
+      "bigBlind": 20,
+      "buttonParticipantId": "opponent-id",
+      "opponents": [
+        {
+          "participantId": "opponent-id",
+          "stack": 360,
+          "committed": 40,
+          "committedThisStreet": 40,
+          "folded": false,
+          "allIn": false,
+          "isButton": true
+        }
+      ],
+      "legalActions": ["fold", "call", "raise", "allIn"],
+      "lastHandSummary": null
+    },
+    "awaitingAction": true,
+    "deadlineAt": "2026-01-01T00:00:08.000Z"
+  }
+}
+```
+
+`check` isn't in `legalActions` here — there's a bet to call (`toCall: 40`), so it's `call` or
+nothing. **You → engine**, calling it:
+
+```json
+{
+  "protocolVersion": "1.0",
+  "type": "action",
+  "matchId": "match-001",
+  "roundId": 6,
+  "seq": 4,
+  "sentAt": "2026-01-01T00:00:03.400Z",
+  "payload": { "action": { "type": "call" } }
+}
+```
+
+This repeats for every street of every hand — however many it takes for the match to end (see
+`config.matchFormat` above) — then ends with `match-end` exactly like every other game:
+
+```json
+{
+  "protocolVersion": "1.0",
+  "type": "match-end",
+  "matchId": "match-001",
+  "seq": 41,
+  "sentAt": "2026-01-01T00:02:12.000Z",
+  "payload": {
+    "result": {
+      "participantIds": ["your-bot-id", "opponent-id"],
+      "stacks": { "your-bot-id": 800, "opponent-id": 0 },
+      "bustedOut": [["opponent-id"]],
+      "handsPlayed": 7
+    },
+    "reason": "completed"
+  }
+}
+```
+
+`bustedOut` groups participants by which hand they busted in — here, `opponent-id` ran out of
+chips during the 7th and final hand, ending the match (`elimination` format's default).
+
+### Reference bots
+
+`bots/poker-texas-hold-em/random-poker/index.mjs` picks uniformly at random among whatever
+`legalActions` allows, with a uniformly random `raise` amount — the simplest real strategy to
+read. `bots/poker-texas-hold-em/calling-station-poker/index.mjs` is even simpler: it never folds
+or raises, just checks when it can and calls otherwise — a fixed, deterministic baseline to
+measure other poker bots against. `bots/poker-texas-hold-em/tight-poker/` is a real TypeScript
+example: it bets/raises only with a good hand (a standard tight preflop range in
+`src/strategy.ts`'s `isPremiumHoleCards`, or a made pair-or-better postflop in `hasMadeHand`) and
+never bluffs, folding a weak hand to anything pricier than the big blind. See
+[`bots/README.md`](../../bots/README.md) for all three.
+
+### Testing it for real
+
+Texas Hold'em takes **2 to 10** participants, not a fixed count like Hearts' exactly-4 — any
+number of bot ids in that range works:
+
+```bash
+yarn thunderdome match run random-poker calling-station-poker \
+  --config '{"startingStack":500,"totalHands":5,"matchFormat":"fixedHands"}'
+```
+
+`--config` is whatever JSON `parseConfig` expects (see the `PokerTexasHoldEmConfig` shape above,
+or `games/poker-texas-hold-em/src/types.ts`'s `PokerTexasHoldEmConfigSchema`). Any bot in
+`bots/poker-texas-hold-em/` is playable this way, by its manifest `id` — including your own, once
+it's merged.
+
+```bash
+yarn thunderdome play random-poker --game-config '{"startingStack":300,"smallBlind":10,"bigBlind":20,"totalHands":3,"matchFormat":"fixedHands"}'
+```
+
+puts you in the ring against `random-poker` instead. Every time it's your turn, your prompt is
+printed right here in the terminal — the street and board, the pot, your hole cards, every
+opponent's stack/status, and the exact legal actions with their min/max amounts:
+
+```
+----------
+
+Texas Hold'em — Hand 1 (preflop)
+Blinds: 10/20 — button: you
+Board: (none)
+Pot: 30
+
+You [button]: stack 290, committed 10 this street, hole cards: 9D 5H
+Opponents:
+  random-poker: stack 280, committed 20 this hand (in)
+
+To call: 10
+Cards: rank+suit — 2-9, T=10, J, Q, K, A; C=clubs, D=diamonds, H=hearts, S=spades.
+Type: FOLD | CALL (10) | RAISE <amount> (min 40, max 300) | ALLIN (300)
+> call
+You called.
+```
+
+Type `FOLD`, `CHECK`, `CALL`, `RAISE <amount>`, or `ALLIN` (case-insensitive; `F`/`X`/`C`/`R`/`A`
+and a few other aliases work too — `games/poker-texas-hold-em/src/human.ts`'s `parseInput` has the
+full list). Right after you submit, the CLI echoes back exactly how it understood your input
+(`You called.`, `You raised to 80.`) via the same `humanInterface.describeAction` hook Hearts uses,
+for the same reason: a well-formed-but-unintended amount is still a real, submittable action, not
+a typo the CLI can catch for you. Type `quit` (or `resign`) any time to forfeit early instead of
+playing the whole match out. See [`apps/cli/README.md`](../../apps/cli/README.md#play) for the
+full CLI reference.
