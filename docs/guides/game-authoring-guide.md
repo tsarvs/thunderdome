@@ -376,7 +376,7 @@ your game can reach — Connect Four's suite has one test per win direction plus
 A game with no bot that can actually play it isn't finished. Write at least one reference bot
 under `bots/<game-id>/<bot-id>/` (see
 [`bot-author-guide.md`](bot-author-guide.md) for that side of the contract — the wire
-protocol and `@thunderdome/bot-sdk`'s `runBot()` helper are entirely game-agnostic, so this is the
+protocol and `@thunderdome/bot-sdk-js`'s `runBot()` helper are entirely game-agnostic, so this is the
 same for any game), then run the real thing:
 
 ```bash

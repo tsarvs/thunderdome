@@ -1,0 +1,18 @@
+{
+  "id": "momentum-stock-market",
+  "name": "Momentum Stock Market",
+  "version": "1.0.0",
+  "game": "stock-market",
+  "author": {
+    "name": "Thunderdome Maintainers",
+    "contact": "maintainers@example.com"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Buys when the price just went up from the previous round, sells when it just went down, holds otherwise — a fixed quantity each time, capped by affordability/ownership."
+}

@@ -1,4 +1,4 @@
-import { shuffle, standardDeck, type Card } from '@thunderdome/card-kit';
+import { shuffle, standardDeck, type Card } from '@thunderdome/deck-of-cards';
 import type { Rng, RoundEvent } from '@thunderdome/engine';
 import {
   bigBlindSeatIndex,
@@ -38,7 +38,7 @@ export interface DealtHand {
  * The deck is shuffled once and sliced into contiguous chunks (2 cards per seat, then 5 reserved
  * for the board) rather than dealt round-robin or with burn cards between streets — a single
  * uniform shuffle makes contiguous slicing statistically identical to either of those (see
- * @thunderdome/card-kit's `dealHands` doc comment for the same reasoning), so both are omitted.
+ * @thunderdome/deck-of-cards's `dealHands` doc comment for the same reasoning), so both are omitted.
  */
 export function dealNewHand(
   participantIds: readonly string[],

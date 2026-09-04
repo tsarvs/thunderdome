@@ -4,7 +4,7 @@
 // manifest.json files; it never imports a bot's or game's actual source.
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { BotManifestSchema, type BotManifest } from '@thunderdome/bot-sdk';
+import { BotManifestSchema, type BotManifest } from '@thunderdome/bot-sdk-js';
 import { GameManifestSchema, type GameManifest } from '@thunderdome/game-sdk';
 
 export interface RegistryIssue {
@@ -83,7 +83,7 @@ export async function scanGames(rootDir: string): Promise<ScanResult<GameRegistr
 /**
  * Scans bots/<game-id>/<bot-id>/manifest.json, validating each with BotManifestSchema and
  * cross-checking that the manifest's own `game` field agrees with the <game-id> directory it's
- * grouped under. tools/boundary-check enforces this same rule at PR time; this enforces it again
+ * grouped under. ci/tools/boundary-check enforces this same rule at PR time; this enforces it again
  * at registry-load time, since nothing stops a manifest from being hand-edited after merge.
  */
 export async function scanBots(rootDir: string): Promise<ScanResult<BotRegistryEntry>> {

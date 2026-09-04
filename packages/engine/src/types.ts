@@ -68,6 +68,19 @@ export interface GameDefinition<TConfig, TState, TObservation, TAction, TResult>
 
   parseConfig(raw: unknown): Result<TConfig>;
 
+  /**
+   * Optional: what a bot actually receives as `init`'s `payload.config` (docs/guides/
+   * protocol-reference.md) — omitted (the common case) means the engine sends the full, parsed
+   * config verbatim, exactly as before this existed. A game implements this only when some part
+   * of its own config must stay organizer-only: real, tunable config a match organizer can set,
+   * but never information a bot's own strategy should be able to read directly (e.g. stock-market
+   * hides each news event's exact fundamental-value effect this way, while still letting a bot
+   * see the event's `type` and everything else in config — games/stock-market/src/game.ts).
+   * `TState.config`/`resolve()`/`initialize()` always keep the full, un-redacted config; only the
+   * wire copy handed to bots is affected.
+   */
+  redactConfigForBots?(config: TConfig): unknown;
+
   initialize(args: { config: TConfig; participantIds: string[]; rng: Rng }): TState;
 
   /**

@@ -6,10 +6,10 @@
  * fixed target to measure other poker bots against.
  *
  * All of the NDJSON wire-protocol handling (replying to "init", reading "observation", exiting
- * on "match-end") lives in @thunderdome/bot-sdk's runBot() — see
+ * on "match-end") lives in @thunderdome/bot-sdk-js's runBot() — see
  * docs/guides/bot-author-guide.md for the full protocol walkthrough.
  */
-import { runBot } from '@thunderdome/bot-sdk';
+import { runBot } from '@thunderdome/bot-sdk-js';
 
 function decideAction(observation) {
   // `call` already caps at your remaining stack (a short call is a legal all-in call in this

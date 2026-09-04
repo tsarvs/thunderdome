@@ -203,7 +203,7 @@ export async function runSingleMatch(args: RunSingleMatchArgs): Promise<SingleMa
           participantId,
           roster,
           rngSeed: rngSeedHex,
-          config,
+          config: game.redactConfigForBots?.(config) ?? config,
         },
         { initTimeoutMs: 10_000 },
       );
@@ -345,7 +345,7 @@ export async function runHumanMatch(args: RunHumanMatchArgs): Promise<SingleMatc
           participantId: botParticipantId,
           roster,
           rngSeed: rngSeedHex,
-          config,
+          config: game.redactConfigForBots?.(config) ?? config,
         },
         { initTimeoutMs: 10_000 },
       );

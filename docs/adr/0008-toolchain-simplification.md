@@ -11,7 +11,7 @@ ADR-0001 originally chose Yarn Berry (4.x) with the `node-modules` linker and No
 LTS), reasoned from first principles. In practice, Berry's stricter per-workspace dependency
 resolution (a workspace may only resolve a binary/module it has itself declared, even when the
 underlying package is already hoisted to the root `node_modules`) meant every workspace needed
-its own explicit `typescript`/`vitest` (and, for `tools/boundary-check`, `tsx`)
+its own explicit `typescript`/`vitest` (and, for `ci/tools/boundary-check`, `tsx`)
 `devDependencies` duplicated across the whole monorepo, purely to satisfy Berry's resolution
 rules rather than because any package actually needed its own copy. Corepack's `packageManager`
 pinning also added a setup step (`corepack enable`) with no real payoff for a single-developer
@@ -39,11 +39,11 @@ yarn@1.22.22` once, same as any other global tool pin).
   (`yarn workspaces foreach --topological ...`). `typecheck` uses Classic's `yarn workspaces run
 typecheck` (safe here because it's order-independent once `build` has already run). `build`
   cannot rely on `yarn workspaces run build` alone — Classic's `workspaces run` does not guarantee
-  topological order, and `tools/boundary-check` depends on `@thunderdome/bot-sdk` and
+  topological order, and `ci/tools/boundary-check` depends on `@thunderdome/bot-sdk-js` and
   `@thunderdome/game-sdk`'s compiled output — so `scripts/build.sh` builds the dependency-free
   packages first, then `boundary-check` last, explicitly and without adding a task runner
   dependency (no Lerna/Nx/Turborepo) for what is currently a small, fixed set of dependency edges.
-- Cross-workspace dependencies (e.g. `tools/boundary-check`'s dependency on `bot-sdk`/`game-sdk`)
+- Cross-workspace dependencies (e.g. `ci/tools/boundary-check`'s dependency on `bot-sdk`/`game-sdk`)
   use ordinary semver ranges (`"^0.1.0"`), not Berry's `workspace:*` protocol, which Classic
   doesn't understand.
 

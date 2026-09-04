@@ -15,7 +15,7 @@ import {
   resolveBotsAndGame,
   runHumanMatch,
 } from '../lib/match-execution.js';
-import { printHandsPlayed, printRoundEvents } from './match.js';
+import { printHandsPlayed, printRoundEvents, printStockPriceRange } from './match.js';
 
 const USAGE =
   'Usage: thunderdome play <botId> [...moreBotIds] [--as <yourParticipantId>] ' +
@@ -122,6 +122,7 @@ export async function runPlayCommand(
   console.log();
   printRoundEvents(outcome.events);
   printHandsPlayed(outcome.result);
+  printStockPriceRange(outcome.result);
   console.log();
 
   if (outcome.status === 'forfeit') {

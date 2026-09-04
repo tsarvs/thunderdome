@@ -2,12 +2,12 @@
  * Leftmost Connect Four — always drops into the lowest-indexed column that isn't full yet.
  *
  * All of the NDJSON wire-protocol handling (replying to "init", reading "observation", exiting
- * on "match-end") lives in @thunderdome/bot-sdk's runBot() — see
+ * on "match-end") lives in @thunderdome/bot-sdk-js's runBot() — see
  * docs/guides/bot-author-guide.md for the full protocol walkthrough (written for RPS, but
  * the wire protocol itself is game-agnostic). This file only needs to answer one question:
  * decideAction().
  */
-import { runBot } from '@thunderdome/bot-sdk';
+import { runBot } from '@thunderdome/bot-sdk-js';
 
 /** Ignores the board entirely — always picks the first (lowest-indexed) legal column. */
 function decideAction(observation) {

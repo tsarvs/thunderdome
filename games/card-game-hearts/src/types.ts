@@ -1,4 +1,4 @@
-import type { Card } from '@thunderdome/card-kit';
+import type { Card } from '@thunderdome/deck-of-cards';
 import { z } from 'zod';
 
 export const HeartsConfigSchema = z.object({

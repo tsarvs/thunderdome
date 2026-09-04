@@ -49,6 +49,22 @@ export function printHandsPlayed(result: unknown): void {
   }
 }
 
+/** Same "read it generically off `result`" idiom as `printHandsPlayed` above — only a game whose
+ * result carries `startingStockPrice`/`finalStockPrice` (currently just Stock Market;
+ * games/stock-market/src/types.ts) gets this line, and any future game with the same two fields
+ * gets it for free too. A no-op for every other game's result shape. */
+export function printStockPriceRange(result: unknown): void {
+  if (typeof result !== 'object' || result === null) {
+    return;
+  }
+  const { startingStockPrice, finalStockPrice } = result as Record<string, unknown>;
+  if (typeof startingStockPrice === 'number' && typeof finalStockPrice === 'number') {
+    console.log(
+      `  (stock price: $${startingStockPrice.toFixed(2)} → $${finalStockPrice.toFixed(2)})`,
+    );
+  }
+}
+
 export interface MatchRunOptions {
   /** Repo root to scan games/ and bots/ under. */
   rootDir: string;
@@ -122,6 +138,7 @@ export async function runMatchCommand(
 
   printRoundEvents(outcome.events);
   printHandsPlayed(outcome.result);
+  printStockPriceRange(outcome.result);
   console.log();
 
   if (outcome.status === 'forfeit') {

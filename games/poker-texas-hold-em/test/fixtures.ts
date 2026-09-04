@@ -2,7 +2,7 @@
 // (vitest only picks up *.test.ts), just factored out since table/deal/betting/showdown/advance
 // each need small pieces of the same state shape to unit-test their one function in isolation,
 // per game-authoring-guide.md §11's "build state directly" convention.
-import { parseCardId, type Card } from '@thunderdome/card-kit';
+import { parseCardId, type Card } from '@thunderdome/deck-of-cards';
 import { createRng, type Rng } from '@thunderdome/rng';
 import type {
   PokerPlayerHandState,
@@ -25,7 +25,7 @@ export function testConfig(overrides?: Partial<PokerTexasHoldEmConfig>): PokerTe
   };
 }
 
-/** Parses card notation (see card-kit's `cardId`/`parseCardId`: rank+suit, e.g. "AS", "TC") —
+/** Parses card notation (see deck-of-cards's `cardId`/`parseCardId`: rank+suit, e.g. "AS", "TC") —
  * throws on anything malformed, since a bad fixture should fail loudly, not silently. */
 export function card(id: string): Card {
   const parsed = parseCardId(id);

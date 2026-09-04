@@ -1,4 +1,4 @@
-import type { Card, Rank } from '@thunderdome/card-kit';
+import type { Card, Rank } from '@thunderdome/deck-of-cards';
 
 export type HandCategory =
   | 'high-card'

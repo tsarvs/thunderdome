@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@thunderdome/bot-sdk": "^0.1.0",
+    "@thunderdome/bot-sdk-js": "^0.1.0",
     "@thunderdome/game-sdk": "^0.1.0"
   }
 }

@@ -39,3 +39,6 @@ jobs:
 
       - name: Test
         run: yarn test
+
+      - name: Test (Python bot SDK)
+        run: python3 -m unittest discover -s packages/bot-sdk-python/test -v

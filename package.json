@@ -11,7 +11,7 @@
     "packages/*",
     "packages/game-dev-toolkit/*",
     "games/*",
-    "tools/*"
+    "ci/tools/*"
   ],
   "scripts": {
     "build": "bash scripts/build.sh",

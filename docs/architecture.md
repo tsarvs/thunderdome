@@ -60,6 +60,10 @@ packages/
   engine/                     GameDefinition contract, match-runner loop, tournament orchestrator
   runtime/                    Docker container lifecycle, resource limits, forfeit taxonomy
   bot-sdk/                    TS developer SDK for bot authors (runBot() protocol client); bot manifest schema
+  bot-sdk-python/             Python developer SDK for bot authors (run_bot() protocol client) —
+                               NOT a Yarn workspace member (no package.json); vendored by copying
+                               its one file into a bot's own directory, same reasoning as bot-sdk's
+                               vendored tarball
   game-sdk/                   GameDefinition helper types/test utilities; game manifest schema
   registry/                   filesystem scan + validation of bot/game manifests
   tournament-formats/         concrete TournamentFormat implementations (round robin, single
@@ -78,8 +82,9 @@ bots/
   <game-id>/<bot-id>/         NOT Yarn workspace members — fully competitor-owned, any language,
                               grouped by the one game each bot plays
 
-tools/
-  boundary-check/             CI diff-classifier + manifest validator
+ci/
+  tools/
+    boundary-check/           CI diff-classifier + manifest validator
 
 docs/
   adr/                        architectural decision records
@@ -391,7 +396,7 @@ Repository enforcement uses two complementary mechanisms, not one:
 - **CODEOWNERS**: requires maintainer review on everything (including bot PRs — running arbitrary
   community code is inherently risky even with a clean manifest) plus game-steward review on
   `games/**`.
-- **CI boundary-check** (`tools/boundary-check`, a required status check): mechanically enforces
+- **CI boundary-check** (`ci/tools/boundary-check`, a required status check): mechanically enforces
   that a PR touching `bots/**` doesn't also touch platform/game paths (unless a maintainer applies
   a `maintainer-override` label — gated by GitHub's own collaborator permissions, so a fork
   contributor can't self-apply it) and stays within exactly one `bots/<game-id>/<bot-id>/` directory, plus

@@ -2,12 +2,13 @@
 
 Dev tooling that isn't a workspace package in its own right.
 
-| Script              | What it does                                                                                                                                                                             |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `build.sh`          | The root `yarn build`'s implementation — builds every workspace package in dependency order (see its own comments; Yarn Classic's `workspaces run` doesn't guarantee topological order). |
-| `pack-bot-sdk.sh`   | Builds `@thunderdome/bot-sdk` and vendors it into every bot that depends on it. See below.                                                                                               |
-| `scaffold-game.mjs` | Generates a new `games/<game-id>/` workspace package — a minimal but real, working `GameDefinition`. See below.                                                                          |
-| `scaffold-bot.mjs`  | Generates a new `bots/<game-id>/<bot-id>/` directory — a starter bot on `@thunderdome/bot-sdk`. See below.                                                                               |
+| Script                     | What it does                                                                                                                                                                             |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build.sh`                 | The root `yarn build`'s implementation — builds every workspace package in dependency order (see its own comments; Yarn Classic's `workspaces run` doesn't guarantee topological order). |
+| `pack-bot-sdk-js.sh`       | Builds `@thunderdome/bot-sdk-js` and vendors it into every TypeScript/JavaScript bot that depends on it. See below.                                                                      |
+| `vendor-python-bot-sdk.sh` | Copies `packages/bot-sdk-python/thunderdome_bot_sdk.py` into every Python bot that depends on it — no build/pack step, just a file copy. See `packages/bot-sdk-python/README.md`.        |
+| `scaffold-game.mjs`        | Generates a new `games/<game-id>/` workspace package — a minimal but real, working `GameDefinition`. See below.                                                                          |
+| `scaffold-bot.mjs`         | Generates a new `bots/<game-id>/<bot-id>/` directory — a starter bot on `@thunderdome/bot-sdk-js`. See below.                                                                            |
 
 Running a real match between bots from `/bots` is now `yarn thunderdome match run <botId>
 <botId>` (`apps/cli/src/commands/match.ts`) — the registry-backed successor to what used
@@ -33,25 +34,27 @@ forfeiting the match. Validated empirically: 60/60 real Docker trials succeeded 
 against a baseline that reliably failed several times per 15–30 trials before it. If you still see
 an `INIT_TIMEOUT` after this, that's a new signal worth investigating, not the old known issue.
 
-## pack-bot-sdk.sh
+## pack-bot-sdk-js.sh
 
 `bots/**` is deliberately not a Yarn workspace member (`docs/adr/0001-monorepo-and-boundary.md`):
 a bot's isolated `docker build bots/<game>/<bot>/` context has no shared `node_modules` to reach
-into, and there's no private npm registry to `npm install` `@thunderdome/bot-sdk` from. So instead,
-this script builds `@thunderdome/bot-sdk` and `npm pack`s it into a tarball, then copies that
-tarball into `vendor/thunderdome-bot-sdk.tgz` inside every bot that depends on it (currently all
-five: `only-rock`, `only-paper`, `only-scissors`, `copycat-rps`, `random-rps`) — each bot's
-`package.json` points at it via a `"file:./vendor/thunderdome-bot-sdk.tgz"` dependency, giving
+into, and there's no private npm registry to `npm install` `@thunderdome/bot-sdk-js` from. So
+instead, this script builds `@thunderdome/bot-sdk-js` and `npm pack`s it into a tarball, then
+copies that tarball into `vendor/thunderdome-bot-sdk-js.tgz` inside every TypeScript/JavaScript
+bot that depends on it (see the script's own `BOT_DIRS` array for the current list) — each bot's
+`package.json` points at it via a `"file:./vendor/thunderdome-bot-sdk-js.tgz"` dependency, giving
 `npm ci` inside that bot's own build context a real, reproducible, committed artifact to install
-from. This works the same whether the bot is TypeScript or plain JavaScript — `@thunderdome/bot-sdk`
-ships compiled JS either way, so a JS bot just gains a `package.json`/`package-lock.json` and an
-`npm ci --omit=dev` step in its (still single-stage) `Dockerfile`.
+from. This works the same whether the bot is TypeScript or plain JavaScript —
+`@thunderdome/bot-sdk-js` ships compiled JS either way, so a JS bot just gains a
+`package.json`/`package-lock.json` and an `npm ci --omit=dev` step in its (still single-stage)
+`Dockerfile`. (A Python bot vendors `packages/bot-sdk-python` instead — see
+`vendor-python-bot-sdk.sh` above.)
 
 ```bash
-./scripts/pack-bot-sdk.sh
+./scripts/pack-bot-sdk-js.sh
 ```
 
-Run this after changing `packages/bot-sdk`, then commit every dependent bot's updated
+Run this after changing `packages/bot-sdk-js`, then commit every dependent bot's updated
 `vendor/*.tgz` and `package-lock.json` alongside your source change — the script refreshes both
 for you (see its own comments for why a plain `npm install` in place isn't enough).
 
@@ -76,23 +79,32 @@ every method, in the same order the scaffold's TODO comments reference.
 
 ## scaffold-bot.mjs
 
-Generates a new `bots/<game-id>/<bot-id>/` directory — a starter bot on `@thunderdome/bot-sdk`'s
-`runBot()`, structured like `bots/rock-paper-scissors/only-rock` (TypeScript, the default) or
-`bots/connect-four/random-connect-four` (`--lang js`). Works for any game, including one you just
-scaffolded above. It also adds the new bot directory to `pack-bot-sdk.sh`'s `BOT_DIRS` array.
+Generates a new `bots/<game-id>/<bot-id>/` directory — a starter bot structured like
+`bots/rock-paper-scissors/only-rock` (`--lang ts`, the default), `bots/connect-four/random-connect-four`
+(`--lang js`), or `bots/connect-four/tactical-connect-four` (`--lang python`). Works for any game,
+including one you just scaffolded above.
+
+- `ts`/`js` bots are built on `@thunderdome/bot-sdk-js`'s `runBot()`; the script also adds the new
+  bot directory to `pack-bot-sdk-js.sh`'s `BOT_DIRS` array so `./scripts/pack-bot-sdk-js.sh` (below)
+  vendors it.
+- `python` bots are built on `thunderdome_bot_sdk`'s `run_bot()` — the script copies
+  `packages/bot-sdk-python/thunderdome_bot_sdk.py` straight into the new bot's directory, so
+  there's no separate vendoring step needed before the first `docker build`. It also adds the new
+  bot directory to `vendor-python-bot-sdk.sh`'s `BOT_DIRS` array, so re-running that script later
+  keeps this bot's copy in sync if `packages/bot-sdk-python` changes.
 
 ```bash
 node scripts/scaffold-bot.mjs card-game-hearts my-first-hearts-bot
-./scripts/pack-bot-sdk.sh   # vendors @thunderdome/bot-sdk in and generates package-lock.json
+./scripts/pack-bot-sdk-js.sh   # ts/js only — vendors @thunderdome/bot-sdk-js and generates package-lock.json
 ```
 
-Then fill in the real `Observation`/`Action` shapes and `decideAction()` — see
+Then fill in the real `Observation`/`Action` shapes and `decideAction()`/`decide_action()` — see
 [`docs/guides/bot-author-guide.md`](../docs/guides/bot-author-guide.md) for the wire protocol
 walkthrough (game-agnostic throughout §1-§8; §10 has Hearts' own `Observation`/`Action` shapes for
 this example).
 
-The script also adds your bot to `pack-bot-sdk.sh`'s `BOT_DIRS` array so you can run it locally —
-but if you're submitting a community bot PR, `tools/boundary-check` requires that PR to touch only
-`bots/<game-id>/<bot-id>/**` (`docs/adr/0007-repository-enforcement.md`), so revert that one edit
-(`git checkout -- scripts/pack-bot-sdk.sh`) before committing; a maintainer adds it to `BOT_DIRS`
-permanently when merging.
+If you're submitting a community bot PR, `ci/tools/boundary-check` requires that PR to touch only
+`bots/<game-id>/<bot-id>/**` (`docs/adr/0007-repository-enforcement.md`), so revert the `BOT_DIRS`
+edit the script made — `git checkout -- scripts/pack-bot-sdk-js.sh` (ts/js) or
+`git checkout -- scripts/vendor-python-bot-sdk.sh` (python) — before committing; a maintainer adds
+your bot to `BOT_DIRS` permanently when merging.

@@ -1,4 +1,4 @@
-import { runBot } from '@thunderdome/bot-sdk';
+import { runBot } from '@thunderdome/bot-sdk-js';
 import { choosePass } from './pass.js';
 import { choosePlay } from './play.js';
 import { updateStateFromObservation } from './state.js';

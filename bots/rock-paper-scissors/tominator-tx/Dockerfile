@@ -6,7 +6,7 @@ RUN npm ci
 COPY src ./src
 RUN npm run build
 
-# @thunderdome/bot-sdk is a real runtime dependency now (not just a type-checking-time one), so
+# @thunderdome/bot-sdk-js is a real runtime dependency now (not just a type-checking-time one), so
 # the final image needs node_modules too — installed separately here with --omit=dev so
 # typescript/@types/node never end up in the runtime image.
 FROM node:25-alpine AS prod-deps

@@ -1,0 +1,17 @@
+{
+  "name": "@thunderdome/boundary-check",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": "./dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@thunderdome/bot-sdk-js": "^0.1.0",
+    "@thunderdome/game-sdk": "^0.1.0"
+  }
+}

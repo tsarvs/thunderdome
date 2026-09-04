@@ -33,7 +33,7 @@ export default tseslint.config(
           './packages/*/tsconfig.test.json',
           './packages/game-dev-toolkit/*/tsconfig.test.json',
           './games/*/tsconfig.test.json',
-          './tools/*/tsconfig.test.json',
+          './ci/tools/*/tsconfig.test.json',
         ],
         tsconfigRootDir: import.meta.dirname,
       },

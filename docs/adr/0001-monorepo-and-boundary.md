@@ -43,7 +43,7 @@ happens to be.
 
 > **Amended:** bots are grouped by game — `bots/<game-id>/<bot-id>/`, not a flat `bots/<bot-id>/`
 > — once real bots existed and a flat namespace mixing every game's submissions together stopped
-> making sense. `tools/boundary-check` treats the `(game-id, bot-id)` pair, not just the first
+> making sense. `ci/tools/boundary-check` treats the `(game-id, bot-id)` pair, not just the first
 > segment, as the atomic "one bot directory" unit, and additionally validates that the game
 > segment agrees with the manifest's own `game` field, so the two can't silently drift apart. Bot
 > ids remain globally unique across the whole `bots/` tree regardless of grouping — the nesting is
@@ -51,15 +51,15 @@ happens to be.
 
 ```
 apps/cli
-packages/{protocol, rng, engine, runtime, bot-sdk, game-sdk, tournament-formats}
+packages/{protocol, rng, engine, runtime, bot-sdk-js, game-sdk, tournament-formats}
 games/<game-id>/                     real Yarn workspace members
 bots/<game-id>/<bot-id>/             NOT Yarn workspace members
-tools/boundary-check/                workspace member — CI enforcement
+ci/tools/boundary-check/                workspace member — CI enforcement
 docs/{adr, guides}
 .github/{CODEOWNERS, workflows/}
 ```
 
-Root `package.json` workspaces glob is `["apps/*", "packages/*", "games/*", "tools/*"]` —
+Root `package.json` workspaces glob is `["apps/*", "packages/*", "games/*", "ci/tools/*"]` —
 `bots/*` is deliberately excluded.
 
 ### Games are Yarn workspace members; bots are not
@@ -95,7 +95,7 @@ actually work without dragging in the whole monorepo.
 
 Both the Game Registry and Bot Registry glob `games/*/manifest.json` /
 `bots/*/*/manifest.json` and
-validate each against a Zod schema owned by `game-sdk`/`bot-sdk` respectively. There is no central
+validate each against a Zod schema owned by `game-sdk`/`bot-sdk-js` respectively. There is no central
 `registry.ts` listing ids by hand — that would recreate exactly the merge-conflict/coupling
 friction this design is trying to avoid. Manifests are plain JSON (never `.ts`/`.js`): reading a
 competitor's metadata must never require executing their code. Game code is imported lazily, by

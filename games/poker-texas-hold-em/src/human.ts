@@ -1,4 +1,4 @@
-import { cardId, type Card } from '@thunderdome/card-kit';
+import { cardId, type Card } from '@thunderdome/deck-of-cards';
 import type { RoundEvent } from '@thunderdome/engine';
 import type {
   BettingStreet,

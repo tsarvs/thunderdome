@@ -1,0 +1,18 @@
+{
+  "id": "random-stock-market",
+  "name": "Random Stock Market",
+  "version": "1.0.0",
+  "game": "stock-market",
+  "author": {
+    "name": "Thunderdome Maintainers",
+    "contact": "maintainers@example.com"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Uniformly random choice among BUY/SELL/HOLD each round (only offering BUY/SELL when affordable/owned), with a uniformly random quantity, PRNG seeded from the match's rngSeed."
+}
