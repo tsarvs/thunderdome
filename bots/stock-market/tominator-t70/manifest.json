@@ -1,0 +1,18 @@
+{
+  "id": "tominator-t70",
+  "name": "T-70",
+  "version": "1.0.0",
+  "game": "stock-market",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Reacts to each signed event like news-reaction-stock-market — trusting the same free directional read and holding a position until the next contradicting event, never unwinding early just because price has started converging — but sizes the trade off an inferred, weight-informed magnitude estimate and portfolio value instead of a flat share count, capping any single trade's own market-impact contribution to avoid runaway feedback. Measured to beat news-reaction-stock-market head-to-head in the large majority of matches."
+}

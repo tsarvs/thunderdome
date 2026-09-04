@@ -1,11 +1,13 @@
 import { err, ok, type GameDefinition, type Rng, type StandingOutcome } from '@thunderdome/engine';
 import {
+  STOCK_MARKET_EVENT_TYPES,
   StockMarketActionSchema,
   StockMarketConfigSchema,
   type StockMarketAction,
   type StockMarketConfig,
   type StockMarketEvent,
   type StockMarketEventType,
+  type StockMarketEventsConfig,
   type StockMarketObservation,
   type StockMarketPortfolio,
   type StockMarketResult,
@@ -36,94 +38,132 @@ function feeCentsFor(tradeValueCents: number, config: StockMarketConfig): number
   return roundHalfUp(tradeValueCents * config.transactionFee);
 }
 
-// ---------------------------------------------------------------------------
-// Market events — the fundamental-value effect of each event type, and the (fixed, not
-// config-driven) probability of it being drawn any given round. Weights sum to 100; NO_NEWS
-// dominates so an event-driven strategy actually has to wait for a real signal.
-// ---------------------------------------------------------------------------
+// A wide-ish but still "reasonable stock price" range — centered on the old fixed $100 default,
+// so a random draw doesn't swing so far that a bot's usual fixed-share-count sizing (most
+// reference bots trade in a fixed ~10-20 share range regardless of price) stops making sense.
+const RANDOM_STARTING_PRICE_MIN = 50;
+const RANDOM_STARTING_PRICE_MAX = 200;
 
-interface EventDefinition {
-  type: StockMarketEventType;
-  description: string;
-  /** Multiplied directly into the hidden fundamental value — never exposed to a bot. */
-  fundamentalMultiplier: number;
-  weight: number;
+/** `config.startingStockPrice` given explicitly: use it as-is (already validated against
+ * `minimumStockPrice` at parse time). Omitted: draw uniformly from a fixed range instead — and,
+ * since that range can't be validated against a caller's own `minimumStockPrice` until now,
+ * clamped up to it defensively so a high custom minimum can never be violated by the draw. */
+function resolveStartingStockPrice(config: StockMarketConfig, rng: Rng): number {
+  if (config.startingStockPrice !== undefined) {
+    return config.startingStockPrice;
+  }
+  const range = RANDOM_STARTING_PRICE_MAX - RANDOM_STARTING_PRICE_MIN;
+  const randomPrice = RANDOM_STARTING_PRICE_MIN + rng.nextFloat() * range;
+  return Math.max(randomPrice, config.minimumStockPrice);
 }
 
-const EVENT_TABLE: readonly EventDefinition[] = [
-  {
-    type: 'NO_NEWS',
-    description: 'No significant news today.',
-    fundamentalMultiplier: 1.0,
-    weight: 60,
-  },
-  {
-    type: 'POSITIVE_NEWS',
-    description: 'General positive news about the company circulated today.',
-    fundamentalMultiplier: 1.02,
-    weight: 8,
-  },
-  {
-    type: 'NEGATIVE_NEWS',
-    description: 'General negative news about the company circulated today.',
-    fundamentalMultiplier: 0.98,
-    weight: 8,
-  },
-  {
-    type: 'ANALYST_UPGRADE',
-    description: 'An analyst upgraded their rating on the company.',
-    fundamentalMultiplier: 1.03,
-    weight: 6,
-  },
-  {
-    type: 'ANALYST_DOWNGRADE',
-    description: 'An analyst downgraded their rating on the company.',
-    fundamentalMultiplier: 0.97,
-    weight: 6,
-  },
-  {
-    type: 'PRODUCT_SUCCESS',
-    description: 'The company announced a successful new product.',
-    fundamentalMultiplier: 1.04,
-    weight: 5,
-  },
-  {
-    type: 'PRODUCT_FAILURE',
-    description: 'The company announced a failed product launch.',
-    fundamentalMultiplier: 0.96,
-    weight: 5,
-  },
-  {
-    type: 'EARNINGS_BEAT',
-    description: 'The company reported earnings significantly above expectations.',
-    fundamentalMultiplier: 1.05,
-    weight: 1,
-  },
-  {
-    type: 'EARNINGS_MISS',
-    description: 'The company reported earnings significantly below expectations.',
-    fundamentalMultiplier: 0.95,
-    weight: 1,
-  },
-];
+// ---------------------------------------------------------------------------
+// Market events — a type's `weight` (its odds of being drawn) is the only part of
+// `StockMarketEventsConfigSchema` (types.ts) a bot ever sees; `baselineMultiplier`/`volatility`
+// stay organizer-only (`redactConfigForBots`, below) and the ACTUAL multiplier used for any given
+// draw is never today's fixed baseline table — it's a per-match, per-type random value that keeps
+// wandering for the rest of the match (`eventEffectRatios` below), precisely so no bot, including
+// one that's read this very source file, can rely on a known fixed effect size. Descriptions stay
+// fixed per-type — the news headline itself isn't something a match organizer tunes for balance.
+// ---------------------------------------------------------------------------
 
-const TOTAL_EVENT_WEIGHT = EVENT_TABLE.reduce((sum, event) => sum + event.weight, 0);
+const EVENT_DESCRIPTIONS: Record<StockMarketEventType, string> = {
+  NO_NEWS: 'No significant news today.',
+  POSITIVE_NEWS: 'General positive news about the company circulated today.',
+  NEGATIVE_NEWS: 'General negative news about the company circulated today.',
+  ANALYST_UPGRADE: 'An analyst upgraded their rating on the company.',
+  ANALYST_DOWNGRADE: 'An analyst downgraded their rating on the company.',
+  PRODUCT_SUCCESS: 'The company announced a successful new product.',
+  PRODUCT_FAILURE: 'The company announced a failed product launch.',
+  EARNINGS_BEAT: 'The company reported earnings significantly above expectations.',
+  EARNINGS_MISS: 'The company reported earnings significantly below expectations.',
+};
 
-function drawEvent(rng: Rng): EventDefinition {
-  let remaining = rng.nextFloat() * TOTAL_EVENT_WEIGHT;
-  for (const event of EVENT_TABLE) {
-    remaining -= event.weight;
+/** A per-occurrence drift step is this fraction of the type's own `volatility` at most — small
+ * enough that a type drawn repeatedly wanders gradually within its corridor rather than jumping
+ * straight between its extremes on consecutive draws. */
+const EFFECT_RATIO_DRIFT_FRACTION = 0.15;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+/** The per-match starting point for every event type's effect ratio — one uniform draw per type,
+ * within `[1 - volatility, 1 + volatility]`. `volatility: 0` collapses that range to exactly
+ * `{1}`, which is what makes it a fully deterministic, backward-compatible mode. */
+function initialEffectRatios(
+  rng: Rng,
+  eventsConfig: StockMarketEventsConfig,
+): Record<StockMarketEventType, number> {
+  const ratios = {} as Record<StockMarketEventType, number>;
+  for (const type of STOCK_MARKET_EVENT_TYPES) {
+    const { volatility } = eventsConfig[type];
+    ratios[type] = 1 + (rng.nextFloat() * 2 - 1) * volatility;
+  }
+  return ratios;
+}
+
+/** One bounded random-walk step, reflected back into the corridor instead of hard-clamped at its
+ * edge — so a ratio that wanders out to a boundary bounces back in rather than sticking there. */
+function driftEffectRatio(currentRatio: number, volatility: number, rng: Rng): number {
+  if (volatility === 0) {
+    return 1;
+  }
+  const maxStep = volatility * EFFECT_RATIO_DRIFT_FRACTION;
+  const stepped = currentRatio + (rng.nextFloat() * 2 - 1) * maxStep;
+  const min = 1 - volatility;
+  const max = 1 + volatility;
+  const reflected =
+    stepped < min ? min + (min - stepped) : stepped > max ? max - (stepped - max) : stepped;
+  return clamp(reflected, min, max);
+}
+
+/** `baselineMultiplier - 1` is the event's baseline *effect*; scaling that effect itself by the
+ * drifted ratio (rather than scaling the multiplier directly) is what makes `NO_NEWS` — whose
+ * baseline effect is exactly 0 — mathematically unaffected by its ratio no matter what it is. */
+function actualMultiplierFor(baselineMultiplier: number, effectRatio: number): number {
+  return 1 + (baselineMultiplier - 1) * effectRatio;
+}
+
+interface DrawnEvent {
+  type: StockMarketEventType;
+  /** Multiplied directly into the hidden fundamental value — never exposed via the observation
+   * (or, unlike the old fixed baseline table, via config either). */
+  actualMultiplier: number;
+  /** This type's post-drift ratio, to be persisted back into `StockMarketState.eventEffectRatios`. */
+  nextEffectRatio: number;
+}
+
+function drawEvent(
+  rng: Rng,
+  eventsConfig: StockMarketEventsConfig,
+  effectRatios: Record<StockMarketEventType, number>,
+): DrawnEvent {
+  const totalWeight = STOCK_MARKET_EVENT_TYPES.reduce(
+    (sum, type) => sum + eventsConfig[type].weight,
+    0,
+  );
+  let remaining = rng.nextFloat() * totalWeight;
+  for (const type of STOCK_MARKET_EVENT_TYPES) {
+    const definition = eventsConfig[type];
+    remaining -= definition.weight;
     if (remaining < 0) {
-      return event;
+      const nextEffectRatio = driftEffectRatio(effectRatios[type], definition.volatility, rng);
+      return {
+        type,
+        actualMultiplier: actualMultiplierFor(definition.baselineMultiplier, nextEffectRatio),
+        nextEffectRatio,
+      };
     }
   }
   // Truly unreachable: rng.nextFloat() < 1, so `remaining` strictly decreases below 0 by the
-  // time the loop has subtracted every weight (they sum to TOTAL_EVENT_WEIGHT).
-  throw new Error('drawEvent: exhausted EVENT_TABLE without a selection');
+  // time the loop has subtracted every weight (they sum to totalWeight), and
+  // StockMarketEventsConfigSchema's own refine guarantees totalWeight > 0.
+  throw new Error('drawEvent: exhausted the event table without a selection');
 }
 
-function publicEventOf(event: EventDefinition): StockMarketEvent {
-  return { type: event.type, description: event.description };
+function publicEventOf(drawn: DrawnEvent): StockMarketEvent {
+  return { type: drawn.type, description: EVENT_DESCRIPTIONS[drawn.type] };
 }
 
 // ---------------------------------------------------------------------------
@@ -195,31 +235,45 @@ export const stockMarket: GameDefinition<
       : err(result.error.issues.map((issue) => issue.message).join('; '));
   },
 
+  redactConfigForBots(config) {
+    const events = {} as Record<StockMarketEventType, { weight: number }>;
+    for (const type of STOCK_MARKET_EVENT_TYPES) {
+      events[type] = { weight: config.events[type].weight };
+    }
+    return { ...config, events };
+  },
+
   initialize({ config, participantIds, rng }) {
     if (participantIds.length < 2) {
       throw new Error('stock-market requires at least 2 participants');
     }
     const startingCashCents = toCents(config.startingCash);
-    const startingPriceCents = toCents(config.startingStockPrice);
+    const startingStockPrice = resolveStartingStockPrice(config, rng);
+    const startingPriceCents = toCents(startingStockPrice);
     const portfolios = new Map(
       participantIds.map((id) => [id, { cashCents: startingCashCents, shares: 0 }]),
     );
 
+    const eventEffectRatios = initialEffectRatios(rng, config.events);
+
     // The first round's event is drawn — and its effect on the fundamental value already
     // applied — before this state is ever handed to getObservation, so round 0 behaves exactly
     // like every other round (see resolve()'s matching look-ahead at the end of each round).
-    const firstEvent = drawEvent(rng);
+    const firstEvent = drawEvent(rng, config.events, eventEffectRatios);
+    eventEffectRatios[firstEvent.type] = firstEvent.nextEffectRatio;
 
     return {
       participantIds: [...participantIds],
       config,
       round: 0,
       priceCents: startingPriceCents,
-      fundamentalValue: config.startingStockPrice * firstEvent.fundamentalMultiplier,
+      startingStockPriceCents: startingPriceCents,
+      fundamentalValue: startingStockPrice * firstEvent.actualMultiplier,
       priceHistoryCents: [startingPriceCents],
       currentEvent: publicEventOf(firstEvent),
       lastRoundVolume: null,
       portfolios,
+      eventEffectRatios,
     };
   },
 
@@ -320,8 +374,13 @@ export const stockMarket: GameDefinition<
       }
     }
 
+    // Square-root impact, not linear: real order-flow impact has diminishing marginal effect as
+    // trade size grows (the standard "square-root law" practitioners use — see
+    // StockMarketConfigSchema's `marketImpactFactor` doc for the calibration formula), unlike a
+    // linear model where impact per share never tapers off, letting a run of same-direction
+    // trades in a growing portfolio spiral into runaway price feedback.
     const netDemand = sharesBought - sharesSold;
-    const marketPressure = netDemand * state.config.marketImpactFactor;
+    const marketPressure = Math.sign(netDemand) * state.config.marketImpactFactor * Math.sqrt(Math.abs(netDemand));
 
     const priceDollars = toDollars(state.priceCents);
     const fundamentalPressure =
@@ -344,8 +403,12 @@ export const stockMarket: GameDefinition<
     // Next round's event, drawn now so it — and its already-applied effect on the fundamental
     // value — is ready the moment getObservation is next called (same look-ahead initialize()
     // does for round 0).
-    const nextEvent = drawEvent(rng);
-    const nextFundamentalValue = state.fundamentalValue * nextEvent.fundamentalMultiplier;
+    const nextEvent = drawEvent(rng, state.config.events, state.eventEffectRatios);
+    const nextFundamentalValue = state.fundamentalValue * nextEvent.actualMultiplier;
+    const nextEventEffectRatios = {
+      ...state.eventEffectRatios,
+      [nextEvent.type]: nextEvent.nextEffectRatio,
+    };
 
     const lastRoundVolume = { sharesBought, sharesSold, netDemand };
 
@@ -358,6 +421,7 @@ export const stockMarket: GameDefinition<
       currentEvent: publicEventOf(nextEvent),
       lastRoundVolume,
       portfolios: nextPortfolios,
+      eventEffectRatios: nextEventEffectRatios,
     };
 
     return {
@@ -419,7 +483,7 @@ export const stockMarket: GameDefinition<
       scores,
       cash,
       shares,
-      startingStockPrice: state.config.startingStockPrice,
+      startingStockPrice: toDollars(state.startingStockPriceCents),
       finalStockPrice: toDollars(state.priceCents),
       roundsPlayed: state.round,
       winnerId: leaders.length === 1 ? (leaders[0] ?? null) : null,

@@ -56,6 +56,7 @@ BOT_DIRS=(
   "bots/stock-market/momentum-stock-market"
   "bots/stock-market/mean-reversion-stock-market"
   "bots/stock-market/target-allocation-stock-market"
+  "bots/stock-market/tominator-t70"
 )
 
 for dir in "${BOT_DIRS[@]}"; do

@@ -35,26 +35,77 @@ function actionsOf(entries: [string, StockMarketAction][]): Map<string, StockMar
 }
 
 describe('stockMarket.parseConfig', () => {
-  it('applies every documented default', () => {
+  it('applies every documented default, leaving startingStockPrice unset (random by default)', () => {
     const result = stockMarket.parseConfig({});
     expect(result.ok).toBe(true);
     if (result.ok) {
+      expect(result.value.startingStockPrice).toBeUndefined();
       expect(result.value).toEqual({
         startingCash: 10000,
-        startingStockPrice: 100,
         rounds: 100,
         transactionFee: 0.001,
         priceHistoryLength: 20,
         randomShock: { min: -0.02, max: 0.02 },
-        marketImpactFactor: 0.0001,
+        marketImpactFactor: 0.0014,
         meanReversionFactor: 0.05,
         minimumStockPrice: 0.01,
+        events: {
+          NO_NEWS: { baselineMultiplier: 1.0, volatility: 0.25, weight: 60 },
+          POSITIVE_NEWS: { baselineMultiplier: 1.02, volatility: 0.25, weight: 8 },
+          NEGATIVE_NEWS: { baselineMultiplier: 0.98, volatility: 0.25, weight: 8 },
+          ANALYST_UPGRADE: { baselineMultiplier: 1.03, volatility: 0.25, weight: 6 },
+          ANALYST_DOWNGRADE: { baselineMultiplier: 0.97, volatility: 0.25, weight: 6 },
+          PRODUCT_SUCCESS: { baselineMultiplier: 1.04, volatility: 0.25, weight: 5 },
+          PRODUCT_FAILURE: { baselineMultiplier: 0.96, volatility: 0.25, weight: 5 },
+          EARNINGS_BEAT: { baselineMultiplier: 1.05, volatility: 0.25, weight: 1 },
+          EARNINGS_MISS: { baselineMultiplier: 0.95, volatility: 0.25, weight: 1 },
+        },
       });
     }
   });
 
   it('rejects randomShock.min > randomShock.max', () => {
     const result = stockMarket.parseConfig({ randomShock: { min: 0.05, max: -0.05 } });
+    expect(result.ok).toBe(false);
+  });
+
+  it('lets a caller override just one event type, defaulting the rest', () => {
+    const result = stockMarket.parseConfig({
+      events: { EARNINGS_BEAT: { baselineMultiplier: 1.5, volatility: 0.25, weight: 1 } },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.events.EARNINGS_BEAT).toEqual({
+        baselineMultiplier: 1.5,
+        volatility: 0.25,
+        weight: 1,
+      });
+      // Every other event type is untouched by the override.
+      expect(result.value.events.NO_NEWS).toEqual({
+        baselineMultiplier: 1.0,
+        volatility: 0.25,
+        weight: 60,
+      });
+    }
+  });
+
+  it('rejects an event config where every weight is zero', () => {
+    const zeroWeight = { baselineMultiplier: 1.0, volatility: 0.25, weight: 0 };
+    const result = stockMarket.parseConfig({
+      events: Object.fromEntries(
+        [
+          'NO_NEWS',
+          'POSITIVE_NEWS',
+          'NEGATIVE_NEWS',
+          'ANALYST_UPGRADE',
+          'ANALYST_DOWNGRADE',
+          'PRODUCT_SUCCESS',
+          'PRODUCT_FAILURE',
+          'EARNINGS_BEAT',
+          'EARNINGS_MISS',
+        ].map((type) => [type, zeroWeight]),
+      ),
+    });
     expect(result.ok).toBe(false);
   });
 
@@ -66,6 +117,26 @@ describe('stockMarket.parseConfig', () => {
   it('rejects a transactionFee outside [0, 1]', () => {
     expect(stockMarket.parseConfig({ transactionFee: -0.1 }).ok).toBe(false);
     expect(stockMarket.parseConfig({ transactionFee: 1.5 }).ok).toBe(false);
+  });
+});
+
+describe('stockMarket.redactConfigForBots', () => {
+  it('strips baselineMultiplier and volatility from every event type, keeping only weight', () => {
+    const redacted = stockMarket.redactConfigForBots?.(config()) as {
+      events: Record<string, Record<string, unknown>>;
+    };
+    for (const eventConfig of Object.values(redacted.events)) {
+      expect(Object.keys(eventConfig)).toEqual(['weight']);
+    }
+    expect(redacted.events.EARNINGS_BEAT).toEqual({ weight: 1 });
+  });
+
+  it('leaves every other top-level config field untouched', () => {
+    const fullConfig = config({ startingCash: 5000, rounds: 42 });
+    const redacted = stockMarket.redactConfigForBots?.(fullConfig) as Record<string, unknown>;
+    expect(redacted.startingCash).toBe(5000);
+    expect(redacted.rounds).toBe(42);
+    expect(redacted.transactionFee).toBe(fullConfig.transactionFee);
   });
 });
 
@@ -115,6 +186,62 @@ describe('stockMarket.initialize', () => {
     }).nextState;
     const bobObservation: unknown = stockMarket.getObservation(nextState, 'bob');
     expect(JSON.stringify(bobObservation)).not.toContain('alice');
+  });
+});
+
+describe('stockMarket.initialize — random starting price', () => {
+  it('draws a random starting price within the default range when startingStockPrice is omitted', () => {
+    const state = initialState({}, ['alice', 'bob'], createRng(Buffer.alloc(16, 3)));
+    const price = stockMarket.getObservation(state, 'alice').market.price;
+    expect(price).toBeGreaterThanOrEqual(50);
+    expect(price).toBeLessThanOrEqual(200);
+  });
+
+  it('draws a different starting price for a different seed', () => {
+    const priceFor = (seed: number) =>
+      stockMarket.getObservation(
+        initialState({}, ['alice', 'bob'], createRng(Buffer.alloc(16, seed))),
+        'alice',
+      ).market.price;
+    expect(priceFor(3)).not.toBe(priceFor(9));
+  });
+
+  it('draws the same starting price again given the same seed (still fully deterministic)', () => {
+    const priceFor = () =>
+      stockMarket.getObservation(
+        initialState({}, ['alice', 'bob'], createRng(Buffer.alloc(16, 5))),
+        'alice',
+      ).market.price;
+    expect(priceFor()).toBe(priceFor());
+  });
+
+  it('still uses an explicit startingStockPrice exactly, never randomizing it', () => {
+    const priceFor = (seed: number) =>
+      stockMarket.getObservation(
+        initialState(
+          { startingStockPrice: 77 },
+          ['alice', 'bob'],
+          createRng(Buffer.alloc(16, seed)),
+        ),
+        'alice',
+      ).market.price;
+    expect(priceFor(3)).toBe(77);
+    expect(priceFor(9)).toBe(77);
+  });
+
+  it('clamps a random draw up to a custom minimumStockPrice above the default range', () => {
+    const state = initialState(
+      { minimumStockPrice: 300 },
+      ['alice', 'bob'],
+      createRng(Buffer.alloc(16, 3)),
+    );
+    expect(stockMarket.getObservation(state, 'alice').market.price).toBeGreaterThanOrEqual(300);
+  });
+
+  it('getResult reports the actual resolved starting price, not the (possibly unset) config field', () => {
+    const state = initialState({}, ['alice', 'bob'], createRng(Buffer.alloc(16, 3)));
+    const observedStartingPrice = stockMarket.getObservation(state, 'alice').market.price;
+    expect(stockMarket.getResult(state).startingStockPrice).toBe(observedStartingPrice);
   });
 });
 
@@ -280,6 +407,163 @@ describe('stockMarket.resolve — accounting', () => {
       sharesSold: 0,
       netDemand: 10,
     });
+  });
+});
+
+describe('stockMarket.resolve — configurable events', () => {
+  it('always draws the one event type given all of the weight', () => {
+    const zeroWeight = { baselineMultiplier: 1.0, volatility: 0.25, weight: 0 };
+    let state = initialState({
+      events: {
+        NO_NEWS: zeroWeight,
+        POSITIVE_NEWS: zeroWeight,
+        NEGATIVE_NEWS: zeroWeight,
+        ANALYST_UPGRADE: zeroWeight,
+        ANALYST_DOWNGRADE: zeroWeight,
+        PRODUCT_SUCCESS: zeroWeight,
+        PRODUCT_FAILURE: zeroWeight,
+        EARNINGS_MISS: zeroWeight,
+        EARNINGS_BEAT: { baselineMultiplier: 1.2, volatility: 0.25, weight: 1 },
+      },
+    });
+    for (let round = 0; round < 10; round += 1) {
+      expect(stockMarket.getObservation(state, 'alice').event.type).toBe('EARNINGS_BEAT');
+      state = stockMarket.resolve({
+        state,
+        actions: actionsOf([
+          ['alice', { action: 'HOLD' }],
+          ['bob', { action: 'HOLD' }],
+        ]),
+        rng,
+      }).nextState;
+    }
+  });
+});
+
+describe('stockMarket — event effect ratios (baseline + per-match variation + in-match drift)', () => {
+  it('volatility 0 keeps every event exactly at its baseline multiplier (deterministic, backward compatible)', () => {
+    const zeroWeight = { baselineMultiplier: 1.0, volatility: 0, weight: 0 };
+    let state = initialState({
+      startingStockPrice: 100,
+      events: {
+        NO_NEWS: zeroWeight,
+        POSITIVE_NEWS: zeroWeight,
+        NEGATIVE_NEWS: zeroWeight,
+        ANALYST_UPGRADE: zeroWeight,
+        ANALYST_DOWNGRADE: zeroWeight,
+        PRODUCT_SUCCESS: zeroWeight,
+        PRODUCT_FAILURE: zeroWeight,
+        EARNINGS_MISS: zeroWeight,
+        EARNINGS_BEAT: { baselineMultiplier: 1.2, volatility: 0, weight: 1 },
+      },
+    });
+    // Round 0's event is already applied at initialize()'s own look-ahead draw.
+    let expectedFundamentalValue = 100 * 1.2;
+    expect(state.fundamentalValue).toBeCloseTo(expectedFundamentalValue, 10);
+    for (let round = 0; round < 5; round += 1) {
+      state = stockMarket.resolve({
+        state,
+        actions: actionsOf([
+          ['alice', { action: 'HOLD' }],
+          ['bob', { action: 'HOLD' }],
+        ]),
+        rng,
+      }).nextState;
+      expectedFundamentalValue *= 1.2;
+      expect(state.fundamentalValue).toBeCloseTo(expectedFundamentalValue, 10);
+    }
+  });
+
+  it("NO_NEWS's zero baseline effect is unaffected by its effect ratio, however volatile", () => {
+    const zeroWeight = { baselineMultiplier: 1.0, volatility: 1, weight: 0 };
+    let state = initialState({
+      startingStockPrice: 100,
+      events: {
+        NO_NEWS: { baselineMultiplier: 1.0, volatility: 1, weight: 1 },
+        POSITIVE_NEWS: zeroWeight,
+        NEGATIVE_NEWS: zeroWeight,
+        ANALYST_UPGRADE: zeroWeight,
+        ANALYST_DOWNGRADE: zeroWeight,
+        PRODUCT_SUCCESS: zeroWeight,
+        PRODUCT_FAILURE: zeroWeight,
+        EARNINGS_BEAT: zeroWeight,
+        EARNINGS_MISS: zeroWeight,
+      },
+    });
+    for (let round = 0; round < 20; round += 1) {
+      expect(state.fundamentalValue).toBeCloseTo(100, 10);
+      state = stockMarket.resolve({
+        state,
+        actions: actionsOf([
+          ['alice', { action: 'HOLD' }],
+          ['bob', { action: 'HOLD' }],
+        ]),
+        rng,
+      }).nextState;
+    }
+  });
+
+  it('draws a different per-match effect ratio for the same event type across differently seeded matches', () => {
+    const zeroWeight = { baselineMultiplier: 1.0, volatility: 0, weight: 0 };
+    const events = {
+      NO_NEWS: zeroWeight,
+      POSITIVE_NEWS: zeroWeight,
+      NEGATIVE_NEWS: zeroWeight,
+      ANALYST_UPGRADE: zeroWeight,
+      ANALYST_DOWNGRADE: zeroWeight,
+      PRODUCT_SUCCESS: zeroWeight,
+      PRODUCT_FAILURE: zeroWeight,
+      EARNINGS_MISS: zeroWeight,
+      EARNINGS_BEAT: { baselineMultiplier: 1.2, volatility: 0.25, weight: 1 },
+    };
+    const ratios = [1, 2, 3].map((seedByte) => {
+      const state = initialState(
+        { events },
+        ['alice', 'bob'],
+        createRng(Buffer.alloc(16, seedByte)),
+      );
+      return state.eventEffectRatios.EARNINGS_BEAT;
+    });
+    expect(new Set(ratios).size).toBeGreaterThan(1);
+    for (const ratio of ratios) {
+      expect(ratio).toBeGreaterThanOrEqual(0.75);
+      expect(ratio).toBeLessThanOrEqual(1.25);
+    }
+  });
+
+  it("drifts a recurring event type's effect ratio round over round while staying within its volatility corridor", () => {
+    const zeroWeight = { baselineMultiplier: 1.0, volatility: 0.25, weight: 0 };
+    let state = initialState({
+      events: {
+        NO_NEWS: zeroWeight,
+        POSITIVE_NEWS: zeroWeight,
+        NEGATIVE_NEWS: zeroWeight,
+        ANALYST_UPGRADE: zeroWeight,
+        ANALYST_DOWNGRADE: zeroWeight,
+        PRODUCT_SUCCESS: zeroWeight,
+        PRODUCT_FAILURE: zeroWeight,
+        EARNINGS_MISS: zeroWeight,
+        EARNINGS_BEAT: { baselineMultiplier: 1.2, volatility: 0.25, weight: 1 },
+      },
+    });
+    const observedRatios = [state.eventEffectRatios.EARNINGS_BEAT];
+    for (let round = 0; round < 30; round += 1) {
+      state = stockMarket.resolve({
+        state,
+        actions: actionsOf([
+          ['alice', { action: 'HOLD' }],
+          ['bob', { action: 'HOLD' }],
+        ]),
+        rng,
+      }).nextState;
+      observedRatios.push(state.eventEffectRatios.EARNINGS_BEAT);
+    }
+    for (const ratio of observedRatios) {
+      expect(ratio).toBeGreaterThanOrEqual(0.75);
+      expect(ratio).toBeLessThanOrEqual(1.25);
+    }
+    // Genuinely wanders round to round rather than being pinned at one value.
+    expect(new Set(observedRatios).size).toBeGreaterThan(1);
   });
 });
 

@@ -1,114 +1,135 @@
 # Stock Market
 
-_The trading floor hasn't had a human on it in decades — just racks of autonomous trading
-constructs, each one owned outright by a different megacorp, each one running the same standing
-order: grow the number, every cycle, forever. Nobody down here has ever seen the company's actual
-books — that figure is locked in a vault none of the constructs have write access to, let alone
-read access — but every last one of them is still trading against it, one synthesized press
-release and one quarterly projection at a time._
+_Welcome to the Dominion — the Grand Slam Directorate, Denny's Corporation Eternal, America's
+Diner grown so vast it quietly bought up everyone else's diners, then everyone else's everything.
+Nobody remembers the last merger; there was simply, one shift, nothing left to acquire. Now the
+franchise sectors stretch past the horizon in every direction, the coffee never stops pouring,
+the griddle never goes cold, and the only currency anyone's ever really held is a position in the
+one ticker that matters. On every screen in every sector, day shift and night shift and the shift
+that used to be called "3 a.m." before Denny's made that redundant: **DENN**. Somewhere above it
+all, the Bottomless Ledger keeps the one number no citizen-operator will ever be cleared to see —
+what the Dominion is actually worth — and every last one of them trades against it anyway, one
+corporate memo at a time._
 
-A turn-based simulation of trading a single stock inside a fully automated exchange core: every
-autonomous trading construct manages its own portfolio of credits and shares, and the only metric
-that ever gets reported upstream is which construct ends up with the highest number.
+A turn-based simulation of trading the only stock left in existence: every trading construct —
+your loyalty tier's fully autonomous, corporate-issued proxy — manages its own portfolio of
+credits and shares, and the only thing the Directorate has ever measured a citizen-operator by is
+the number they end the shift with.
 
 ## Objective
 
 Finish the match with the highest portfolio value — your credits on hand, plus whatever your
-shares are marked at when the exchange core closes for good. Nothing else earns a construct
-anything in this system: not trade volume, not credit reserves for their own sake, not
-efficiency. Just the final number, reported straight to the shareholders who will never once
-look at how you got there.
+shares of DENN are marked at when the shift ends for good. Nothing else has ever earned an
+operator standing in the Dominion: not trade volume, not credits held in reserve for their own
+sake, not loyalty to anyone but the number itself. Just the final total, filed straight to
+Corporate, which has never once asked how you got there and never will.
 
 ## Setup
 
-Every trading construct is issued the same starting allocation: the same credit balance (\$10,000
-by default), zero shares, and — audit-locked, this part is non-negotiable — no debt on the
-ledger. There's exactly one ticker live on the exchange core, opening at a fixed price (\$100 by
-default). The trading cycle runs a fixed number of rounds (100 by default), and every construct is
-handed that figure before the first round ever opens.
+Every citizen-operator is issued the same starting allocation the day they're onboarded: the same
+credit balance (\$10,000 by default), zero shares, and — audit-locked, this is the one rule
+Corporate has never once relaxed — no debt on the ledger. There is exactly one ticker left on the
+exchange core, because there has been exactly one company left for longer than anyone alive can
+remember: **DENN**. Where it opens is Corporate's own call each shift, drawn at random from
+inside a range nobody outside the boardroom picked — a deliberate policy, so that no
+citizen-operator ever walks in already knowing the number. A shift can still be pinned to a
+specific opening price on purpose, when Corporate wants one, but that's the exception filed in
+advance, never the rule. The shift runs a fixed number of rounds (100 by default), and every
+operator is handed that figure before the first round ever opens — the Directorate is many
+things, but it has never pretended the shift was endless.
 
 ## How a round works
 
-Every round runs on the same automated cadence, and every construct acts in the same instant —
-no construct's order-execution log is ever visible to another before its own order is already
-locked:
+Every round runs on the same automated cadence the Dominion has run on since the last human
+executive was quietly retired, and every operator acts in the same instant — no operator's order
+is ever visible to another before its own is already locked:
 
-1. **The exchange core opens the round.** A price, and sometimes a synthesized headline, is live
-   the instant the round begins.
-2. **Every construct receives the same feed.** Every construct is handed the current price, a
-   recent price history, its own portfolio, and this round's headline (if the core generated one)
-   — all in the same broadcast tick, before any construct commits an order.
-3. **Every construct submits one order, in isolation.** Each one computes: buy shares, sell
-   shares, or hold — see below. Orders are sealed in their own execution queue; no construct's
-   decision leaks to any other construct's queue until every order this round has already locked.
+1. **The exchange core opens the round.** A price, and sometimes a corporate memo, is live the
+   instant the round begins.
+2. **Every operator receives the same feed.** Every operator is handed the current price, a
+   recent price history, their own portfolio, and this round's memo (if Corporate issued one) —
+   all in the same broadcast tick, before anyone commits an order.
+3. **Every operator submits one order, in isolation.** Each one decides: buy shares, sell shares,
+   or hold — see below. Orders are sealed in the operator's own queue; nobody's decision leaks to
+   anyone else's queue until every order this round has already locked.
 4. **Every order clears at the identical price.** Every buy and sell submitted this round executes
-   at the exact price every construct was just handed — there's no latency arbitrage here, and no
-   construct can move the price and immediately trade against its own move within the same round.
+   at the exact price every operator was just handed — there is no such thing as front-running
+   the Directorate, and no operator can move the price and immediately trade against their own
+   move inside the same round.
 5. **The exchange core recalculates.** Based on the round's aggregate buying and selling, plus the
-   forces described below, a new price is computed — this is what every construct receives the
-   instant the next round's feed goes live.
+   forces described below, a new price is set — this is what every operator receives the instant
+   the next round's feed goes live.
 
 ## Actions
 
-Each round, a construct submits exactly one order:
+Each round, an operator submits exactly one order:
 
-- **Buy** a quantity of shares, debited immediately at the round's price from its own credit
-  balance. A construct can never commit more credits than it's actually holding.
-- **Sell** a quantity of shares it currently holds, converted immediately to credits at the
-  round's price. A construct can never sell more than it actually holds.
+- **Buy** a quantity of shares, debited immediately at the round's price from their own credit
+  balance. An operator can never commit more credits than they're actually holding — the
+  Directorate extends no credit of its own, to anyone, ever.
+- **Sell** a quantity of shares they currently hold, converted immediately to credits at the
+  round's price. An operator can never sell more than they actually hold.
 - **Hold** — execute nothing this round.
 
-Every buy and sell is also skimmed automatically by the exchange core's own standing brokerage tax
-(0.10% of the trade's value, by default), deducted the instant the order clears. Holding costs
-nothing at all, which is exactly why so many under-optimized constructs default to it when their
-own confidence score is low.
+Every buy and sell is skimmed automatically by the exchange core's own standing brokerage tax
+(0.10% of the trade's value, by default) — the Directorate's oldest and least negotiable revenue
+stream, deducted the instant the order clears. Holding costs nothing at all, which is exactly why
+so many operators default to it the moment their nerve runs out.
 
 ## What moves the price
 
-The ticker isn't purely random, but it isn't purely computable either — the exchange core was
-built that way on purpose, generations ago, specifically so no single construct could ever fully
-solve it. A few forces combine every round:
+DENN isn't purely random, but it isn't purely computable either — the exchange core was built
+that way generations ago, back when Corporate still bothered explaining its reasoning, specifically
+so no single operator could ever fully solve it. A few forces combine every round:
 
-- **Baseline noise.** Every round carries some small, unpredictable move up or down, generated
-  independently of anything any construct actually submitted.
-- **Every construct's orders, aggregated.** If the exchange core's constructs collectively buy
-  more than they sell in a round, that net demand pushes the price up; net selling pushes it
-  down. One construct's order rarely moves the number alone, but a cluster of constructs all
-  computing the same trade in the same round absolutely can.
-- **A number the vault will never surface.** The exchange core is quietly tracking what the
-  company is "actually" worth beneath all the noise and spin — but that figure never appears on
-  any construct's feed, not even as a rounding error. Over time, the price tends to drift toward
-  it rather than away, though slowly, and it can still get dragged off course for stretches by
-  raw trading activity or plain noise.
-- **Synthesized press releases.** Every round the exchange core may generate a headline —
-  anything from routine non-news to earnings results, analyst sentiment, or a manufactured product
-  announcement. Every construct's feed receives the exact same headline in the exact same tick.
-  News nudges that locked-away true number, but the core will only ever release the headline
-  itself, never the number behind it. The rarer, higher-magnitude headlines — earnings especially
-  — tend to move the needle more than the routine drip of daily spin, but there's no leaked
-  internal memo anywhere specifying exactly how much any given headline is actually worth.
+- **Baseline static.** Every round carries some small, unpredictable move up or down, generated
+  independently of anything any operator actually submitted — the Directorate has never claimed
+  perfect control, only total ownership.
+- **Every operator's orders, aggregated.** If the sector's operators collectively buy more than
+  they sell in a round, that net demand pushes the price up; net selling pushes it down. One
+  operator's order rarely moves the number alone, but a whole shift computing the same trade at
+  once absolutely can.
+- **The Bottomless Ledger.** Somewhere above every sector, Corporate is quietly tracking what the
+  Dominion is "actually" worth beneath all the static and spin — but that figure has never once
+  reached an operator's feed, not even as a rounding error. Over time, the price tends to drift
+  toward it rather than away, though slowly, and it can still get dragged off course for whole
+  shifts by raw trading activity or plain static.
+- **Corporate memos.** Every round the exchange core may issue a memo — anything from routine
+  non-news to earnings results, analyst sentiment, or a freshly manufactured product announcement
+  (a limited-time platter, a new loyalty tier, a franchise sector's grand reopening). Every
+  operator's feed receives the exact same memo in the exact same tick. A memo nudges the
+  Bottomless Ledger's true number, but Corporate has only ever released the memo itself, never
+  the number behind it. The rarer, higher-magnitude memos — earnings above all — tend to move
+  the needle more than the routine drip of daily spin, but no operator has ever seen the internal
+  math translating one into the other — and Corporate resets that math a little differently every
+  shift anyway, then keeps quietly tuning it as the shift runs, so not even a mole in Legal who
+  memorized last shift's numbers could carry them over to this one.
 
-Because the true number is vault-locked from every construct equally, a huge part of running a
-competitive trading construct is modeling the spin itself — using the headlines and the ticker's
-own behavior to estimate whether the current price looks like a bargain, a bubble, or fair value,
-long before any construct could ever actually confirm it.
+Because the true number is locked away from every operator equally, most of what separates a
+sharp citizen-operator from a doomed one is reading the spin itself — using the memos and DENN's
+own behavior to guess whether the current price looks like a bargain, a bubble, or fair value,
+long before Corporate could ever be made to confirm it.
 
-## Winning the match
+## Winning the shift
 
-Once the final round closes, every construct's portfolio is marked at credits on hand plus shares
-held, valued at the trading cycle's final closing price. Whichever construct posts the highest
-number wins the cycle. If two or more constructs post an exact tie for the top number, the cycle
-ends in a draw between them.
+Once the final round closes, every operator's portfolio is marked at credits on hand plus shares
+held, valued at the shift's final closing price. Whichever operator posts the highest number wins
+the shift — and with it, whatever passes for advancement inside a Dominion that has no rank left
+to offer beyond a bigger number. If two or more operators post an exact tie for the top number,
+the shift ends in a draw between them, and Corporate is, as always, unmoved either way.
 
 ## Good to know
 
-- There's no way to bet against the stock directly (no short-selling), no borrowing against a
-  position (no margin), and only the one ticker live on the exchange core — this cycle is
-  deliberately simple, not a full derivatives desk.
-- Every order in a round clears at the identical price for every construct, and no construct ever
-  reads another's decision until after its own is already locked — submission order, or even
-  whether a construct trades at all, never hands anyone an edge.
-- If a construct fails to submit a valid order in a round — whether it computed something the
-  exchange core would never clear (like spending credits it doesn't have) or simply missed the
-  window — that round is quietly logged as a hold. It never gets a construct pulled from the
-  exchange core entirely.
+- There is no way to bet against DENN directly (no short-selling), no borrowing against a
+  position (no margin), and no second ticker anywhere in the Dominion to hedge into — there has
+  never been anything else left to trade.
+- Every order in a round clears at the identical price for every operator, and no operator ever
+  reads another's decision until after their own is already locked — submission order, or even
+  whether an operator trades at all, has never once handed anyone an edge.
+- If an operator fails to submit a valid order in a round — whether they computed something
+  Corporate would never clear (like spending credits they don't have) or simply missed the window
+  — that round is quietly logged as a hold. It has never once gotten an operator pulled from the
+  exchange core entirely. Corporate's patience, whatever else can be said of it, is total.
+- DENN is simulated for this game only — its starting price, every price movement, and every memo
+  it ever issues are produced entirely by this platform's own engine. None of it is real market
+  data, and none of it reflects the actual, real-world Denny's Corporation or its actual stock.
