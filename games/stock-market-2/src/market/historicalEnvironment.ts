@@ -1,7 +1,14 @@
 import { readFileSync } from 'node:fs';
 import type { Rng } from '@thunderdome/engine';
-import type { DailyMarketConditions, StockMarket2Config, StockMarket2Event, StockMarket2EventType } from '../types.js';
+import type {
+  DailyMarketConditions,
+  MarketRegime,
+  StockMarket2Config,
+  StockMarket2Event,
+  StockMarket2EventType,
+} from '../types.js';
 import type { MarketEnvironment } from './environment.js';
+import { INITIAL_REGIME } from './regime.js';
 
 // ---------------------------------------------------------------------------
 // The bundled real dataset — 2,515 real DENN daily bars (2016-01-19 through 2026-01-16, the real
@@ -53,6 +60,16 @@ const EVENT_DESCRIPTIONS: Record<StockMarket2EventType, string> = {
 };
 
 const TRAILING_VOLATILITY_WINDOW = 20;
+const REGIME_TRAILING_WINDOW = 20;
+/** A reasonable "normal" daily-volatility assumption for classification purposes only — real
+ * trailing volatility is compared against this fixed baseline to decide HIGH_VOLATILITY/CRISIS/
+ * LOW_VOLATILITY, rather than against a computed whole-dataset average (simpler, and avoids
+ * scanning the entire dataset on every call). */
+const REGIME_BASELINE_DAILY_VOLATILITY = 0.02;
+const REGIME_CRISIS_VOL_RATIO = 2.5;
+const REGIME_HIGH_VOL_RATIO = 1.5;
+const REGIME_LOW_VOL_RATIO = 0.5;
+const REGIME_TREND_THRESHOLD = 0.05;
 
 /** Provider-agnostic surface the historical market environment consumes — a future second
  * dataset (spec §29) just needs a second implementation of this, loaded the same way. */
@@ -113,16 +130,62 @@ export function resolveHistoryStartIndex(
 }
 
 /**
- * HISTORICAL mode's reference/pre-open price for round `r` is always the *previous* real trading
+ * Deterministic — no `rng` involved — a real regime label derived purely from trailing real
+ * closes ending at `referenceIndex` (never `referenceIndex`'s own future). Unlike SYNTHETIC
+ * mode's Markov transition, HISTORICAL mode's regime is a classification of real data, not a
+ * stochastic process, matching this game's "don't fabricate randomness on top of a real company"
+ * design (see games/stock-market-2/README.md). It only ever influences liquidity/spread sizing
+ * (`game.ts`), never price directly — the real close already *is* the price signal.
+ */
+function classifyRegime(provider: HistoricalDataProvider, referenceIndex: number): MarketRegime {
+  const windowStart = Math.max(1, referenceIndex - REGIME_TRAILING_WINDOW + 1);
+  const returns: number[] = [];
+  for (let i = windowStart; i <= referenceIndex; i++) {
+    returns.push(Math.log(provider.closeCentsAt(i) / provider.closeCentsAt(i - 1)));
+  }
+  if (returns.length === 0) {
+    return INITIAL_REGIME;
+  }
+
+  const cumulativeReturn = returns.reduce((sum, r) => sum + r, 0);
+  const mean = cumulativeReturn / returns.length;
+  const variance = returns.reduce((sum, r) => sum + (r - mean) ** 2, 0) / returns.length;
+  const volatilityRatio = Math.sqrt(variance) / REGIME_BASELINE_DAILY_VOLATILITY;
+
+  if (volatilityRatio > REGIME_CRISIS_VOL_RATIO) {
+    return 'CRISIS';
+  }
+  if (volatilityRatio > REGIME_HIGH_VOL_RATIO) {
+    return 'HIGH_VOLATILITY';
+  }
+  if (volatilityRatio < REGIME_LOW_VOL_RATIO) {
+    return 'LOW_VOLATILITY';
+  }
+  if (cumulativeReturn > REGIME_TREND_THRESHOLD) {
+    return 'BULL';
+  }
+  if (cumulativeReturn < -REGIME_TREND_THRESHOLD) {
+    return 'BEAR';
+  }
+  return 'SIDEWAYS';
+}
+
+/**
+ * HISTORICAL mode's hidden fundamental value for round `r` is always the *previous* real trading
  * day's real close (round 0 is the one exception: it uses its own pinned starting day's close,
  * since that's simply the match's configured starting point, not a lookahead — nothing is traded
  * before round 0 begins). This keeps the environment's walk decoupled from whatever the simulated
  * exchange actually closed at on prior rounds (spec §31), and guarantees a bot is never handed
- * today's real close before submitting orders (spec §32's "avoid lookahead bias").
+ * today's real close before submitting orders (spec §32's "avoid lookahead bias") — even
+ * indirectly, through how it shapes the reference price `market/referencePriceModel.ts` computes
+ * from this value.
  *
- * Expected volume and the volatility hint are likewise always drawn from that same reference day
- * (previous real day, or round 0's own pinned day) — real, already-public numbers, never today's
- * own not-yet-realized values.
+ * Expected volume, the volatility hint, and the regime classification are likewise always drawn
+ * from that same reference day (previous real day, or round 0's own pinned day) — real,
+ * already-public numbers, never today's own not-yet-realized values. `eventImpactReturn` is
+ * always 0 here — HISTORICAL mode's real event impact is already fully embedded in the real
+ * close data itself; layering a *synthetic* impact on top would double-count it and would mean
+ * fabricating a number about a real company (see games/stock-market-2/README.md).
  */
 export function createHistoricalMarketEnvironment(
   provider: HistoricalDataProvider,
@@ -144,7 +207,9 @@ export function createHistoricalMarketEnvironment(
       return {
         date: provider.dateAt(dayIndex),
         event: provider.eventAt(dayIndex),
-        referencePriceCents: provider.closeCentsAt(referenceIndex),
+        eventImpactReturn: 0,
+        fundamentalValueCents: provider.closeCentsAt(referenceIndex),
+        regime: classifyRegime(provider, referenceIndex),
         expectedDailyVolume: provider.volumeAt(referenceIndex),
         volatilityHint: volatilityCount > 0 ? volatilitySum / volatilityCount : 0.02,
       };

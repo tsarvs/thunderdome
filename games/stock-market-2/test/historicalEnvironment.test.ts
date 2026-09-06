@@ -6,9 +6,18 @@ import {
   resolveHistoryStartIndex,
   type HistoricalDataProvider,
 } from '../src/market/historicalEnvironment.js';
+import { INITIAL_REGIME } from '../src/market/regime.js';
 import { StockMarket2ConfigSchema } from '../src/types.js';
 
 const rng = createRng(Buffer.alloc(16, 1));
+
+function conditionsFor(
+  environment: ReturnType<typeof createHistoricalMarketEnvironment>,
+  round: number,
+  previousFundamentalValueCents = 0,
+) {
+  return environment.conditionsFor({ round, rng, previousFundamentalValueCents, previousRegime: INITIAL_REGIME });
+}
 
 function config(overrides: Record<string, unknown> = {}) {
   return StockMarket2ConfigSchema.parse({ mode: 'HISTORICAL', ...overrides });
@@ -48,27 +57,29 @@ describe('createHistoricalMarketEnvironment — no lookahead bias', () => {
   const historyStartIndex = 100;
   const environment = createHistoricalMarketEnvironment(provider, historyStartIndex);
 
-  it("round 0's reference price is its own pinned starting day's real close (the configured starting point, not a leak)", () => {
-    const conditions = environment.conditionsFor({ round: 0, rng, lastRealizedCloseCents: 0 });
-    expect(conditions.referencePriceCents).toBe(provider.closeCentsAt(historyStartIndex));
+  it("round 0's fundamental value is its own pinned starting day's real close (the configured starting point, not a leak)", () => {
+    const conditions = conditionsFor(environment, 0);
+    expect(conditions.fundamentalValueCents).toBe(provider.closeCentsAt(historyStartIndex));
     expect(conditions.date).toBe(provider.dateAt(historyStartIndex));
+    expect(conditions.eventImpactReturn).toBe(0);
   });
 
-  it("round r>=1's reference price is YESTERDAY's real close, never today's", () => {
-    const conditions = environment.conditionsFor({ round: 5, rng, lastRealizedCloseCents: 0 });
-    expect(conditions.referencePriceCents).toBe(provider.closeCentsAt(historyStartIndex + 4));
-    expect(conditions.referencePriceCents).not.toBe(provider.closeCentsAt(historyStartIndex + 5));
+  it("round r>=1's fundamental value is YESTERDAY's real close, never today's", () => {
+    const conditions = conditionsFor(environment, 5);
+    expect(conditions.fundamentalValueCents).toBe(provider.closeCentsAt(historyStartIndex + 4));
+    expect(conditions.fundamentalValueCents).not.toBe(provider.closeCentsAt(historyStartIndex + 5));
     expect(conditions.date).toBe(provider.dateAt(historyStartIndex + 5));
   });
 
-  it('ignores lastRealizedCloseCents entirely — the simulated exchange never rewrites the real path', () => {
-    const a = environment.conditionsFor({ round: 5, rng, lastRealizedCloseCents: 1 });
-    const b = environment.conditionsFor({ round: 5, rng, lastRealizedCloseCents: 999_999 });
-    expect(a.referencePriceCents).toBe(b.referencePriceCents);
+  it('ignores previousFundamentalValueCents/previousRegime entirely — the simulated exchange never rewrites the real path', () => {
+    const a = conditionsFor(environment, 5, 1);
+    const b = conditionsFor(environment, 5, 999_999);
+    expect(a.fundamentalValueCents).toBe(b.fundamentalValueCents);
+    expect(a.regime).toBe(b.regime);
   });
 
   it('maps each round to the next real trading day in sequence', () => {
-    const dates = [0, 1, 2, 3].map((round) => environment.conditionsFor({ round, rng, lastRealizedCloseCents: 0 }).date);
+    const dates = [0, 1, 2, 3].map((round) => conditionsFor(environment, round).date);
     expect(dates).toEqual([
       provider.dateAt(historyStartIndex),
       provider.dateAt(historyStartIndex + 1),
@@ -80,13 +91,43 @@ describe('createHistoricalMarketEnvironment — no lookahead bias', () => {
   it("reports today's real public event, which is not itself a leak of today's price move", () => {
     // 2016-02-17 (index 20) is a real EARNINGS_BEAT day (see src/data/README.md).
     const earningsEnv = createHistoricalMarketEnvironment(provider, 20);
-    expect(earningsEnv.conditionsFor({ round: 0, rng, lastRealizedCloseCents: 0 }).event.type).toBe('EARNINGS_BEAT');
+    expect(conditionsFor(earningsEnv, 0).event.type).toBe('EARNINGS_BEAT');
   });
 
   it('expected volume and volatility hint are also drawn from the reference day, never the current day', () => {
-    const conditions = environment.conditionsFor({ round: 5, rng, lastRealizedCloseCents: 0 });
+    const conditions = conditionsFor(environment, 5);
     expect(conditions.expectedDailyVolume).toBe(provider.volumeAt(historyStartIndex + 4));
     expect(conditions.volatilityHint).toBeGreaterThan(0);
+  });
+
+  it('never fabricates a synthetic event impact on top of real data', () => {
+    for (const round of [0, 1, 2, 3, 4, 5]) {
+      expect(conditionsFor(environment, round).eventImpactReturn).toBe(0);
+    }
+  });
+});
+
+describe('createHistoricalMarketEnvironment — regime classification is deterministic, from real data only', () => {
+  const provider = loadDennProvider();
+
+  it('falls back to the initial regime with no trailing history to classify from', () => {
+    const environment = createHistoricalMarketEnvironment(provider, 0);
+    expect(conditionsFor(environment, 0).regime).toBe(INITIAL_REGIME);
+  });
+
+  it('is fully deterministic given the same real data (no rng involved)', () => {
+    const environment = createHistoricalMarketEnvironment(provider, 500);
+    const a = conditionsFor(environment, 10);
+    const b = conditionsFor(environment, 10);
+    expect(a.regime).toBe(b.regime);
+  });
+
+  it('classifies the real 2025-11-04 buyout-announcement jump window as elevated volatility', () => {
+    // Index 2461 corresponds to shortly after the real +50% same-day jump (src/data/events.ts);
+    // trailing realized volatility across that window is far above this classifier's baseline.
+    const environment = createHistoricalMarketEnvironment(provider, 2465);
+    const regime = conditionsFor(environment, 0).regime;
+    expect(['HIGH_VOLATILITY', 'CRISIS']).toContain(regime);
   });
 });
 
@@ -101,8 +142,8 @@ describe('createHistoricalMarketEnvironment — provider swappability', () => {
       eventAt: () => ({ type: 'NO_NEWS', description: 'placeholder' }),
     };
     const environment = createHistoricalMarketEnvironment(fakeProvider, 0);
-    expect(environment.conditionsFor({ round: 0, rng, lastRealizedCloseCents: 0 }).referencePriceCents).toBe(5000);
-    expect(environment.conditionsFor({ round: 1, rng, lastRealizedCloseCents: 0 }).referencePriceCents).toBe(5000);
-    expect(environment.conditionsFor({ round: 2, rng, lastRealizedCloseCents: 0 }).referencePriceCents).toBe(5500);
+    expect(conditionsFor(environment, 0).fundamentalValueCents).toBe(5000);
+    expect(conditionsFor(environment, 1).fundamentalValueCents).toBe(5000);
+    expect(conditionsFor(environment, 2).fundamentalValueCents).toBe(5500);
   });
 });

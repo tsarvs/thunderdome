@@ -1,15 +1,25 @@
 import { createRng } from '@thunderdome/rng';
 import { describe, expect, it } from 'vitest';
 import { computeAvailability, resolveRound, type ResolveRoundArgs } from '../src/exchange/matchingEngine.js';
-import type { LiquiditySnapshot, RestingOrder, StockMarket2Action, StockMarket2Portfolio } from '../src/types.js';
+import {
+  RiskConfigSchema,
+  type LiquiditySnapshot,
+  type RestingOrder,
+  type RiskConfig,
+  type StockMarket2Action,
+  type StockMarket2Portfolio,
+} from '../src/types.js';
 
 const CASH = 1_000_000; // $10,000.00
+const DEFAULT_RISK: RiskConfig = RiskConfigSchema.parse({});
+
+function portfolio(overrides: Partial<StockMarket2Portfolio> = {}): StockMarket2Portfolio {
+  return { cashCents: CASH, shares: 0, averageEntryPriceCents: 0, realizedPnlCents: 0, bankrupt: false, ...overrides };
+}
 
 function portfolios(overrides: Record<string, Partial<StockMarket2Portfolio>> = {}): Map<string, StockMarket2Portfolio> {
   const ids = new Set(['alice', 'bob', ...Object.keys(overrides)]);
-  return new Map(
-    [...ids].map((id) => [id, { cashCents: CASH, shares: 0, ...overrides[id] }]),
-  );
+  return new Map([...ids].map((id) => [id, portfolio(overrides[id])]));
 }
 
 function emptyLiquidity(): LiquiditySnapshot {
@@ -26,6 +36,7 @@ function baseArgs(overrides: Partial<ResolveRoundArgs> = {}): ResolveRoundArgs {
     actions: new Map(),
     participantIds: ['alice', 'bob'],
     feeRate: 0,
+    risk: DEFAULT_RISK,
     nextOrderSequence: 0,
     rng: createRng(Buffer.alloc(16, 1)),
     ...overrides,
@@ -47,7 +58,7 @@ describe('resolveRound — market orders against synthetic liquidity', () => {
     expect(result.trades).toEqual([
       { buyerParticipantId: 'alice', sellerParticipantId: null, priceCents: 10010, quantity: 10 },
     ]);
-    expect(result.portfolios.get('alice')).toEqual({ cashCents: CASH - 10 * 10010, shares: 10 });
+    expect(result.portfolios.get('alice')).toMatchObject({ cashCents: CASH - 10 * 10010, shares: 10 });
   });
 
   it('fills a market sell against the best bid level', () => {
@@ -61,7 +72,7 @@ describe('resolveRound — market orders against synthetic liquidity', () => {
     expect(result.trades).toEqual([
       { buyerParticipantId: null, sellerParticipantId: 'alice', priceCents: 9990, quantity: 10 },
     ]);
-    expect(result.portfolios.get('alice')).toEqual({ cashCents: CASH + 10 * 9990, shares: 0 });
+    expect(result.portfolios.get('alice')).toMatchObject({ cashCents: CASH + 10 * 9990, shares: 0 });
   });
 
   it('walks multiple price levels when one level is insufficient, producing worse blended prices (slippage)', () => {
@@ -384,7 +395,83 @@ describe('computeAvailability', () => {
       { id: 'a:1', participantId: 'alice', side: 'SELL', limitPriceCents: 11000, timeInForce: 'GTC', quantity: 2, submittedRound: 0 },
       { id: 'b:0', participantId: 'bob', side: 'BUY', limitPriceCents: 10000, timeInForce: 'GTC', quantity: 100, submittedRound: 0 },
     ];
-    const result = computeAvailability({ cashCents: CASH, shares: 5 }, openOrders, 'alice');
+    const result = computeAvailability(portfolio({ shares: 5 }), openOrders, 'alice');
     expect(result).toEqual({ availableCashCents: CASH - 3 * 10000, availableShares: 3 });
+  });
+});
+
+describe('resolveRound — short selling and margin (config.risk.allowShortSelling)', () => {
+  const MARGIN_RISK: RiskConfig = RiskConfigSchema.parse({ allowShortSelling: true });
+
+  it('a SELL beyond current holdings is rejected when shorting is disabled (default)', () => {
+    const result = resolveRound(
+      baseArgs({
+        pendingLiquidity: { bids: [{ priceCents: 9990, quantity: 100 }], asks: [] },
+        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }]]),
+      }),
+    );
+    expect(result.trades).toEqual([]);
+    expect(result.portfolios.get('alice')?.shares).toBe(0);
+  });
+
+  it('a SELL beyond current holdings opens a short when shorting is enabled', () => {
+    const result = resolveRound(
+      baseArgs({
+        risk: MARGIN_RISK,
+        pendingLiquidity: { bids: [{ priceCents: 9990, quantity: 100 }], asks: [] },
+        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }]]),
+      }),
+    );
+    expect(result.portfolios.get('alice')?.shares).toBe(-10);
+    expect(result.portfolios.get('alice')?.cashCents).toBe(CASH + 10 * 9990);
+  });
+
+  it('a short position is capped by config.risk.borrowableShares', () => {
+    const result = resolveRound(
+      baseArgs({
+        risk: RiskConfigSchema.parse({ allowShortSelling: true, borrowableShares: 6 }),
+        pendingLiquidity: { bids: [{ priceCents: 9990, quantity: 100 }], asks: [] },
+        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }]]),
+      }),
+    );
+    expect(result.portfolios.get('alice')?.shares).toBe(-6);
+  });
+
+  it('a short position is capped by margin buying power', () => {
+    const result = resolveRound(
+      baseArgs({
+        risk: RiskConfigSchema.parse({ allowShortSelling: true, initialMarginRatio: 1 }),
+        portfolios: portfolios({ alice: { cashCents: 50_000 } }), // equity $500 -> buying power $500 @ initialMarginRatio 1
+        pendingLiquidity: { bids: [{ priceCents: 10000, quantity: 100 }], asks: [] },
+        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }]]),
+      }),
+    );
+    expect(result.portfolios.get('alice')?.shares).toBe(-5); // $500 buying power / $100 per share
+  });
+
+  it('covering a short is always allowed even with zero margin buying power', () => {
+    const result = resolveRound(
+      baseArgs({
+        risk: MARGIN_RISK,
+        portfolios: portfolios({ alice: { cashCents: 0, shares: -10, averageEntryPriceCents: 10000 } }),
+        pendingLiquidity: { bids: [], asks: [{ priceCents: 9000, quantity: 100 }] },
+        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }]]),
+      }),
+    );
+    expect(result.portfolios.get('alice')?.shares).toBe(0);
+    expect(result.portfolios.get('alice')?.realizedPnlCents).toBe(10 * (10000 - 9000));
+  });
+
+  it('a bankrupt participant can never trade again, regardless of what they submit', () => {
+    const result = resolveRound(
+      baseArgs({
+        risk: MARGIN_RISK,
+        portfolios: portfolios({ alice: { bankrupt: true, cashCents: 1_000_000 } }),
+        pendingLiquidity: { bids: [], asks: [{ priceCents: 9000, quantity: 100 }] },
+        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }]]),
+      }),
+    );
+    expect(result.trades).toEqual([]);
+    expect(result.portfolios.get('alice')?.shares).toBe(0);
   });
 });

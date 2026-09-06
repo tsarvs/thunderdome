@@ -11,10 +11,12 @@ export const DENN_SYMBOL = 'DENN';
 export const DEFAULT_SYNTHETIC_SYMBOL = 'SYNTH';
 
 /**
- * Real-data-grounded event taxonomy for HISTORICAL mode (see `src/data/events.ts` for how each
- * type is derived from Denny's real SEC filings). SYNTHETIC mode currently only ever reports
- * `NO_NEWS` — a synthetic event generator (regime-aware, with its own hidden impact) is explicit
- * future work (spec Phase 4), not something this rework attempts.
+ * Shared across both modes. HISTORICAL mode derives this from Denny's real SEC filings
+ * (`src/data/events.ts`) — a bot never sees a numeric effect size, only the headline. SYNTHETIC
+ * mode generates the same five types from a regime-aware synthetic event process
+ * (`market/eventGenerator.ts`) with its own hidden impact — never a numeric effect size either.
+ * Reusing one taxonomy across both modes (rather than the fuller list a real exchange's real
+ * newswire might carry) keeps one bot strategy meaningfully portable between them.
  */
 export const STOCK_MARKET_2_EVENT_TYPES = [
   'NO_NEWS',
@@ -32,11 +34,23 @@ export interface StockMarket2Event {
 }
 
 // ---------------------------------------------------------------------------
-// Market mode
+// Market mode / regime
 // ---------------------------------------------------------------------------
 
 export const MARKET_MODES = ['SYNTHETIC', 'HISTORICAL'] as const;
 export type MarketMode = (typeof MARKET_MODES)[number];
+
+/** Never exposed to bots directly — a bot infers it from price/volume/spread behavior, same as a
+ * real trader would (spec §8). See `market/regime.ts` for transition/profile logic. */
+export const MARKET_REGIMES = [
+  'BULL',
+  'BEAR',
+  'SIDEWAYS',
+  'HIGH_VOLATILITY',
+  'LOW_VOLATILITY',
+  'CRISIS',
+] as const;
+export type MarketRegime = (typeof MARKET_REGIMES)[number];
 
 // ---------------------------------------------------------------------------
 // Orders
@@ -83,7 +97,9 @@ export type StockMarket2Action = z.infer<typeof StockMarket2ActionSchema>;
 /** A resting LIMIT order sitting in the book across rounds (only GTC orders ever persist between
  * rounds — DAY orders that don't fully fill are dropped at end of day, so any `RestingOrder` a
  * new round's `resolve()` finds in `state.openOrders` is always GTC). MARKET orders never rest —
- * they either fill now (fully or partially) or their remainder is simply dropped. */
+ * they either fill now (fully or partially) or their remainder is simply dropped. Also used for
+ * the synthetic forced-liquidation order a margin call generates — always MARKET-equivalent, so
+ * never itself rests (see `portfolio/margin.ts`). */
 export interface RestingOrder {
   id: string;
   participantId: string;
@@ -95,12 +111,15 @@ export interface RestingOrder {
 }
 
 /** One executed fill, in cents. `counterparty: null` means the other side was synthetic external
- * liquidity, not another participant (see `exchange/matchingEngine.ts`). */
+ * liquidity, not another participant (see `exchange/matchingEngine.ts`). `forced: true` marks a
+ * fill that came from a margin-call liquidation rather than the participant's own order (spec
+ * §25 — recorded separately from normal trades). */
 export interface Trade {
   buyerParticipantId: string | null;
   sellerParticipantId: string | null;
   priceCents: number;
   quantity: number;
+  forced?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,14 +148,20 @@ export interface LiquiditySnapshot {
 export interface DailyMarketConditions {
   date: string;
   event: StockMarket2Event;
-  /** The day's pre-open reference/mid price, in cents — never today's real closing price in
-   * HISTORICAL mode (that would be lookahead bias, spec §32). Only used to center the synthetic
-   * liquidity ladder; actual executions come from the exchange, not this value directly. */
-  referencePriceCents: number;
-  /** Used to scale synthetic liquidity depth. */
+  /** The event's hidden signed log-return contribution — never shown to bots. Zero for NO_NEWS. */
+  eventImpactReturn: number;
+  /** The day's hidden "true value", in cents — never shown to bots. The day's actual reference/
+   * tradable price (computed by `market/referencePriceModel.ts`) gravitates toward this without
+   * tracking it perfectly (spec §7). SYNTHETIC mode evolves this as its own process; HISTORICAL
+   * mode simply sets it to the real close on this same real day (safe: by the time this value is
+   * used, in the NEXT round's reference-price calc, that real day is already "yesterday"). */
+  fundamentalValueCents: number;
+  /** Hidden — a bot infers it from behavior, never reads it directly. */
+  regime: MarketRegime;
+  /** Used to scale synthetic liquidity depth (already regime-adjusted). */
   expectedDailyVolume: number;
-  /** A rough daily-return standard deviation estimate, used to scale the liquidity ladder's
-   * spread/depth — never derived from the day's own not-yet-realized move. */
+  /** A rough BASE daily-return standard deviation estimate (before the regime's own volatility
+   * multiplier is applied) — never derived from the day's own not-yet-realized move. */
   volatilityHint: number;
 }
 
@@ -145,16 +170,35 @@ export interface DailyMarketConditions {
 // ---------------------------------------------------------------------------
 
 export const SyntheticProfileSchema = z.object({
-  /** Round 0's reference price — SYNTHETIC mode has no real data to seed from. */
+  /** Round 0's reference price AND fundamental value — SYNTHETIC mode has no real data to seed
+   * from. */
   initialPrice: z.number().positive().default(100),
-  /** Daily log-return standard deviation driving the placeholder random-walk reference price.
-   * This is deliberately the simplest possible placeholder market model — no hidden fundamental
-   * value, regime, or event-impact model yet (spec Phase 4, out of scope for this rework). */
-  volatility: z.number().min(0).default(0.02),
-  /** Constant daily log-return drift added on top of the random shock. */
-  drift: z.number().default(0),
+  /** Per-round log-return drift of the hidden fundamental value, on top of whatever the current
+   * regime's own drift contributes (see `market/regime.ts`). */
+  fundamentalDrift: z.number().default(0),
+  /** Per-round log-return shock volatility of the hidden fundamental value. */
+  fundamentalVolatility: z.number().min(0).default(0.015),
 });
 export type SyntheticProfile = z.infer<typeof SyntheticProfileSchema>;
+
+/**
+ * How the day's actual reference/tradable price tracks the hidden fundamental value —
+ * shared by both modes (`market/referencePriceModel.ts`), since "how much does price track true
+ * value, and how much extra noise sits on top" is the same question regardless of where the true
+ * value came from. Setting `meanReversionFactor: 1, referenceVolatility: 0` in HISTORICAL mode
+ * makes the reference price snap exactly to the real fundamental value (the previous real close)
+ * every round; `meanReversionFactor: 0` makes either mode ignore the fundamental value entirely
+ * and just random-walk.
+ */
+export const ReferencePriceModelConfigSchema = z.object({
+  /** How much of the gap between the reference price and the fundamental value closes each round
+   * (0 = never tracks it at all, 1 = snaps to it instantly, leaving nothing to trade on). */
+  meanReversionFactor: z.number().min(0).max(1).default(0.15),
+  /** Per-round log-return shock volatility of the reference price itself, on top of its pull
+   * toward the fundamental value — regime-scaled (see `market/regime.ts`). */
+  referenceVolatility: z.number().min(0).default(0.02),
+});
+export type ReferencePriceModelConfig = z.infer<typeof ReferencePriceModelConfigSchema>;
 
 export const LiquidityProfileSchema = z.object({
   /** Used both to scale synthetic liquidity depth and as the market-impact denominator implicit
@@ -174,6 +218,35 @@ export const LiquidityProfileSchema = z.object({
   levelPriceStepBps: z.number().min(0).default(15),
 });
 export type LiquidityProfile = z.infer<typeof LiquidityProfileSchema>;
+
+export const RiskConfigSchema = z
+  .object({
+    /** Off by default — every position stays long-only/cash-only, exactly as before (spec Phase
+     * 3's whole test suite depends on this default never changing). Turning it on enables BOTH
+     * short selling and margin buying power for long positions together — a real brokerage
+     * likewise requires a margin account to short at all, so this repo doesn't model "margin
+     * without shorting" or "shorting without margin" as separate toggles. */
+    allowShortSelling: z.boolean().default(false),
+    /** A hard ceiling on how large a short position any one participant may hold — deliberately a
+     * per-participant limit, not a shared borrow pool across participants (a shared, depleting
+     * float would need to track allocation/release across every participant; out of scope for
+     * this pass — see README). */
+    borrowableShares: z.number().nonnegative().default(1000),
+    /** Annualized cost of borrowing shares to short, converted to a per-round rate assuming 252
+     * trading days/rounds per year — same convention real brokerages use for day-count. */
+    borrowFeeAnnualized: z.number().min(0).default(0.03),
+    /** Reg-T-style: total gross position value (long + short) may not exceed equity /
+     * initialMarginRatio. */
+    initialMarginRatio: z.number().min(0.01).max(1).default(0.5),
+    /** Equity must stay at or above maintenanceMarginRatio * gross position value, or a margin
+     * call forces liquidation. */
+    maintenanceMarginRatio: z.number().min(0.01).max(1).default(0.3),
+  })
+  .refine((risk) => risk.maintenanceMarginRatio <= risk.initialMarginRatio, {
+    message: 'maintenanceMarginRatio must be <= initialMarginRatio',
+    path: ['maintenanceMarginRatio'],
+  });
+export type RiskConfig = z.infer<typeof RiskConfigSchema>;
 
 export const StockMarket2ConfigSchema = z
   .object({
@@ -195,7 +268,9 @@ export const StockMarket2ConfigSchema = z
     orderBookDepth: z.number().int().min(1).max(10).default(5),
     minimumStockPrice: z.number().positive().default(0.01),
     synthetic: SyntheticProfileSchema.default({}),
+    referenceModel: ReferencePriceModelConfigSchema.default({}),
     liquidity: LiquidityProfileSchema.default({}),
+    risk: RiskConfigSchema.default({}),
   })
   .superRefine((config, ctx) => {
     if (
@@ -221,7 +296,24 @@ export type StockMarket2Config = z.infer<typeof StockMarket2ConfigSchema>;
 
 export interface StockMarket2Portfolio {
   cashCents: number;
+  /** Can be negative — a short position (spec §22). */
   shares: number;
+  /** Average cost basis of the current position (long or short), in cents; 0 when flat. Needed to
+   * realize P&L correctly across partial fills and long<->short crossings (spec §26). */
+  averageEntryPriceCents: number;
+  realizedPnlCents: number;
+  /** Set once equity goes negative even after a full forced liquidation (spec §25) — a bankrupt
+   * participant's future orders are always ignored (treated as HOLD), never re-checked. */
+  bankrupt: boolean;
+}
+
+/** Running per-participant counters carried across rounds, surfaced in `StockMarket2Result` —
+ * kept separate from `StockMarket2Portfolio` since these are cumulative match statistics, not
+ * account state the exchange reasons about. */
+export interface StockMarket2RiskStats {
+  borrowFeesPaidCents: number;
+  marginCalls: number;
+  forcedLiquidations: number;
 }
 
 export interface DailyCandle {
@@ -252,6 +344,10 @@ export interface StockMarket2State {
   startDate: string;
   /** This round's pre-open reference/mid price, in cents — see `DailyMarketConditions`. */
   referencePriceCents: number;
+  /** Hidden "true value" driving this round's reference price — never shown to bots. */
+  fundamentalValueCents: number;
+  /** Hidden market regime for this round — never shown to bots. */
+  regime: MarketRegime;
   /** This round's synthetic liquidity ladder — generated one round ahead (during the previous
    * round's `resolve()`, or during `initialize()` for round 0) so bots always decide against the
    * exact same public book the exchange will actually match against. */
@@ -264,6 +360,7 @@ export interface StockMarket2State {
   priceHistory: DailyCandle[];
   lastRoundVolume: StockMarket2Volume | null;
   portfolios: Map<string, StockMarket2Portfolio>;
+  riskStats: Map<string, StockMarket2RiskStats>;
   /** Monotonic counter used to mint unique resting-order ids. */
   nextOrderSequence: number;
 }
@@ -292,12 +389,24 @@ export interface StockMarket2Observation {
   mode: MarketMode;
   portfolio: {
     cash: number;
+    /** Can be negative — a short position. */
     shares: number;
+    /** Net liquidation value / equity: cash + shares * markPrice. */
     value: number;
     /** Cash/shares not already reserved by this participant's own resting orders — what a new
-     * order can actually draw on. */
+     * order can actually draw on (does not yet account for margin — see `buyingPower`). */
     availableCash: number;
     availableShares: number;
+    /** Total gross position value (long + short) this account may hold right now, given its
+     * current equity and `initialMarginRatio` — 0 whenever `config.risk.allowShortSelling` is
+     * off, since margin buying power isn't available without a margin account. */
+    buyingPower: number;
+    /** Gross position value already in use (|shares| * markPrice). */
+    marginUsed: number;
+    /** Equity must stay at or above this or a margin call forces liquidation. 0 when flat. */
+    maintenanceRequirement: number;
+    realizedPnl: number;
+    bankrupt: boolean;
   };
   openOrders: PublicOpenOrder[];
   market: {
@@ -320,9 +429,17 @@ export interface StockMarket2Observation {
 
 export interface StockMarket2Result {
   participantIds: string[];
+  /** Final net liquidation value per participant, in dollars — the primary win metric (spec §37;
+   * risk-adjusted metrics like Sharpe/max-drawdown are explicitly deferred as secondary
+   * analytics). */
   scores: Record<string, number>;
   cash: Record<string, number>;
   shares: Record<string, number>;
+  realizedPnl: Record<string, number>;
+  borrowFeesPaid: Record<string, number>;
+  marginCalls: Record<string, number>;
+  forcedLiquidations: Record<string, number>;
+  bankrupt: Record<string, boolean>;
   symbol: string;
   mode: MarketMode;
   startingPrice: number;
@@ -330,5 +447,6 @@ export interface StockMarket2Result {
   startDate: string;
   endDate: string;
   roundsPlayed: number;
+  /** `null` when the top score is shared by more than one participant. */
   winnerId: string | null;
 }

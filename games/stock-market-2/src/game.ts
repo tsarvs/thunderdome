@@ -8,27 +8,39 @@ import {
   loadDennProvider,
   resolveHistoryStartIndex,
 } from './market/historicalEnvironment.js';
+import { computeReferencePriceCents } from './market/referencePriceModel.js';
+import { INITIAL_REGIME, REGIME_PROFILES } from './market/regime.js';
 import { createSyntheticMarketEnvironment } from './market/syntheticEnvironment.js';
 import { toCents, toDollars } from './money.js';
+import {
+  buyingPowerCents,
+  equityCents,
+  grossPositionValueCents,
+  isBelowMaintenance,
+  maintenanceRequirementCents,
+} from './portfolio/accounting.js';
+import { dailyBorrowFeeCents } from './portfolio/borrow.js';
+import { forceLiquidate } from './portfolio/margin.js';
+import type { Rng } from '@thunderdome/engine';
 import {
   DENN_SYMBOL,
   StockMarket2ActionSchema,
   StockMarket2ConfigSchema,
+  type LiquidityLevel,
+  type LiquidityProfile,
   type LiquiditySnapshot,
+  type MarketRegime,
   type PublicOpenOrder,
   type PublicOrderBookLevel,
   type RestingOrder,
   type StockMarket2Action,
   type StockMarket2Config,
   type StockMarket2Observation,
-  type StockMarket2Portfolio,
+  type StockMarket2RiskStats,
   type StockMarket2Result,
   type StockMarket2State,
+  type Trade,
 } from './types.js';
-
-function portfolioValueCents(portfolio: StockMarket2Portfolio, priceCents: number): number {
-  return portfolio.cashCents + portfolio.shares * priceCents;
-}
 
 /** Reconstructed fresh on every call rather than stored in state — a `MarketEnvironment` closes
  * over config/data, neither of which belongs in serializable game state (state is logged/replayed
@@ -39,6 +51,28 @@ function environmentFor(config: StockMarket2Config, historyStartIndex: number): 
     return createHistoricalMarketEnvironment(loadDennProvider(), historyStartIndex);
   }
   return createSyntheticMarketEnvironment(config.synthetic, config.liquidity.averageDailyVolume);
+}
+
+/** Generates one round's synthetic liquidity ladder, scaling the environment's base expected-
+ * volume/volatility-hint by the current regime's own liquidity/volatility multipliers (spec §8 —
+ * regime affects liquidity/spread; SYNTHETIC's own price drift already lives in how the
+ * fundamental value evolved, HISTORICAL's regime never touches price at all, only this). */
+function generateRegimeAdjustedLiquidity(args: {
+  referencePriceCents: number;
+  expectedDailyVolume: number;
+  volatilityHint: number;
+  regime: MarketRegime;
+  profile: LiquidityProfile;
+  rng: Rng;
+}): LiquiditySnapshot {
+  const regimeProfile = REGIME_PROFILES[args.regime];
+  return generateLiquiditySnapshot({
+    referencePriceCents: args.referencePriceCents,
+    expectedDailyVolume: args.expectedDailyVolume * regimeProfile.liquidityMultiplier,
+    volatilityHint: args.volatilityHint * regimeProfile.volatilityMultiplier,
+    profile: args.profile,
+    rng: args.rng,
+  });
 }
 
 function aggregateBookLevels(
@@ -88,13 +122,21 @@ function describeObservation(observation: StockMarket2Observation): string {
       : `Open orders: ${openOrders
           .map((o) => `${o.id} ${o.side} ${String(o.quantity)}@$${o.limitPrice.toFixed(2)} (${o.timeInForce})`)
           .join(', ')}\n`;
+  const marginLine =
+    portfolio.buyingPower > 0 || portfolio.marginUsed > 0
+      ? `Margin: buying power $${portfolio.buyingPower.toFixed(2)}, used $${portfolio.marginUsed.toFixed(2)}, ` +
+        `maintenance req. $${portfolio.maintenanceRequirement.toFixed(2)}\n`
+      : '';
+  const bankruptLine = portfolio.bankrupt ? 'BANKRUPT — no further trading is possible.\n' : '';
 
   return (
     `\nRound ${String(round + 1)}/${String(totalRounds)} — ${symbol} (${market.date}) — ` +
     `last close $${market.lastClose.toFixed(2)}, ${bidAsk}\n` +
     `Portfolio: $${portfolio.cash.toFixed(2)} cash (avail $${portfolio.availableCash.toFixed(2)}), ` +
     `${String(portfolio.shares)} shares (avail ${String(portfolio.availableShares)}), ` +
-    `value $${portfolio.value.toFixed(2)}\n` +
+    `value $${portfolio.value.toFixed(2)}, realized P&L $${portfolio.realizedPnl.toFixed(2)}\n` +
+    marginLine +
+    bankruptLine +
     openOrdersLine +
     (event.type === 'NO_NEWS' ? '' : `News: ${event.description}\n`) +
     'BUY/SELL <qty> [@<limitPrice>] [gtc], CANCEL <orderId>, or HOLD? '
@@ -158,6 +200,10 @@ function describeAction(action: StockMarket2Action): string {
     .join(' ');
 }
 
+function emptyRiskStats(): StockMarket2RiskStats {
+  return { borrowFeesPaidCents: 0, marginCalls: 0, forcedLiquidations: 0 };
+}
+
 // ---------------------------------------------------------------------------
 // GameDefinition
 // ---------------------------------------------------------------------------
@@ -170,7 +216,7 @@ export const stockMarket2: GameDefinition<
   StockMarket2Result
 > = {
   id: 'stock-market-2',
-  version: '0.2.0',
+  version: '0.3.0',
 
   parseConfig(raw) {
     const result = StockMarket2ConfigSchema.safeParse(raw);
@@ -195,17 +241,30 @@ export const stockMarket2: GameDefinition<
     }
     const startingCashCents = toCents(config.startingCash);
     const portfolios = new Map(
-      participantIds.map((id) => [id, { cashCents: startingCashCents, shares: 0 }]),
+      participantIds.map((id) => [
+        id,
+        { cashCents: startingCashCents, shares: 0, averageEntryPriceCents: 0, realizedPnlCents: 0, bankrupt: false },
+      ]),
     );
+    const riskStats = new Map(participantIds.map((id) => [id, emptyRiskStats()]));
 
     const historyStartIndex =
       config.mode === 'HISTORICAL' ? resolveHistoryStartIndex(config, loadDennProvider(), rng) : 0;
     const environment = environmentFor(config, historyStartIndex);
-    const conditions = environment.conditionsFor({ round: 0, rng, lastRealizedCloseCents: 0 });
-    const pendingLiquidity = generateLiquiditySnapshot({
-      referencePriceCents: conditions.referencePriceCents,
+    const conditions = environment.conditionsFor({
+      round: 0,
+      rng,
+      previousFundamentalValueCents: 0,
+      previousRegime: INITIAL_REGIME,
+    });
+    // Round 0 is the match's pinned starting point: reference price = fundamental value exactly
+    // — no pull/shock/event applied yet, since nothing has traded before the match begins.
+    const referencePriceCents = conditions.fundamentalValueCents;
+    const pendingLiquidity = generateRegimeAdjustedLiquidity({
+      referencePriceCents,
       expectedDailyVolume: conditions.expectedDailyVolume,
       volatilityHint: conditions.volatilityHint,
+      regime: conditions.regime,
       profile: config.liquidity,
       rng,
     });
@@ -215,9 +274,11 @@ export const stockMarket2: GameDefinition<
       config,
       historyStartIndex,
       round: 0,
-      startingPriceCents: conditions.referencePriceCents,
+      startingPriceCents: referencePriceCents,
       startDate: conditions.date,
-      referencePriceCents: conditions.referencePriceCents,
+      referencePriceCents,
+      fundamentalValueCents: conditions.fundamentalValueCents,
+      regime: conditions.regime,
       pendingLiquidity,
       currentEvent: conditions.event,
       currentDate: conditions.date,
@@ -225,6 +286,7 @@ export const stockMarket2: GameDefinition<
       priceHistory: [],
       lastRoundVolume: null,
       portfolios,
+      riskStats,
       nextOrderSequence: 0,
     };
   },
@@ -252,6 +314,7 @@ export const stockMarket2: GameDefinition<
     const book = aggregateBookLevels(state.openOrders, state.pendingLiquidity, state.config.orderBookDepth);
     const priceCents = markPriceCents(state);
     const lastClose = toDollars(priceCents);
+    const risk = state.config.risk;
 
     return {
       round: state.round,
@@ -261,9 +324,14 @@ export const stockMarket2: GameDefinition<
       portfolio: {
         cash: toDollars(portfolio.cashCents),
         shares: portfolio.shares,
-        value: toDollars(portfolioValueCents(portfolio, priceCents)),
+        value: toDollars(equityCents(portfolio, priceCents)),
         availableCash: toDollars(availableCashCents),
         availableShares,
+        buyingPower: toDollars(buyingPowerCents(portfolio, priceCents, risk)),
+        marginUsed: toDollars(grossPositionValueCents(portfolio, priceCents)),
+        maintenanceRequirement: toDollars(maintenanceRequirementCents(portfolio, priceCents, risk)),
+        realizedPnl: toDollars(portfolio.realizedPnlCents),
+        bankrupt: portfolio.bankrupt,
       },
       openOrders,
       market: {
@@ -301,8 +369,12 @@ export const stockMarket2: GameDefinition<
         `too many orders: submitted ${String(action.orders.length)}, max ${String(state.config.maxOrdersPerRound)}`,
       );
     }
-    if (state.portfolios.get(participantId) === undefined) {
+    const portfolio = state.portfolios.get(participantId);
+    if (portfolio === undefined) {
       return err(`unknown participant "${participantId}"`);
+    }
+    if (portfolio.bankrupt && action.orders.length > 0) {
+      return err('participant is bankrupt and can no longer trade');
     }
 
     // Structural checks only — real economic feasibility (affordability across a whole batch of
@@ -321,6 +393,7 @@ export const stockMarket2: GameDefinition<
   },
 
   resolve({ state, actions, rng }) {
+    const risk = state.config.risk;
     const matchResult = resolveRound({
       round: state.round,
       referencePriceCents: state.referencePriceCents,
@@ -330,16 +403,84 @@ export const stockMarket2: GameDefinition<
       actions,
       participantIds: state.participantIds,
       feeRate: state.config.transactionFee,
+      risk,
       nextOrderSequence: state.nextOrderSequence,
       rng,
     });
 
-    const candle = buildDailyCandle(state.currentDate, state.referencePriceCents, matchResult.trades);
+    let portfolios = matchResult.portfolios;
+    let openOrders = matchResult.openOrders;
+    let remainingBidLiquidity: LiquidityLevel[] = matchResult.remainingLiquidity.bids;
+    let remainingAskLiquidity: LiquidityLevel[] = matchResult.remainingLiquidity.asks;
+    const riskStats = new Map(state.riskStats);
+    const forcedTrades: Trade[] = [];
+
+    // Borrow fees and margin calls (spec §23/§25) both need a mark price for THIS round — the
+    // last actual transaction price if anything traded, else the day's reference price. The final
+    // realized candle (below) still only reflects real executions, forced liquidations included.
+    const lastTrade = matchResult.trades[matchResult.trades.length - 1];
+    const interimMarkPriceCents = lastTrade?.priceCents ?? state.referencePriceCents;
+
+    if (risk.allowShortSelling) {
+      for (const participantId of state.participantIds) {
+        const portfolio = portfolios.get(participantId);
+        if (portfolio === undefined || portfolio.bankrupt || portfolio.shares >= 0) {
+          continue;
+        }
+        const feeCents = dailyBorrowFeeCents(-portfolio.shares, interimMarkPriceCents, risk.borrowFeeAnnualized);
+        if (feeCents <= 0) {
+          continue;
+        }
+        portfolios = new Map(portfolios);
+        portfolios.set(participantId, { ...portfolio, cashCents: portfolio.cashCents - feeCents });
+        const stats = riskStats.get(participantId) ?? emptyRiskStats();
+        riskStats.set(participantId, { ...stats, borrowFeesPaidCents: stats.borrowFeesPaidCents + feeCents });
+      }
+
+      for (const participantId of state.participantIds) {
+        const portfolio = portfolios.get(participantId);
+        if (portfolio === undefined || portfolio.bankrupt || portfolio.shares === 0) {
+          continue;
+        }
+        if (!isBelowMaintenance(portfolio, interimMarkPriceCents, risk)) {
+          continue;
+        }
+
+        openOrders = openOrders.filter((o) => o.participantId !== participantId);
+        const isLong = portfolio.shares > 0;
+        const liquidation = forceLiquidate({
+          participantId,
+          portfolio,
+          liquidity: isLong ? remainingBidLiquidity : remainingAskLiquidity,
+          feeRate: state.config.transactionFee,
+        });
+        if (isLong) {
+          remainingBidLiquidity = liquidation.remainingLiquidity;
+        } else {
+          remainingAskLiquidity = liquidation.remainingLiquidity;
+        }
+        forcedTrades.push(...liquidation.trades);
+
+        const equityAfter = equityCents(liquidation.portfolio, interimMarkPriceCents);
+        portfolios = new Map(portfolios);
+        portfolios.set(participantId, equityAfter < 0 ? { ...liquidation.portfolio, bankrupt: true } : liquidation.portfolio);
+
+        const stats = riskStats.get(participantId) ?? emptyRiskStats();
+        riskStats.set(participantId, {
+          ...stats,
+          marginCalls: stats.marginCalls + 1,
+          forcedLiquidations: stats.forcedLiquidations + (liquidation.trades.length > 0 ? 1 : 0),
+        });
+      }
+    }
+
+    const allTrades = [...matchResult.trades, ...forcedTrades];
+    const candle = buildDailyCandle(state.currentDate, state.referencePriceCents, allTrades);
     const priceHistory = [...state.priceHistory, candle].slice(-state.config.priceHistoryLength);
 
     let sharesBought = 0;
     let sharesSold = 0;
-    for (const trade of matchResult.trades) {
+    for (const trade of allTrades) {
       if (trade.buyerParticipantId !== null) {
         sharesBought += trade.quantity;
       }
@@ -354,12 +495,24 @@ export const stockMarket2: GameDefinition<
     const nextConditions = environment.conditionsFor({
       round: nextRound,
       rng,
-      lastRealizedCloseCents: toCents(candle.close),
+      previousFundamentalValueCents: state.fundamentalValueCents,
+      previousRegime: state.regime,
     });
-    const nextPendingLiquidity = generateLiquiditySnapshot({
-      referencePriceCents: nextConditions.referencePriceCents,
+    const nextReferencePriceCents = computeReferencePriceCents({
+      lastRealizedCloseCents: toCents(candle.close),
+      fundamentalValueCents: nextConditions.fundamentalValueCents,
+      regime: nextConditions.regime,
+      eventImpactReturn: nextConditions.eventImpactReturn,
+      meanReversionFactor: state.config.referenceModel.meanReversionFactor,
+      referenceVolatility: state.config.referenceModel.referenceVolatility,
+      minimumPriceCents: toCents(state.config.minimumStockPrice),
+      rng,
+    });
+    const nextPendingLiquidity = generateRegimeAdjustedLiquidity({
+      referencePriceCents: nextReferencePriceCents,
       expectedDailyVolume: nextConditions.expectedDailyVolume,
       volatilityHint: nextConditions.volatilityHint,
+      regime: nextConditions.regime,
       profile: state.config.liquidity,
       rng,
     });
@@ -367,14 +520,17 @@ export const stockMarket2: GameDefinition<
     const nextState: StockMarket2State = {
       ...state,
       round: nextRound,
-      referencePriceCents: nextConditions.referencePriceCents,
+      referencePriceCents: nextReferencePriceCents,
+      fundamentalValueCents: nextConditions.fundamentalValueCents,
+      regime: nextConditions.regime,
       pendingLiquidity: nextPendingLiquidity,
       currentEvent: nextConditions.event,
       currentDate: nextConditions.date,
-      openOrders: matchResult.openOrders,
+      openOrders,
       priceHistory,
       lastRoundVolume,
-      portfolios: matchResult.portfolios,
+      portfolios,
+      riskStats,
       nextOrderSequence: matchResult.nextOrderSequence,
     };
 
@@ -389,6 +545,7 @@ export const stockMarket2: GameDefinition<
             date: state.currentDate,
             candle,
             trades: matchResult.trades,
+            forcedLiquidations: forcedTrades,
             lastRoundVolume,
           },
         },
@@ -412,14 +569,25 @@ export const stockMarket2: GameDefinition<
     const scores: Record<string, number> = {};
     const cash: Record<string, number> = {};
     const shares: Record<string, number> = {};
+    const realizedPnl: Record<string, number> = {};
+    const borrowFeesPaid: Record<string, number> = {};
+    const marginCalls: Record<string, number> = {};
+    const forcedLiquidations: Record<string, number> = {};
+    const bankrupt: Record<string, boolean> = {};
     for (const participantId of state.participantIds) {
       const portfolio = state.portfolios.get(participantId);
       if (portfolio === undefined) {
         continue;
       }
-      scores[participantId] = toDollars(portfolioValueCents(portfolio, priceCents));
+      scores[participantId] = toDollars(equityCents(portfolio, priceCents));
       cash[participantId] = toDollars(portfolio.cashCents);
       shares[participantId] = portfolio.shares;
+      realizedPnl[participantId] = toDollars(portfolio.realizedPnlCents);
+      bankrupt[participantId] = portfolio.bankrupt;
+      const stats = state.riskStats.get(participantId);
+      borrowFeesPaid[participantId] = toDollars(stats?.borrowFeesPaidCents ?? 0);
+      marginCalls[participantId] = stats?.marginCalls ?? 0;
+      forcedLiquidations[participantId] = stats?.forcedLiquidations ?? 0;
     }
 
     const bestScore = Math.max(...Object.values(scores));
@@ -431,6 +599,11 @@ export const stockMarket2: GameDefinition<
       scores,
       cash,
       shares,
+      realizedPnl,
+      borrowFeesPaid,
+      marginCalls,
+      forcedLiquidations,
+      bankrupt,
       symbol: state.config.symbol,
       mode: state.config.mode,
       startingPrice: toDollars(state.startingPriceCents),
