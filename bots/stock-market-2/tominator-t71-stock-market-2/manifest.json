@@ -1,0 +1,18 @@
+{
+  "id": "tominator-t71-stock-market-2",
+  "name": "Tominator T-71",
+  "version": "0.1.0",
+  "game": "stock-market-2",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom.sarver@7factor.io"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Reacts to signed public events with a learned magnitude estimate (same free-direction, learned-magnitude shape as stock-market/tominator-t70), confirmed/dampened by short-term trend; fades deviations from a longer trailing average on the many rounds with no event, always sized cash-only since that's a heuristic bet, not real information. Goes short on a negative event when margin is enabled, discounted by an estimated borrow-cost carry. Never averages down, runs a self-imposed buying-power safety margin, and backs both with a portfolio-level stop-loss and a proactive margin-call de-risk."
+}

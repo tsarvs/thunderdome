@@ -1,0 +1,18 @@
+{
+  "id": "mean-reversion-stock-market-2",
+  "name": "Mean Reversion",
+  "version": "0.1.0",
+  "game": "stock-market-2",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom.sarver@7factor.io"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Buys at market once the last realized close has drifted at least 3% below the average of its own recent realized closes (betting on reversion upward), sells once it's drifted 3% above, holds in between."
+}

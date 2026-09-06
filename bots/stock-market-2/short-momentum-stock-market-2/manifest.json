@@ -1,0 +1,18 @@
+{
+  "id": "short-momentum-stock-market-2",
+  "name": "Short Momentum",
+  "version": "0.1.0",
+  "game": "stock-market-2",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom.sarver@7factor.io"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Opens or adds to a short position at market after two consecutive down realized closes, covers on the first uptick. Sized against margin buying power, so it never trades in a game that has config.risk.allowShortSelling off."
+}

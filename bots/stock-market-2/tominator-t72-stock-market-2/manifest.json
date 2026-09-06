@@ -1,0 +1,18 @@
+{
+  "id": "tominator-t72-stock-market-2",
+  "name": "Tominator T-72",
+  "version": "0.1.0",
+  "game": "stock-market-2",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom.sarver@7factor.io"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "An evolution of tominator-t71-stock-market-2: the same event-reaction/mean-reversion/risk-control core, plus mode-aware leverage (levering the mean-reversion signal only in SYNTHETIC mode, where the price process is structurally bounded, never in HISTORICAL mode's real, possibly-trending data), realized-volatility-scaled sizing, and an order-flow confirmation signal from the previous round's net demand."
+}

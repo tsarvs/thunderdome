@@ -49,19 +49,23 @@ export function printHandsPlayed(result: unknown): void {
   }
 }
 
-/** Same "read it generically off `result`" idiom as `printHandsPlayed` above — only a game whose
- * result carries `startingStockPrice`/`finalStockPrice` (currently just Stock Market;
- * games/stock-market/src/types.ts) gets this line, and any future game with the same two fields
- * gets it for free too. A no-op for every other game's result shape. */
+/** Same "read it generically off `result`" idiom as `printHandsPlayed` above — a game's result
+ * gets this line whether it carries `startingStockPrice`/`finalStockPrice` (Stock Market,
+ * games/stock-market/src/types.ts) or `startingPrice`/`finalPrice` (Stock Market 2,
+ * games/stock-market-2/src/types.ts — renamed since that result also covers a SYNTHETIC-mode
+ * ticker that isn't literally "the stock"). A no-op for every other game's result shape. */
 export function printStockPriceRange(result: unknown): void {
   if (typeof result !== 'object' || result === null) {
     return;
   }
-  const { startingStockPrice, finalStockPrice } = result as Record<string, unknown>;
-  if (typeof startingStockPrice === 'number' && typeof finalStockPrice === 'number') {
-    console.log(
-      `  (stock price: $${startingStockPrice.toFixed(2)} → $${finalStockPrice.toFixed(2)})`,
-    );
+  const { startingStockPrice, finalStockPrice, startingPrice, finalPrice } = result as Record<
+    string,
+    unknown
+  >;
+  const starting = typeof startingStockPrice === 'number' ? startingStockPrice : startingPrice;
+  const final = typeof finalStockPrice === 'number' ? finalStockPrice : finalPrice;
+  if (typeof starting === 'number' && typeof final === 'number') {
+    console.log(`  (stock price: $${starting.toFixed(2)} → $${final.toFixed(2)})`);
   }
 }
 

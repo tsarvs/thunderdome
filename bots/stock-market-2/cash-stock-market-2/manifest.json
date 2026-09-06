@@ -1,0 +1,18 @@
+{
+  "id": "cash-stock-market-2",
+  "name": "Cash Bot",
+  "version": "0.1.0",
+  "game": "stock-market-2",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom.sarver@7factor.io"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Never trades. Exists to prove the market moves on its own (regime drift, events, other participants' flow) independent of any bot's own trading."
+}

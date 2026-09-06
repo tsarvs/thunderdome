@@ -1,0 +1,18 @@
+{
+  "id": "adaptive-market-maker-stock-market-2",
+  "name": "Adaptive Market Maker",
+  "version": "0.1.0",
+  "game": "stock-market-2",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom.sarver@7factor.io"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "A risk-managed market maker, not a directional bet: rests two-sided DAY limit orders every round, sized as a real fraction of portfolio value, with a spread floor derived from the real transaction fee (widened further in elevated volatility) so every filled round trip is profitable on its own. The quote center is skewed by a learned event-magnitude signal (both modes) and a mean-reversion fade (SYNTHETIC only), and inventory itself is mean-reverting by construction. Backed by a portfolio-level stop-loss and a proactive margin de-risk governor."
+}

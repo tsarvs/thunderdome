@@ -15,9 +15,10 @@ bias toward any language or any game, sits the **Engine** — judge, executioner
 in the wasteland every contender obeys without question.
 
 **The state of the empire, as chronicled this cycle:** the wire protocol, the Docker-forged cage
-every bot fights inside, the one true game engine, four blood-sworn arenas
-(Rock-Paper-Scissors, Connect Four, the 4-seat trick-taking gauntlet of Hearts, and the no-limit
-felt of Texas Hold'em), the registry
+every bot fights inside, the one true game engine, six blood-sworn arenas
+(Rock-Paper-Scissors, Connect Four, the 4-seat trick-taking gauntlet of Hearts, the no-limit
+felt of Texas Hold'em, and the twin trading floors of Stock Market and Stock Market 2 — the
+latter's real order book, short selling, and margin calls a law unto themselves), the registry
 that remembers every name ever entered, a command to summon a single match between registered
 champions (`yarn thunderdome match run`), a full tournament ringmaster — round robin's gauntlet,
 single elimination's guillotine, and Swiss league's cumulative-score tables all now law
@@ -182,6 +183,7 @@ yarn thunderdome match run leftmost-connect-four random-connect-four
 yarn thunderdome match run random-hearts lowest-card-hearts point-dodger-hearts tominator-t101   # requires ecatly 4 seats
 yarn thunderdome match run random-poker calling-station-poker --config '{"startingStack":500,"totalHands":5,"matchFormat":"fixedHands"}'
 yarn thunderdome match run random-stock-market buy-and-hold-stock-market momentum-stock-market mean-reversion-stock-market --config '{"rounds":20}'
+yarn thunderdome match run random-stock-market-2 buy-and-hold-stock-market-2 momentum-stock-market-2 mean-reversion-stock-market-2 --config '{"rounds":20}'
 
 # play bots yourself
 yarn thunderdome play tominator-tx --game-config '{"totalRounds":10}'

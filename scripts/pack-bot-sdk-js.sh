@@ -57,8 +57,17 @@ BOT_DIRS=(
   "bots/stock-market/mean-reversion-stock-market"
   "bots/stock-market/target-allocation-stock-market"
   "bots/stock-market/tominator-t70"
-  "bots/stock-market-2/tominator-t70-2"
+  "bots/stock-market-2/tominator-t71-stock-market-2"
+  "bots/stock-market-2/tominator-t72-stock-market-2"
+  "bots/stock-market-2/tominator-t73-stock-market-2"
+  "bots/stock-market-2/adaptive-market-maker-stock-market-2"
   "bots/stock-market-2/buy-and-hold-stock-market-2"
+  "bots/stock-market-2/cash-stock-market-2"
+  "bots/stock-market-2/random-stock-market-2"
+  "bots/stock-market-2/momentum-stock-market-2"
+  "bots/stock-market-2/mean-reversion-stock-market-2"
+  "bots/stock-market-2/short-momentum-stock-market-2"
+  "bots/stock-market-2/market-maker-stock-market-2"
 )
 
 for dir in "${BOT_DIRS[@]}"; do
