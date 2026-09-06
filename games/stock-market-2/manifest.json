@@ -1,0 +1,18 @@
+{
+  "id": "stock-market-2",
+  "name": "Stock Market 2",
+  "version": "0.2.0",
+  "entryPackage": "@thunderdome/game-stock-market-2",
+  "protocolVersion": "^1.0",
+  "minParticipants": 1,
+  "maxParticipants": 10,
+  "deterministic": false,
+  "supportedTournamentFormats": ["round-robin"],
+  "maintainers": [
+    {
+      "name": "Tom Sarver",
+      "contact": "tom.sarver@7factor.io"
+    }
+  ],
+  "description": "A daily-round single-symbol exchange simulation with a real order book (bid/ask spread, market and limit orders, partial fills, GTC/DAY lifetimes, synthetic external liquidity, player-vs-player matching). Runs in SYNTHETIC mode (a seeded placeholder price process, the default) or HISTORICAL mode (replaying the real Denny's Corp / DENN daily record with real SEC-filing-derived news events). Plays solo (one bot vs. the market) or head-to-head with multiple bots."
+}

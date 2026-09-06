@@ -47,6 +47,7 @@ strategies actually trying to win — read them for strategy ideas, not API plum
 | [`stock-market/mean-reversion-stock-market`](stock-market/mean-reversion-stock-market/) | Stock Market | JavaScript | Buys once price has drifted well below its own recent average, sells once it's drifted well above it, holds in between. |
 | [`stock-market/news-reaction-stock-market`](stock-market/news-reaction-stock-market/) | Stock Market | Python | Reacts only to the round's public news — buys on clearly positive headlines, sells on clearly negative ones, holds on `NO_NEWS`. Never looks at price history at all. |
 | [`stock-market/target-allocation-stock-market`](stock-market/target-allocation-stock-market/) | Stock Market | TypeScript | Rebalances toward keeping roughly half its portfolio value in shares, buying/selling to correct drift beyond a small tolerance band. |
+| [`stock-market-2/buy-and-hold-stock-market-2`](stock-market-2/buy-and-hold-stock-market-2/) | Stock Market 2 | JavaScript | Ported unchanged from `stock-market/buy-and-hold-stock-market`: spends 90% of its starting cash on shares in round 0, then holds for the rest of the match against the real historical DENN data. |
 
 ## Competitors
 
@@ -60,6 +61,7 @@ Real strategies, entered to actually win — not written to demonstrate anything
 | [`card-game-hearts/tominator-t1`](card-game-hearts/tominator-t1/)             | Hearts              | TypeScript | Plays the highest card in hand that still loses to the trick's current highest card.                          |
 | [`card-game-hearts/tominator-t101`](card-game-hearts/tominator-t101/)          | Hearts              | TypeScript | Tracks played cards and which suits opponents have shown out of to inform play; defaults to defensive point-avoidance but switches to an aggressive shoot-the-moon attempt once a hand-strength signal crosses a threshold while leading. |
 | [`stock-market/tominator-t70`](stock-market/tominator-t70/)                   | Stock Market        | TypeScript | Reacts to each signed event like `news-reaction-stock-market` — trusting the same free directional read and holding a position until the next contradicting event, never unwinding early just because price has started converging — but sizes the trade off an inferred, weight-informed magnitude estimate and portfolio value instead of a flat share count, capping any single trade's own market-impact contribution to avoid runaway feedback. Measured to beat `news-reaction-stock-market` head-to-head in the large majority of matches. |
+| [`stock-market-2/tominator-t70-2`](stock-market-2/tominator-t70-2/)           | Stock Market 2      | TypeScript | Ported from `stock-market/tominator-t70` onto the real-historical-DENN-data variant of the game — same react-to-a-signed-event, estimate-magnitude, size-by-portfolio-value, cap-self-impact shape, with its magnitude prior now grounded in the real SEC 8-K data (`EARNINGS_BEAT`/`MISS` gets a higher base prior than `POSITIVE_NEWS`/`NEGATIVE_NEWS`) instead of organizer-configured event weights, since this game has no synthetic weighted event table to read one from. |
 
 Both tables are one roster as far as the platform is concerned — nothing about `match run`,
 `tournament run`, or the registry distinguishes a "reference" bot from a "competitor" one; the
@@ -100,7 +102,8 @@ shipped directly into the image. Neither Python bot has a build step either — 
 Want to watch them actually play each other? `yarn thunderdome match run <botId> <botId>
 [...moreBotIds]` runs a real match between registry-resolved bots through the real engine and
 runtime (building each bot's Docker image on demand) — 2 bot ids for Rock Paper Scissors or
-Connect Four, exactly 4 for Hearts, 2-10 for Texas Hold'em or Stock Market. See
+Connect Four, exactly 4 for Hearts, 2-10 for Texas Hold'em or Stock Market, 1-10 for Stock Market
+2 (it plays solo against the real historical market just as well as head-to-head). See
 [`docs/guides/bot-author-guide.md`](../docs/guides/bot-author-guide.md) §9/§10/§11 for details.
 To play against 3 Hearts bots yourself instead of watching, see `yarn thunderdome play` in
 [`apps/cli/README.md`](../apps/cli/README.md#play).

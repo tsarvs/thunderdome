@@ -1,0 +1,18 @@
+{
+  "id": "buy-and-hold-stock-market-2",
+  "name": "Buy and Hold",
+  "version": "0.2.0",
+  "game": "stock-market-2",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom.sarver@7factor.io"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Spends 90% of starting cash on shares in round 0, then holds for every remaining round regardless of price or news."
+}

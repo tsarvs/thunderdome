@@ -1,0 +1,9 @@
+{
+  "name": "buy-and-hold-stock-market-2",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@thunderdome/bot-sdk-js": "file:./vendor/thunderdome-bot-sdk-js.tgz"
+  }
+}
