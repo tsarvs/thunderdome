@@ -68,6 +68,10 @@ BOT_DIRS=(
   "bots/stock-market-2/mean-reversion-stock-market-2"
   "bots/stock-market-2/short-momentum-stock-market-2"
   "bots/stock-market-2/market-maker-stock-market-2"
+  "bots/stock-market-3/cross-sectional-momentum-stock-market-3"
+  "bots/stock-market-3/market-neutral-stock-market-3"
+  "bots/stock-market-3/tominator-t900-stock-market-3"
+  "bots/stock-market-3/tominator-t901-stock-market-3"
 )
 
 for dir in "${BOT_DIRS[@]}"; do

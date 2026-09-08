@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { printStockPriceRange } from '../src/commands/match.js';
+import { printPortfolioSummaries, printSecurityPriceTable, printStockPriceRange } from '../src/commands/match.js';
 
 describe('printStockPriceRange', () => {
   afterEach(() => {
@@ -40,6 +40,77 @@ describe('printStockPriceRange', () => {
     printStockPriceRange(null);
     printStockPriceRange(undefined);
     printStockPriceRange('not an object');
+    expect(log).not.toHaveBeenCalled();
+  });
+});
+
+describe('printSecurityPriceTable', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('prints a before -> after line per security (Stock Market 3)', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    printSecurityPriceTable({
+      securityPrices: [
+        { symbol: 'ACME', startingPrice: 100, finalPrice: 140.21 },
+        { symbol: 'BETA', startingPrice: 50, finalPrice: 12.5 },
+      ],
+    });
+    expect(log).toHaveBeenCalledWith('  Security prices (before -> after):');
+    expect(log).toHaveBeenCalledWith('    ACME: $100.00 -> $140.21 (+40.2%)');
+    expect(log).toHaveBeenCalledWith('    BETA: $50.00 -> $12.50 (-75.0%)');
+  });
+
+  it('is a no-op for a result with no securityPrices field', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    printSecurityPriceTable({ winnerId: 'alice' });
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op for non-object results', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    printSecurityPriceTable(null);
+    printSecurityPriceTable('not an object');
+    expect(log).not.toHaveBeenCalled();
+  });
+});
+
+describe('printPortfolioSummaries', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('prints cash/equity and each open position per participant (Stock Market 3)', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    printPortfolioSummaries({
+      portfolioSummaries: {
+        alice: {
+          cash: 5000,
+          equity: 10500.5,
+          bankrupt: false,
+          positions: [{ symbol: 'ACME', shares: 100, averageEntryPrice: 90, marketValue: 14021, unrealizedPnl: 5021 }],
+        },
+        bob: { cash: 0, equity: 0, bankrupt: true, positions: [] },
+      },
+    });
+    expect(log).toHaveBeenCalledWith('  Bot portfolios:');
+    expect(log).toHaveBeenCalledWith('    alice: equity $10500.50, cash $5000.00');
+    expect(log).toHaveBeenCalledWith('      ACME: 100 sh @ avg $90.00, value $14021.00 (+$5021.00 unrealized)');
+    expect(log).toHaveBeenCalledWith('    bob: equity $0.00, cash $0.00 [BANKRUPT]');
+    expect(log).toHaveBeenCalledWith('      (no open positions)');
+  });
+
+  it('is a no-op for a result with no portfolioSummaries field', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    printPortfolioSummaries({ winnerId: 'alice' });
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op for non-object results', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    printPortfolioSummaries(null);
+    printPortfolioSummaries('not an object');
     expect(log).not.toHaveBeenCalled();
   });
 });

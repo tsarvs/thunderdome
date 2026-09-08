@@ -1,0 +1,17 @@
+{
+  "id": "stock-market-3",
+  "name": "Stock Market 3",
+  "version": "0.1.0",
+  "entryPackage": "@thunderdome/game-stock-market-3",
+  "protocolVersion": "^1.0",
+  "minParticipants": 1,
+  "maxParticipants": 10,
+  "deterministic": false,
+  "maintainers": [
+    {
+      "name": "Tom Sarver",
+      "contact": "tom@tomsarver.dev"
+    }
+  ],
+  "description": "A multi-symbol exchange simulation: a configurable universe of equities across 5 sectors plus a tradable synthetic index, all partially driven by a shared hidden macro economy, real quarterly company fundamentals and earnings with their own analyst-consensus estimates, a public economic-release calendar, and corporate actions (dividends, buybacks, splits, acquisitions, delistings) — layered onto the same real order book, matching engine, and Reg-T-style margin/short-selling as games/stock-market-2 (on by default here)."
+}

@@ -23,6 +23,7 @@ INDEPENDENT_PACKAGES=(
   "@thunderdome/game-poker-texas-hold-em"
   "@thunderdome/game-stock-market"
   "@thunderdome/game-stock-market-2"
+  "@thunderdome/game-stock-market-3"
 )
 
 for pkg in "${INDEPENDENT_PACKAGES[@]}"; do

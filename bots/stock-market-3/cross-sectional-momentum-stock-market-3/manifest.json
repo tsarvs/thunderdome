@@ -1,0 +1,18 @@
+{
+  "id": "cross-sectional-momentum-stock-market-3",
+  "name": "Cross-Sectional Momentum",
+  "version": "0.1.0",
+  "game": "stock-market-3",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Ranks every active equity by its own trailing 20-round return and goes long the top 2 (shorting the bottom 2 when the match allows margin/short-selling), rebalancing every 10 rounds. Computed only from public priceHistory."
+}

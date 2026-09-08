@@ -1,0 +1,18 @@
+{
+  "id": "market-neutral-stock-market-3",
+  "name": "Market Neutral",
+  "version": "0.1.0",
+  "game": "stock-market-3",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Buys the top-3 equities by trailing momentum, estimates each pick's beta via OLS regression against SYNTH_INDEX's own trailing returns, and shorts the index in proportion to the beta-weighted long book to hedge out market-wide exposure. Falls back to unhedged longs when short selling isn't allowed."
+}
