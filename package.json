@@ -10,6 +10,7 @@
     "apps/*",
     "packages/*",
     "packages/game-dev-toolkit/*",
+    "packages/research/*",
     "games/*",
     "ci/tools/*"
   ],
