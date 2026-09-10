@@ -1,0 +1,18 @@
+{
+  "id": "fusion-fundamental-v0",
+  "name": "Fusion Fundamental v0",
+  "version": "0.1.0",
+  "game": "stock-market-4",
+  "author": {
+    "name": "Thunderdome Maintainers",
+    "contact": "maintainers@example.com"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Fundamental-research trading bot: reads point-in-time fusion research on ELMT, models base/fusion-derived/fusion-option value under explicit Bear/Base/Bull assumptions, compares fair value against the market's own reaction, and trades the valuation gap. Does not infer supplier relationships research hasn't established."
+}

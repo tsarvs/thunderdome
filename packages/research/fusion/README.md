@@ -120,3 +120,14 @@ independently queryable.
 
 See [`@thunderdome/research-core`](../core/README.md) for what every type here means and how
 temporal visibility is computed.
+
+## Keeping this dataset current
+
+[`daily-research-update-skill.md`](./daily-research-update-skill.md) is a set of operating
+instructions for an LLM client outside this repo (e.g. ChatGPT) to find genuinely new, real-world
+developments daily and report them as one markdown findings document — same discipline as
+everything above (evidence vs. interpretation, capability ≠ qualification ≠ contract, real
+citations). It does not author schema or touch the dataset itself: the resulting markdown gets
+pasted back into this repo's own coding session, which turns it into the actual schema-correct
+additions (ids, timestamps, append-only updates) with full knowledge of the real schema and what's
+already here.

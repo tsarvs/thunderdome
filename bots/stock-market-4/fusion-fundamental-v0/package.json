@@ -1,0 +1,24 @@
+{
+  "name": "fusion-fundamental-v0",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "backtest": "tsx backtest/runBacktest.ts"
+  },
+  "dependencies": {
+    "@thunderdome/bot-sdk-js": "file:./vendor/thunderdome-bot-sdk-js.tgz"
+  },
+  "devDependencies": {
+    "@thunderdome/game-stock-market-4": "file:./vendor/thunderdome-game-stock-market-4.tgz",
+    "@thunderdome/research-core": "file:./vendor/thunderdome-research-core.tgz",
+    "@thunderdome/research-fusion": "file:./vendor/thunderdome-research-fusion.tgz",
+    "@types/node": "^25.0.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

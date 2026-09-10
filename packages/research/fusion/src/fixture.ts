@@ -19,6 +19,7 @@ export const FUSION_FIXTURE_IDS = {
     dtt: 'entity-dtt',
     compassU: 'entity-compass-u',
     crest: 'entity-crest',
+    jt60sa: 'entity-jt60sa', // Sept 9, 2026 update
     // Companies / organizations
     cfs: 'entity-cfs',
     elmt: 'entity-elmt',
@@ -40,6 +41,8 @@ export const FUSION_FIXTURE_IDS = {
     typeOne: 'entity-type-one',
     realta: 'entity-realta',
     doe: 'entity-doe',
+    freemelt: 'entity-freemelt', // Sept 9, 2026 update
+    f4e: 'entity-f4e', // Sept 9, 2026 update
     // Materials
     tungsten: 'entity-tungsten',
     hts: 'entity-hts',
@@ -154,6 +157,8 @@ export const FUSION_FIXTURE_IDS = {
     schwabmunchenManufacturesKDopedTungsten: 'rel-schwabmunchen-manufactures-k-doped-tungsten',
     schwabmunchenManufacturesTungstenPowder: 'rel-schwabmunchen-manufactures-tungsten-powder',
     schwabmunchenManufacturesMolybdenumPowder: 'rel-schwabmunchen-manufactures-molybdenum-powder',
+    // Sept 9, 2026 update
+    freemeltJt60sa: 'rel-freemelt-jt60sa',
   },
   evidence: {
     elmtCfs: 'evidence-elmt-cfs',
@@ -197,6 +202,11 @@ export const FUSION_FIXTURE_IDS = {
     elmtSchwabmunchenApa: 'evidence-elmt-schwabmunchen-apa',
     osramHistoricalMaterialsDocumentation: 'evidence-osram-historical-materials-documentation',
     schwabmunchenFusionResearchPublication: 'evidence-schwabmunchen-fusion-research-publication',
+    // Sept 9, 2026 update
+    freemeltJt60saOrder2026: 'evidence-freemelt-jt60sa-order-2026',
+    fujikuraFusionPowerWorld2026: 'evidence-fujikura-fusion-power-world-2026',
+    cfsSparc80PercentUpdate2026: 'evidence-cfs-sparc-80-percent-update-2026',
+    fujikuraCfsHtsSupplyDisclosure2025: 'evidence-fujikura-cfs-hts-supply-disclosure-2025',
   },
   assertions: {
     qualificationNotProcurement: 'assertion-qualification-not-procurement',
@@ -300,6 +310,9 @@ export const FUSION_FIXTURE_IDS = {
     tritiumSupplyConstraintPersists: 'event-tritium-supply-constraint-persists',
     elmtAmsOsramAcquisitionAnnounced: 'event-elmt-ams-osram-acquisition-announced',
     vitzroNextechHanwhaContractAwarded: 'event-vitzro-nextech-hanwha-contract-awarded',
+    // Sept 9, 2026 update
+    freemeltJt60saOrderAwarded: 'event-freemelt-jt60sa-order-awarded',
+    fujikuraFusionPowerWorld2026: 'event-fujikura-fusion-power-world-2026',
   },
 } as const;
 
@@ -332,6 +345,9 @@ const ids = FUSION_FIXTURE_IDS;
  */
 export function createFusionFixtureDataset(): ResearchDataset {
   const SNAPSHOT = '2026-09-08T00:00:00Z';
+  // A later research pass (Sept 9, 2026) — kept as its own constant rather than reusing SNAPSHOT,
+  // since it's a genuinely later point-in-time than the ELMT/Schwabmünchen ingestion above.
+  const SNAPSHOT_2026_09_09 = '2026-09-09T00:00:00Z';
 
   // The nine fusion programs tracked independently for both "potential fusion customer" (spec
   // §10) and "fusion qualification" (spec §11) relationships, each initialized UNKNOWN/
@@ -1104,6 +1120,31 @@ export function createFusionFixtureDataset(): ResearchDataset {
         name: 'Tungsten Fusion Materials',
         recordedAt: '2023-01-01T00:00:00Z',
       },
+
+      // ------------------------------------------------------------------------------------------
+      // Sept 9, 2026 research update — Freemelt / F4E / JT-60SA tungsten-component order
+      // ------------------------------------------------------------------------------------------
+      {
+        id: ids.entities.jt60sa,
+        type: 'reactor',
+        name: 'JT-60SA',
+        description: 'Satellite tokamak fusion programme (Japan/EU collaboration).',
+        recordedAt: SNAPSHOT_2026_09_09,
+      },
+      {
+        id: ids.entities.freemelt,
+        type: 'company',
+        name: 'Freemelt',
+        description: 'Freemelt AB — additive manufacturing company.',
+        recordedAt: SNAPSHOT_2026_09_09,
+      },
+      {
+        id: ids.entities.f4e,
+        type: 'government-agency',
+        name: 'Fusion for Energy (F4E)',
+        description: 'EU implementing agency for fusion-related procurement (e.g. ITER, JT-60SA).',
+        recordedAt: SNAPSHOT_2026_09_09,
+      },
     ],
 
     // ------------------------------------------------------------------------------------------
@@ -1779,6 +1820,22 @@ export function createFusionFixtureDataset(): ResearchDataset {
           },
         ],
       })),
+
+      // Sept 9, 2026 research update
+      {
+        id: ids.relationships.freemeltJt60sa,
+        type: 'supplies',
+        fromEntityId: ids.entities.freemelt,
+        toEntityId: ids.entities.jt60sa,
+        states: [
+          {
+            status: 'production contract',
+            recordedAt: SNAPSHOT_2026_09_09,
+            effectiveFrom: SNAPSHOT_2026_09_09,
+            evidenceIds: [ids.evidence.freemeltJt60saOrder2026],
+          },
+        ],
+      },
     ],
 
     // ------------------------------------------------------------------------------------------
@@ -2230,6 +2287,59 @@ export function createFusionFixtureDataset(): ResearchDataset {
           'A documented publication involving personnel associated with the Schwabmünchen/ams OSRAM operation concerns tungsten wire/materials research for fusion-reactor applications. This establishes historical fusion-materials technical research involvement. It does NOT establish commercial fusion supply, ITER/DEMO/private-fusion qualification, a fusion customer relationship, or fleet-scale fusion supply.',
         entityIds: [ids.entities.schwabmunchenMetalOperations, ids.entities.fusionMaterials],
         metadata: { provenanceClass: 'PAPER_FINDING' },
+      },
+
+      // ------------------------------------------------------------------------------------------
+      // Sept 9, 2026 research update
+      // ------------------------------------------------------------------------------------------
+      {
+        id: ids.evidence.freemeltJt60saOrder2026,
+        observedAt: SNAPSHOT_2026_09_09,
+        publishedAt: SNAPSHOT_2026_09_09,
+        availableAt: SNAPSHOT_2026_09_09,
+        source: { name: 'Metal AM', uri: 'https://www.metal-am.com/freemelt-receives-order-for-33000-fusion-components/' },
+        description:
+          'Freemelt AB announced it received an order from Fusion for Energy (F4E) to manufacture and deliver 33,000 tungsten-based components for the JT-60SA fusion programme. The order has a base value of SEK 55 million (approximately €5 million) and a potential total value of up to SEK 84 million (approximately €7.5 million). Deliveries are expected over two years through 2028, with the majority scheduled for 2027, to JT-60SA in Japan.',
+        entityIds: [ids.entities.freemelt, ids.entities.f4e, ids.entities.jt60sa, ids.entities.tungsten],
+        metadata: { provenanceClass: 'FACT' },
+      },
+      {
+        id: ids.evidence.fujikuraFusionPowerWorld2026,
+        observedAt: SNAPSHOT_2026_09_09,
+        publishedAt: '2026-08-19T00:00:00Z',
+        availableAt: '2026-08-19T00:00:00Z',
+        source: { name: 'Fujikura Ltd.', uri: 'https://www.fujikura.co.jp/en/news/events/20260819fusion_power_world_--_2025_2.html' },
+        description:
+          'Fujikura is exhibiting at FUSION POWER WORLD 2026 (Makuhari Messe, Japan) from September 9-11, 2026, with a stated exhibit focus on high-temperature superconducting (HTS) wire and technologies expected to be used in fusion-energy applications. Does not itself announce any new customer, qualification, or contract.',
+        entityIds: [ids.entities.fujikura, ids.entities.hts],
+        metadata: { provenanceClass: 'COMPANY_CLAIM' },
+      },
+      {
+        id: ids.evidence.cfsSparc80PercentUpdate2026,
+        observedAt: SNAPSHOT_2026_09_09,
+        source: { name: 'Commonwealth Fusion Systems', uri: 'https://cfs.energy/devens-campus/updates/' },
+        description:
+          'Commonwealth Fusion Systems currently reports SPARC is "almost 80% complete" (source\'s own wording, not converted to a precise figure): magnets manufactured at the Devens facility are being installed, the vacuum vessel is being prepared, and SPARC support systems have begun operating. CFS is holding a public-facing SPARC facility tour on September 10, 2026.',
+        entityIds: [ids.entities.cfs, ids.entities.sparc, ids.entities.hts, ids.entities.vacuumVessel],
+        metadata: { provenanceClass: 'COMPANY_CLAIM' },
+      },
+      {
+        id: ids.evidence.fujikuraCfsHtsSupplyDisclosure2025,
+        // Recorded today (when research actually reviewed this primary source), even though the
+        // source's own publishedAt is over a year earlier — see this file's own "recordedAt =
+        // when research learned it" convention. Corroborates (with a real, checkable primary
+        // source) the ALREADY-recorded rel-fujikura-cfs "supplier (investor)" state, which was
+        // previously backed only by an unsourced CONVERSATION_RESEARCH evidence entry — added as
+        // its own evidence rather than a new relationship state, since the status itself doesn't
+        // change.
+        observedAt: SNAPSHOT_2026_09_09,
+        publishedAt: '2025-09-02T00:00:00Z',
+        availableAt: '2025-09-02T00:00:00Z',
+        source: { name: 'Fujikura Ltd.', uri: 'https://www.fujikura.co.jp/en/news/pressrelease/20250902cfs.html' },
+        description:
+          "Fujikura's disclosure states it has had a relationship with Commonwealth Fusion Systems since CFS's founding and has been supplying HTS wire to CFS, and that it is making additional capital investments to increase HTS production for fusion-energy reactors.",
+        entityIds: [ids.entities.fujikura, ids.entities.cfs, ids.entities.hts, ids.entities.sparc],
+        metadata: { provenanceClass: 'COMPANY_CLAIM' },
       },
     ],
 
@@ -3318,18 +3428,76 @@ export function createFusionFixtureDataset(): ResearchDataset {
         payload: {},
         evidenceIds: [ids.evidence.vitzroNextechHanwhaContract],
       },
+
+      // Sept 9, 2026 research update
+      {
+        id: ids.events.freemeltJt60saOrderAwarded,
+        timestamp: SNAPSHOT_2026_09_09,
+        // Deliberately NOT 'SUPPLIER_WON_PRODUCTION_CONTRACT' — that exact string is the payload
+        // information-leak.test.ts checks is absent from any snapshot before Walter Tosto's 2029
+        // event; reusing it here would false-negative that test the moment a snapshot reaches
+        // 2026-09-09 (this event is legitimately visible by then, unlike that one).
+        type: 'FUSION_COMPONENT_ORDER_AWARDED',
+        entityIds: [ids.entities.freemelt, ids.entities.f4e, ids.entities.jt60sa],
+        payload: { contractType: 'production' },
+        evidenceIds: [ids.evidence.freemeltJt60saOrder2026],
+      },
+      {
+        id: ids.events.fujikuraFusionPowerWorld2026,
+        timestamp: SNAPSHOT_2026_09_09,
+        type: 'EXHIBITION_PARTICIPATION',
+        entityIds: [ids.entities.fujikura, ids.entities.hts],
+        payload: {},
+        evidenceIds: [ids.evidence.fujikuraFusionPowerWorld2026],
+      },
     ],
 
     // ------------------------------------------------------------------------------------------
     // Research questions (spec §17)
     // ------------------------------------------------------------------------------------------
-    questions: ELMT_RESEARCH_QUESTIONS.map((entry, index) => ({
-      id: `question-rq-elmt-${String(index + 1).padStart(3, '0')}`,
-      code: `RQ-ELMT-${String(index + 1).padStart(3, '0')}`,
-      question: entry.question,
-      status: 'open' as const,
-      createdAt: SNAPSHOT,
-      relatedEntityIds: entry.relatedEntityIds,
-    })),
+    questions: [
+      ...ELMT_RESEARCH_QUESTIONS.map((entry, index) => ({
+        id: `question-rq-elmt-${String(index + 1).padStart(3, '0')}`,
+        code: `RQ-ELMT-${String(index + 1).padStart(3, '0')}`,
+        question: entry.question,
+        status: 'open' as const,
+        createdAt: SNAPSHOT,
+        relatedEntityIds: entry.relatedEntityIds,
+      })),
+      // Sept 9, 2026 research update
+      {
+        id: 'question-rq-2026-09-09-001',
+        code: 'RQ-2026-09-09-001',
+        question:
+          "What specific tungsten-based components are included in Freemelt's JT-60SA order, and what material specifications are required?",
+        status: 'open' as const,
+        createdAt: SNAPSHOT_2026_09_09,
+        relatedEntityIds: [ids.entities.freemelt, ids.entities.jt60sa, ids.entities.tungsten],
+      },
+      {
+        id: 'question-rq-2026-09-09-002',
+        code: 'RQ-2026-09-09-002',
+        question: "Who supplies the tungsten feedstock/intermediate material Freemelt uses for the JT-60SA order?",
+        status: 'open' as const,
+        createdAt: SNAPSHOT_2026_09_09,
+        relatedEntityIds: [ids.entities.freemelt, ids.entities.tungsten],
+      },
+      {
+        id: 'question-rq-2026-09-09-003',
+        code: 'RQ-2026-09-09-003',
+        question: 'Does Fusion for Energy (F4E) have additional current tungsten-component procurement programs beyond the Freemelt order?',
+        status: 'open' as const,
+        createdAt: SNAPSHOT_2026_09_09,
+        relatedEntityIds: [ids.entities.f4e],
+      },
+      {
+        id: 'question-rq-2026-09-09-004',
+        code: 'RQ-2026-09-09-004',
+        question: "What does Almonty's September 2026 investor presentation contain?",
+        status: 'open' as const,
+        createdAt: SNAPSHOT_2026_09_09,
+        relatedEntityIds: [ids.entities.almonty],
+      },
+    ],
   };
 }

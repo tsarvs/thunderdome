@@ -142,3 +142,33 @@ describe('point-in-time test: the Vitzro Nextech / Hanwha Aerospace contract (an
     expect(snapshot.state.events.some((e) => e.type === 'AEROSPACE_CONTRACT_AWARDED')).toBe(true);
   });
 });
+
+/**
+ * A fourth point-in-time case, from the Sept 9, 2026 research update: Freemelt's order from
+ * Fusion for Energy (F4E) to supply tungsten-based components for JT-60SA.
+ */
+describe('point-in-time test: the Freemelt / F4E JT-60SA order (announced 2026-09-09)', () => {
+  const dataset = createFusionFixtureDataset();
+
+  it('is absent from a snapshot taken the day before the announcement', () => {
+    const snapshot = createResearchSnapshot(dataset, '2026-09-08T23:59:59Z');
+    expect(snapshot.state.events.some((e) => e.type === 'FUSION_COMPONENT_ORDER_AWARDED')).toBe(false);
+    expect(
+      snapshot.state.evidence.some((e) => e.id === FUSION_FIXTURE_IDS.evidence.freemeltJt60saOrder2026),
+    ).toBe(false);
+    const relationship = snapshot.state.relationships.find(
+      (r) => r.id === FUSION_FIXTURE_IDS.relationships.freemeltJt60sa,
+    );
+    expect(relationship).toBeUndefined();
+    expect(JSON.stringify(snapshot)).not.toContain('Freemelt');
+  });
+
+  it('is present from the moment of the announcement', () => {
+    const snapshot = createResearchSnapshot(dataset, '2026-09-09T00:00:00Z');
+    expect(snapshot.state.events.some((e) => e.type === 'FUSION_COMPONENT_ORDER_AWARDED')).toBe(true);
+    const relationship = snapshot.state.relationships.find(
+      (r) => r.id === FUSION_FIXTURE_IDS.relationships.freemeltJt60sa,
+    );
+    expect(relationship?.states.some((s) => s.status === 'production contract')).toBe(true);
+  });
+});
