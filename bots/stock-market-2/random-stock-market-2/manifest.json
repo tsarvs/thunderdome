@@ -1,0 +1,18 @@
+{
+  "id": "random-stock-market-2",
+  "name": "Random Trader",
+  "version": "0.1.0",
+  "game": "stock-market-2",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom.sarver@7factor.io"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Each round, submits a randomized MARKET or LIMIT order (or holds), sized and priced within whatever's currently affordable/held. Uses its own seeded PRNG, never Math.random()."
+}

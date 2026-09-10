@@ -1,0 +1,18 @@
+{
+  "id": "tominator-t901-stock-market-3",
+  "name": "Tominator T-901",
+  "version": "0.1.0",
+  "game": "stock-market-3",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Cross-sectional momentum/value (lookback windows chosen in-match via backtest, not copied from the simulator's source) blended with analyst-revision-trend, a decaying post-earnings-surprise term, and a macro sector-tilt term whose sector sensitivities are learned in-match via its own running regression against realized economic-release surprises (never read from the simulator's hidden config); conviction-weighted sizing, a fixed-payout acquisition/delisting arbitrage overlay, drawdown/volatility-scaled risk budget, and liquidity-aware LIMIT orders."
+}

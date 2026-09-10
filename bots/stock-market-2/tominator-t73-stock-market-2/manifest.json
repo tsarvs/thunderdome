@@ -1,0 +1,18 @@
+{
+  "id": "tominator-t73-stock-market-2",
+  "name": "Tominator T-73",
+  "version": "0.1.0",
+  "game": "stock-market-2",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom.sarver@7factor.io"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "A more aggressive fork of tominator-t72-stock-market-2, deliberately maximizing its real-event-driven big-win mechanism: bets nearly full portfolio value (or a much larger share of available margin) on a real event's trustworthy direction, keeps adding to an event-driven position even while temporarily underwater (unlike the mean-reversion signal, which stays exactly as conservative as T-72), and loosens its risk backstops just enough to let a real winning position run further. Higher variance than T-72 by design."
+}

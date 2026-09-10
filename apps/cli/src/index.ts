@@ -1,5 +1,7 @@
 #!/usr/bin/env node
+import { realpathSync } from 'node:fs';
 import { parseArgs } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import { runCleanupCommand } from './commands/cleanup.js';
 import { runMatchCommand } from './commands/match.js';
 import { runPlayCommand } from './commands/play.js';
@@ -162,8 +164,26 @@ function registerInterruptHandler(): void {
   process.on('SIGTERM', handle);
 }
 
+/** `import.meta.url` always resolves to this module's REAL path (symlinks followed), but
+ * `process.argv[1]` retains whatever path was used to invoke it — including a symlink, which is
+ * exactly what every real install goes through: package.json's `"bin"` entry becomes
+ * `node_modules/.bin/thunderdome`, a symlink to `dist/index.js`. A naive string comparison
+ * between the two silently fails (and this whole CLI silently no-ops, with exit code 0 and zero
+ * output) for that primary, documented invocation path — `realpathSync` resolves the symlink
+ * first so the comparison matches regardless of how this file was invoked. */
+function isRunAsCliEntryPoint(): boolean {
+  if (process.argv[1] === undefined) {
+    return false;
+  }
+  try {
+    return realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+}
+
 /* node:coverage disable */
-if (import.meta.url === `file://${process.argv[1] ?? ''}`) {
+if (isRunAsCliEntryPoint()) {
   registerInterruptHandler();
   run(process.argv.slice(2))
     .then((code) => {

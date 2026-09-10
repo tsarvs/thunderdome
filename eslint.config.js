@@ -32,6 +32,7 @@ export default tseslint.config(
           './apps/*/tsconfig.test.json',
           './packages/*/tsconfig.test.json',
           './packages/game-dev-toolkit/*/tsconfig.test.json',
+          './packages/research/*/tsconfig.test.json',
           './games/*/tsconfig.test.json',
           './ci/tools/*/tsconfig.test.json',
         ],

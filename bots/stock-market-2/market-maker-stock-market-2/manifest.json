@@ -1,0 +1,18 @@
+{
+  "id": "market-maker-stock-market-2",
+  "name": "Market Maker",
+  "version": "0.1.0",
+  "game": "stock-market-2",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom.sarver@7factor.io"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Every round, quotes a fresh DAY LIMIT buy just below and a DAY LIMIT sell just above the visible mid-price, sized within whatever's currently affordable/held (or shortable, if the game has margin enabled)."
+}

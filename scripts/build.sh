@@ -8,6 +8,9 @@ set -euo pipefail
 INDEPENDENT_PACKAGES=(
   "@thunderdome/protocol"
   "@thunderdome/rng"
+  "@thunderdome/research-core"
+  "@thunderdome/research-fusion"
+  "@thunderdome/research-quantum"
   "@thunderdome/deck-of-cards"
   "@thunderdome/engine"
   "@thunderdome/runtime"
@@ -22,6 +25,9 @@ INDEPENDENT_PACKAGES=(
   "@thunderdome/game-card-game-hearts"
   "@thunderdome/game-poker-texas-hold-em"
   "@thunderdome/game-stock-market"
+  "@thunderdome/game-stock-market-2"
+  "@thunderdome/game-stock-market-3"
+  "@thunderdome/game-stock-market-4"
 )
 
 for pkg in "${INDEPENDENT_PACKAGES[@]}"; do

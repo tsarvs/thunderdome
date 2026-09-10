@@ -1,0 +1,18 @@
+{
+  "id": "tominator-t900-stock-market-3",
+  "name": "Tominator T-900",
+  "version": "0.1.0",
+  "game": "stock-market-3",
+  "author": {
+    "name": "Tom Sarver",
+    "contact": "tom@tomsarver.dev"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "Cross-sectional momentum (10-round, matching the sim's real window) blended with a 40-round value/mean-reversion term and analyst-revision-trend, plus a dedicated fixed-payout arbitrage overlay for pending acquisitions/delistings, drawdown/volatility-scaled sizing, and liquidity-aware LIMIT orders instead of MARKET orders."
+}
