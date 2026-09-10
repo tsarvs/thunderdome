@@ -1,5 +1,5 @@
 {
-  "name": "@thunderdome/game-stock-market-4",
+  "name": "@thunderdome/market-data",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,11 +8,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.test.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:fusion-fixture": "tsx --tsconfig tsconfig.test.json scripts/seedFusionFixture.ts"
   },
   "dependencies": {
-    "@thunderdome/engine": "^0.1.0",
-    "@thunderdome/market-data": "^0.1.0",
     "zod": "^3.23.8"
   }
 }

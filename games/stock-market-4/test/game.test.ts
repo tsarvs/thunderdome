@@ -512,6 +512,7 @@ describe('stockMarket4.resolve / isTerminal / getResult / getStandingOutcomes', 
     expect(result).toEqual({
       participantIds: PARTICIPANT_IDS,
       totalRounds: 2,
+      gameType: 'HISTORICAL',
       marketDataMode: 'historical',
       // No trades were made — final equity is just the untouched starting capital, in cents.
       finalEquityCents: { alice: 100_000_00, bob: 100_000_00 },

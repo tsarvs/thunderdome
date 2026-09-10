@@ -1,4 +1,10 @@
 import { err, ok, type GameDefinition, type StandingOutcome } from '@thunderdome/engine';
+import {
+  createSqliteMarketDataProvider,
+  openMarketDataStore,
+  type MarketDataProvider,
+} from '@thunderdome/market-data';
+import { join } from 'node:path';
 import { resolveOrdersForPortfolio } from './execution/orders.js';
 import { generateTradingCalendar } from './market/calendar.js';
 import {
@@ -46,25 +52,121 @@ function tradingCalendarFor(config: StockMarket4Config): CalendarDate[] {
   return generateTradingCalendar(config.startDate, config.endDate, new Set(config.tradingHolidays));
 }
 
+/** The calendar this match will ACTUALLY play — `tradingCalendarFor(config)` trimmed to
+ * `state.forwardShadowCutoffDate` when set (`gameType: 'FORWARD_SHADOW'` only; see types.ts).
+ * Identical to `tradingCalendarFor(config)` for `'HISTORICAL'`/`'SYNTHETIC'`, always. This is the
+ * ONLY place `gameType` affects match lifecycle — no other function in this file branches on it,
+ * which is what keeps trading/execution/portfolio/scoring logic shared across every game type
+ * rather than duplicated per type. */
+function effectiveTradingCalendar(
+  state: Pick<StockMarket4State, 'config' | 'forwardShadowCutoffDate'>,
+): CalendarDate[] {
+  const nominal = tradingCalendarFor(state.config);
+  const cutoff = state.forwardShadowCutoffDate;
+  return cutoff === null ? nominal : nominal.filter((date) => date <= cutoff);
+}
+
+/** `MIN` over every traded ticker's `latestKnownDate` — "every ticker this match can trade is
+ * known through at least this date." Deliberately excludes `config.benchmarkTicker`: a benchmark
+ * is a comparison yardstick, not necessarily even tradeable (see its own doc comment in types.ts),
+ * so it must never gate how long a FORWARD_SHADOW match itself can run.
+ *
+ * `MIN`, never `MAX`: a real ingestion pipeline can easily have one ticker's data land before
+ * another's on any given day. `MAX` would advance the calendar past a date where some traded
+ * ticker has no data yet, corrupting this game's existing "a missing bar is a genuine data gap"
+ * semantics (spec's `bar: null` contract) into "a missing bar means the match ran out of data,"
+ * every single day, for whichever ticker happens to lag. Do not "simplify" this back to a
+ * dataset-wide `MAX` — see docs/adr/0011-explicit-game-types.md for the full rationale and a
+ * regression test (`gameType.test.ts`) that would catch exactly that regression. */
+function forwardShadowCutoffDateFor(
+  config: StockMarket4Config,
+  marketData: MarketDataProvider,
+): CalendarDate | null {
+  let cutoff: CalendarDate | null = null;
+  for (const ticker of config.marketDataUniverse) {
+    const latest = marketData.latestKnownDate(ticker);
+    if (latest === null) return null; // no data at all yet for a traded ticker
+    if (cutoff === null || latest < cutoff) cutoff = latest;
+  }
+  return cutoff;
+}
+
+/**
+ * Resolves `config.marketDataset` (when set) into a live `MarketDataProvider`, called once from
+ * `initialize()`. `null` when this match uses inline `historicalPrices`/`corporateActions`
+ * instead (the schema's `superRefine` already guarantees exactly one of the two is set — see
+ * `types.ts`).
+ *
+ * The dataset's ticker coverage against `config.marketDataUniverse` is checked HERE rather than
+ * in the config schema's own `superRefine`, because that validation needs to query the actual
+ * dataset — `parseConfig` deliberately stays a pure, in-memory function with no filesystem/
+ * database access (see `types.ts`'s doc comment on that `superRefine` branch).
+ *
+ * Note on resource lifecycle: the SQLite handle this opens is never explicitly closed — there is
+ * currently no `GameDefinition` teardown hook to call it from (see
+ * docs/adr/0005-observation-vs-game-state.md). Acceptable for now (a `node:sqlite` read-only
+ * handle on a local file has no meaningful external resource cost beyond process lifetime); worth
+ * revisiting if/when a long-running host process (e.g. a tournament runner) starts opening many
+ * of these per run.
+ */
+function buildMarketDataProvider(config: StockMarket4Config): MarketDataProvider | null {
+  if (config.marketDataset === undefined) return null;
+  const { id, version, storeDir } = config.marketDataset;
+
+  const storeResult = openMarketDataStore(join(storeDir, `${id}.sqlite`));
+  if (!storeResult.ok) {
+    throw new Error(`stock-market-4: ${storeResult.reason}`);
+  }
+  const providerResult = createSqliteMarketDataProvider(storeResult.value, { id, version });
+  if (!providerResult.ok) {
+    throw new Error(`stock-market-4: ${providerResult.reason}`);
+  }
+  const provider = providerResult.value;
+
+  const datasetTickers = provider.tickers();
+  const missingTickers = config.marketDataUniverse.filter(
+    (ticker) => !datasetTickers.includes(ticker),
+  );
+  if (missingTickers.length > 0) {
+    throw new Error(
+      `stock-market-4: marketDataUniverse declares ticker(s) not present in dataset "${id}" version "${version}": ${missingTickers.join(', ')}`,
+    );
+  }
+  if (config.benchmarkTicker !== undefined && !datasetTickers.includes(config.benchmarkTicker)) {
+    throw new Error(
+      `stock-market-4: benchmarkTicker "${config.benchmarkTicker}" is not present in dataset "${id}" version "${version}"`,
+    );
+  }
+  return provider;
+}
+
 /** Every declared security's market data as of `date` — `null` `bar`/date-less `history` never
  * leak a bar past `date` (see `market/historicalPrices.ts`'s `historicalBarsAsOf`). `date === null`
- * (past the match's last trading day) reports every security with no history and a `null` bar. */
+ * (past the match's last trading day) reports every security with no history and a `null` bar.
+ *
+ * `marketData` is `state.marketData` (see `initialize()`): when present (this match declared
+ * `config.marketDataset`), bars/actions come from the SQLite-backed provider instead of
+ * `config.historicalPrices`/`config.corporateActions` — everything downstream
+ * (`splitAdjustedBarsAsOf`, and every caller of THIS function) is completely unchanged either way,
+ * since the provider reproduces the exact same `DailyBar[]`/`CorporateAction[]` shapes. */
 function securitiesAsOf(
   config: StockMarket4Config,
+  marketData: MarketDataProvider | null,
   date: CalendarDate | null,
 ): SecurityMarketObservation[] {
   return config.marketDataUniverse.map((ticker) => {
-    const series = config.historicalPrices[ticker] ?? [];
+    const series =
+      marketData === null
+        ? (config.historicalPrices[ticker] ?? [])
+        : marketData.barsAsOf(ticker, date ?? config.endDate, Number.POSITIVE_INFINITY);
+    const actions =
+      marketData === null
+        ? config.corporateActions
+        : marketData.corporateActionsAsOf(ticker, date ?? config.endDate);
     const history =
       date === null
         ? []
-        : splitAdjustedBarsAsOf(
-            series,
-            config.corporateActions,
-            ticker,
-            date,
-            config.historicalContextDays,
-          );
+        : splitAdjustedBarsAsOf(series, actions, ticker, date, config.historicalContextDays);
     const latest = history.at(-1);
     return { ticker, bar: latest?.date === date ? latest : null, history };
   });
@@ -165,8 +267,23 @@ export const stockMarket4: GameDefinition<
   // whole tape (and the whole research timeline) up front. Everything else in config (dates,
   // tickers, fees, risk settings, ...) is uniform, static match-ruleset information with nothing
   // to redact.
+  //
+  // `marketDataset.storeDir` gets the same treatment for a different reason: it's a filesystem
+  // path into this HOST's `@thunderdome/market-data` store, not match data a bot could use to see
+  // the future — a bot has no legitimate use for it either way, so it's stripped while `id`/
+  // `version` (harmless identifiers) pass through.
   redactConfigForBots(config) {
-    return { ...config, historicalPrices: {}, corporateActions: [], researchTimeline: [] };
+    return {
+      ...config,
+      historicalPrices: {},
+      corporateActions: [],
+      researchTimeline: [],
+      ...(config.marketDataset === undefined
+        ? {}
+        : {
+            marketDataset: { id: config.marketDataset.id, version: config.marketDataset.version },
+          }),
+    };
   },
 
   // §3 — initialize. This game never uses `rng` (see the module doc comment above on
@@ -180,9 +297,34 @@ export const stockMarket4: GameDefinition<
       );
     }
     const startingCashCents = toCents(config.startingCapital);
+    const marketData = buildMarketDataProvider(config);
+
+    let forwardShadowCutoffDate: CalendarDate | null = null;
+    if (config.gameType === 'FORWARD_SHADOW') {
+      // config.marketDataset is guaranteed set here (schema superRefine), so
+      // buildMarketDataProvider is guaranteed to have returned non-null — this check is that
+      // invariant made explicit for the type checker, not a normal runtime failure mode.
+      if (marketData === null) {
+        throw new Error('stock-market-4: FORWARD_SHADOW requires a resolved marketData provider');
+      }
+      forwardShadowCutoffDate = forwardShadowCutoffDateFor(config, marketData);
+      const playableDays = tradingCalendarFor(config).filter(
+        (date) => forwardShadowCutoffDate === null || date <= forwardShadowCutoffDate,
+      );
+      if (playableDays.length === 0) {
+        throw new Error(
+          `stock-market-4: FORWARD_SHADOW match has no playable trading days — dataset's latest ` +
+            `known date (${forwardShadowCutoffDate ?? 'none'}) is before startDate ` +
+            `(${config.startDate})`,
+        );
+      }
+    }
+
     return {
       participantIds: [...participantIds],
       config,
+      marketData,
+      forwardShadowCutoffDate,
       round: 0,
       portfolios: new Map(participantIds.map((id) => [id, createPortfolio(startingCashCents)])),
       lastFills: new Map(participantIds.map((id) => [id, []])),
@@ -204,20 +346,25 @@ export const stockMarket4: GameDefinition<
       throw new Error(`unknown participant "${participantId}"`);
     }
     const opponentIds = state.participantIds.filter((candidateId) => candidateId !== participantId);
-    const calendar = tradingCalendarFor(state.config);
+    const calendar = effectiveTradingCalendar(state);
     const date = calendar[state.round] ?? null;
-    const securities = securitiesAsOf(state.config, date);
+    const securities = securitiesAsOf(state.config, state.marketData, date);
     const portfolio =
       state.portfolios.get(participantId) ?? createPortfolio(toCents(state.config.startingCapital));
     return {
       round: state.round,
       totalRounds: calendar.length,
       opponentIds,
+      gameType: state.config.gameType,
       marketDataMode: state.config.marketDataMode,
       date,
       securities,
       corporateActions:
-        date === null ? [] : visibleCorporateActions(state.config.corporateActions, date),
+        date === null
+          ? []
+          : state.marketData === null
+            ? visibleCorporateActions(state.config.corporateActions, date)
+            : state.marketData.corporateActionsAsOf(null, date),
       portfolio: portfolioObservationFor(
         portfolio,
         securities,
@@ -258,7 +405,7 @@ export const stockMarket4: GameDefinition<
   // participant's portfolio BEFORE that same round's new orders execute, then fills every order
   // against today's (already-adjusted-if-a-split-just-happened) bars.
   resolve({ state, actions }) {
-    const calendar = tradingCalendarFor(state.config);
+    const calendar = effectiveTradingCalendar(state);
     const date = calendar[state.round];
     if (date === undefined) {
       // Already past the last trading day — isTerminal should have stopped the match before
@@ -269,10 +416,19 @@ export const stockMarket4: GameDefinition<
       };
     }
 
-    const securities = securitiesAsOf(state.config, date);
+    const securities = securitiesAsOf(state.config, state.marketData, date);
     const barsByTicker = new Map(securities.map((security) => [security.ticker, security.bar]));
     const marksCents = markPricesCentsFor(securities);
     const risk = state.config.risk;
+    // Actions effective exactly TODAY (spec §40) — `settleCorporateActionsForPortfolio` and
+    // `roundEventData.corporateActionsSettled` below both filter to `action.date === date`
+    // internally/explicitly, so passing the broader "every action visible as of today" set from
+    // the provider is safe; it's `state.config.corporateActions` itself (empty in `marketDataset`
+    // mode) that would silently under-settle if used directly here.
+    const corporateActions =
+      state.marketData === null
+        ? state.config.corporateActions
+        : state.marketData.corporateActionsAsOf(null, date);
 
     const nextPortfolios = new Map(state.portfolios);
     const nextLastFills = new Map<string, Fill[]>();
@@ -283,11 +439,7 @@ export const stockMarket4: GameDefinition<
       const portfolio =
         state.portfolios.get(participantId) ??
         createPortfolio(toCents(state.config.startingCapital));
-      const settled = settleCorporateActionsForPortfolio(
-        portfolio,
-        state.config.corporateActions,
-        date,
-      );
+      const settled = settleCorporateActionsForPortfolio(portfolio, corporateActions, date);
       const orders = actions.get(participantId)?.orders ?? [];
       const { portfolio: filledPortfolio, fills: orderFills } = resolveOrdersForPortfolio(
         settled,
@@ -352,9 +504,7 @@ export const stockMarket4: GameDefinition<
       date,
       fills: Object.fromEntries(nextLastFills),
       marginCalledParticipantIds,
-      corporateActionsSettled: state.config.corporateActions.filter(
-        (action) => action.date === date,
-      ),
+      corporateActionsSettled: corporateActions.filter((action) => action.date === date),
     };
 
     return {
@@ -386,13 +536,14 @@ export const stockMarket4: GameDefinition<
   // totalRounds rounds are played, full stop — see the guide's §7 for why a new game should be
   // able to point at its own state and say concretely why this always becomes true.
   isTerminal(state) {
-    return state.round >= tradingCalendarFor(state.config).length;
+    return state.round >= effectiveTradingCalendar(state).length;
   },
 
   getResult(state) {
-    const calendar = tradingCalendarFor(state.config);
+    const calendar = effectiveTradingCalendar(state);
     const finalDate = calendar.at(-1);
-    const finalSecurities = finalDate === undefined ? [] : securitiesAsOf(state.config, finalDate);
+    const finalSecurities =
+      finalDate === undefined ? [] : securitiesAsOf(state.config, state.marketData, finalDate);
     const marksCents = markPricesCentsFor(finalSecurities);
 
     const finalEquityCents: Record<string, number> = {};
@@ -418,18 +569,25 @@ export const stockMarket4: GameDefinition<
 
     const firstDate = calendar[0];
     const benchmarkTicker = state.config.benchmarkTicker;
+    const benchmarkSeries =
+      benchmarkTicker === undefined
+        ? []
+        : state.marketData === null
+          ? (state.config.historicalPrices[benchmarkTicker] ?? [])
+          : state.marketData.barsAsOf(
+              benchmarkTicker,
+              finalDate ?? state.config.endDate,
+              Number.POSITIVE_INFINITY,
+            );
     const benchmarkReturn =
       benchmarkTicker === undefined || firstDate === undefined || finalDate === undefined
         ? null
-        : benchmarkBuyAndHoldReturn(
-            state.config.historicalPrices[benchmarkTicker] ?? [],
-            firstDate,
-            finalDate,
-          );
+        : benchmarkBuyAndHoldReturn(benchmarkSeries, firstDate, finalDate);
 
     return {
       participantIds: state.participantIds,
       totalRounds: calendar.length,
+      gameType: state.config.gameType,
       marketDataMode: state.config.marketDataMode,
       finalEquityCents,
       riskStats,

@@ -19,6 +19,7 @@ Classic's `workspaces run` doesn't guarantee topological order — see `scripts/
 | [`registry`](registry/)                                             | Filesystem scan and validation of bot and game manifests — how the CLI resolves a bot/game id to real code.                                                                                                           | `bot-sdk-js`, `game-sdk` |
 | [`tournament-formats`](tournament-formats/)                         | Concrete `TournamentFormat` implementations: round robin and single elimination.                                                                                                                                      | `engine`                 |
 | [`tournament-store`](tournament-store/)                             | Persisted `TournamentRecord` read/write — one JSON file per tournament, no database.                                                                                                                                  | `engine`                 |
+| [`market-data`](market-data/)                                       | Versioned, SQLite-backed market-data store behind a generic `MarketDataProvider` interface (see ADR-0010) — a narrow, explicit exception to §10's "no database" for market data only.                                | —                        |
 | [`game-dev-toolkit/deck-of-cards`](game-dev-toolkit/deck-of-cards/) | Shared card/deck/trick primitives for card games — currently backs `games/card-game-hearts` and `games/poker-texas-hold-em`.                                                                                          | `rng`                    |
 | [`research/core`](research/core/)                                   | Domain-neutral representation of structured research over time — entities, relationships, evidence, hypotheses, models, datasets, temporal state/snapshot reconstruction. Knows nothing about stocks, games, or bots. | —                        |
 | [`research/fusion`](research/fusion/)                               | A small, representative fusion-research fixture proving `research/core`'s schema can carry a real domain — NOT the complete fusion research database.                                                                 | `research/core`          |
@@ -27,11 +28,6 @@ Classic's `workspaces run` doesn't guarantee topological order — see `scripts/
 `game-dev-toolkit/*` and `research/*` are each their own workspace glob in the root `package.json`
 (a family of related packages rather than a single one), separate from the flat `packages/*` glob
 the rest of this directory uses.
-
-[`bot-sdk-python`](bot-sdk-python/) also lives here but isn't a Yarn workspace package at all — no
-`package.json`, nothing in the table above — since it's Python, not TypeScript: the Python analog
-of `bot-sdk-js` for bot authors writing in Python, with its own README explaining the (simpler,
-no-build) vendoring story.
 
 [`bot-sdk-python`](bot-sdk-python/) also lives here but isn't a Yarn workspace package at all — no
 `package.json`, nothing in the table above — since it's Python, not TypeScript: the Python analog

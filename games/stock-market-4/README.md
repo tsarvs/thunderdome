@@ -42,6 +42,32 @@ should) extend earlier than `startDate` so that warmup window has real data to d
 days actually played during the match. A gap in the data (a ticker with no bar on some trading day)
 is reported to the bot as `bar: null`, never silently carried forward from the prior close.
 
+## Game type
+
+`config.gameType` (`'HISTORICAL'` | `'SYNTHETIC'` | `'FORWARD_SHADOW'`, default `'HISTORICAL'`) is
+a **match-lifecycle** discriminator — deliberately not the same axis as `marketDataMode` above,
+which is a **data-provenance** label. A `FORWARD_SHADOW` match replaying real prices is still
+`marketDataMode: 'historical'`; the two answer different questions and both are reported on every
+observation/result. See [`docs/adr/0011-explicit-game-types.md`](../../docs/adr/0011-explicit-game-types.md)
+for the full rationale.
+
+`'HISTORICAL'` and `'SYNTHETIC'` behave identically to each other and to every match before this
+field existed: the full nominal `[startDate, endDate]` calendar plays out regardless of how sparse
+a `config.marketDataset` actually is (a missing bar stays an ordinary per-ticker data gap,
+`bar: null`, exactly as always). `'FORWARD_SHADOW'` requires `config.marketDataset` (inline
+`historicalPrices`/`corporateActions` can't represent data that isn't all authored yet) and is the
+one case where the match's effective calendar is trimmed to what the dataset actually has: the
+earliest date every ticker in `config.marketDataUniverse` is currently known through (not
+`config.benchmarkTicker`, which never gates match length). This lets a `FORWARD_SHADOW` match end
+cleanly at "ran out of real data" instead of playing a tail of empty rounds up to a possibly-distant
+`endDate`.
+
+**This is still a bounded, single-process, non-resumable run.** A `FORWARD_SHADOW` match plays
+exactly what's currently published, once, then ends — like any other match. It is not yet
+resumable: re-running it later against a dataset that has since grown starts a brand-new match from
+round 0, with no memory of the previous run's portfolio/state. Making it resumable across process
+restarts is separate, later roadmap work.
+
 ## Corporate actions
 
 `config.corporateActions` declares real (or synthetic) dividends, splits, reverse-splits,

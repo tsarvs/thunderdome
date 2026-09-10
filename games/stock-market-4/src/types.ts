@@ -1,3 +1,4 @@
+import type { MarketDataProvider } from '@thunderdome/market-data';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -400,6 +401,50 @@ export type MarketDataMode = (typeof MARKET_DATA_MODES)[number];
 export const MarketDataModeSchema = z.enum(MARKET_DATA_MODES);
 
 // ---------------------------------------------------------------------------
+// Game type (roadmap Phase 2 — see docs/adr/0011-explicit-game-types.md). Deliberately NOT the
+// same axis as `marketDataMode` above, despite the overlapping HISTORICAL/SYNTHETIC vocabulary:
+// `marketDataMode` is a data-PROVENANCE label (is this price series real or fabricated?) with zero
+// effect on match behavior, while `gameType` is a match-LIFECYCLE discriminator (how long can the
+// match's own trading calendar be known to be, up front?). The two are independent and both must
+// be read to fully describe a match — a FORWARD_SHADOW match replaying real prices is still
+// `marketDataMode: 'historical'`, and a HISTORICAL-lifecycle match could in principle replay a
+// `marketDataMode: 'synthetic'` series. HISTORICAL/SYNTHETIC `gameType`s behave IDENTICALLY today
+// (both play the full nominal calendar `startDate`-`endDate`, exactly as before this field
+// existed) — only FORWARD_SHADOW has any distinct lifecycle behavior (see `game.ts`'s
+// `effectiveTradingCalendar`), because "how do we know when a forward match runs out of real,
+// not-yet-authored data" is the one lifecycle question a fixed inline config can't already answer
+// for itself.
+// ---------------------------------------------------------------------------
+
+export const GAME_TYPES = ['HISTORICAL', 'SYNTHETIC', 'FORWARD_SHADOW'] as const;
+export type GameType = (typeof GAME_TYPES)[number];
+export const GameTypeSchema = z.enum(GAME_TYPES);
+
+// ---------------------------------------------------------------------------
+// Market dataset reference (roadmap Phase 1 — see docs/adr/0010-sqlite-market-data-store.md).
+// An ALTERNATIVE to declaring `historicalPrices`/`corporateActions` inline: a match may instead
+// point at a published, versioned dataset in a `@thunderdome/market-data` SQLite store, so a
+// competition stays reproducible against the exact dataset version it ran with even after that
+// dataset is later corrected (a correction publishes a new version; it never mutates an existing
+// one). The two are mutually exclusive (enforced below) — inline fields remain fully supported so
+// every existing match config keeps working unchanged; this is additive, not a replacement.
+// ---------------------------------------------------------------------------
+
+export const MarketDatasetRefSchema = z
+  .object({
+    id: z.string().min(1),
+    version: z.string().min(1),
+    /** Directory containing `<id>.sqlite`. Not something a match organizer typically hand-authors
+     * inline — resolved by whatever builds `configRaw` (e.g. a CLI default, mirroring
+     * `tournament-store`'s own `defaultStoreDir` convention) and merged in before `parseConfig`
+     * runs, so `parseConfig`/`initialize` themselves stay pure functions of their own `raw`/
+     * `config` input. Stripped from what a bot ever sees — see `redactConfigForBots` below. */
+    storeDir: z.string().min(1),
+  })
+  .strict();
+export type MarketDatasetRef = z.infer<typeof MarketDatasetRefSchema>;
+
+// ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
@@ -429,6 +474,10 @@ const BaseStockMarket4ConfigSchema = z.object({
   historicalContextDays: z.number().int().positive().default(250),
   startingCapital: z.number().positive().default(100_000),
   marketDataUniverse: z.array(z.string().min(1)).min(1),
+  /** Match-lifecycle discriminator — see the Game type section above for how this differs from
+   * `marketDataMode` below. Defaults to `'HISTORICAL'` since that's this game's original, primary
+   * mode; every match config predating this field behaves identically to before. */
+  gameType: GameTypeSchema.default('HISTORICAL'),
   /** Non-trading dates within (or spanning) the match window besides weekends — organizer-
    * declared rather than a baked-in exchange calendar, since an arbitrary historical date range
    * could span any exchange's holiday schedule for any year (see `market/calendar.ts`). */
@@ -436,16 +485,26 @@ const BaseStockMarket4ConfigSchema = z.object({
   /** Every ticker in `marketDataUniverse` must have an entry here (checked below) — the actual
    * bars `market/historicalPrices.ts` replays day by day, whether that's real historical data or
    * an organizer-supplied synthetic series (see `marketDataMode` below and the Market data mode
-   * section above) — this field, and everything that reads it, is identical either way. */
-  historicalPrices: z.record(z.string().min(1), HistoricalPriceSeriesSchema),
-  /** Which kind of series `historicalPrices` actually holds for this match — a label only (see
-   * the Market data mode section above); defaults to `'historical'` since that's this game's
-   * original, primary mode. */
+   * section above) — this field, and everything that reads it, is identical either way.
+   *
+   * Defaults to `{}` because a match may instead declare `marketDataset` below and source its
+   * data from a `@thunderdome/market-data` store — the two are mutually exclusive (checked
+   * below), and exactly one must be provided. */
+  historicalPrices: z.record(z.string().min(1), HistoricalPriceSeriesSchema).default({}),
+  /** Which kind of series `historicalPrices` (or `marketDataset`) actually holds for this
+   * match — a label only (see the Market data mode section above); defaults to `'historical'`
+   * since that's this game's original, primary mode. */
   marketDataMode: MarketDataModeSchema.default('historical'),
   /** Every action's `ticker` must be in `marketDataUniverse` (checked below) — real historical
    * dividends/splits/reverse-splits/buybacks/acquisitions/delistings `market/corporateActions.ts`
-   * applies day by day alongside `historicalPrices`. */
+   * applies day by day alongside `historicalPrices`. Ignored when `marketDataset` is set — see
+   * that field's own doc comment. */
   corporateActions: z.array(CorporateActionSchema).default([]),
+  /** Alternative to `historicalPrices`/`corporateActions`: sources this match's market data from
+   * a published, versioned `@thunderdome/market-data` SQLite dataset instead of inline config —
+   * see the Market dataset reference section above. Mutually exclusive with the inline fields
+   * (checked below). */
+  marketDataset: MarketDatasetRefSchema.optional(),
   /** Fraction of trade notional charged as a fee on every fill (spec §29), same convention as
    * stock-market-3. */
   transactionFeeRate: z.number().min(0).max(1).default(0.001),
@@ -476,6 +535,44 @@ export const StockMarket4ConfigSchema = BaseStockMarket4ConfigSchema.strict()
     },
   )
   .superRefine((config, ctx) => {
+    // FORWARD_SHADOW requires a `marketDataset` — inline historicalPrices/corporateActions is a
+    // fixed blob authored entirely before the match starts, which can't represent data that
+    // isn't all known/authored yet. Checked before the mutual-exclusivity block below so a
+    // FORWARD_SHADOW match with neither field set gets THIS message, not "either
+    // historicalPrices or marketDataset must be provided".
+    if (config.gameType === 'FORWARD_SHADOW' && config.marketDataset === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['gameType'],
+        message:
+          'FORWARD_SHADOW requires config.marketDataset — inline historicalPrices/' +
+          'corporateActions cannot represent data that has not all been authored yet',
+      });
+    }
+    // Market dataset reference vs. inline historicalPrices/corporateActions: mutually exclusive,
+    // and exactly one must be provided. When `marketDataset` is set, ticker-coverage/ordering
+    // checks against the ACTUAL dataset can't happen here — this is a pure, in-memory Zod schema
+    // with no filesystem/database access (the same "keep I/O out of schema validation" principle
+    // `@thunderdome/research-core` follows for its own dataset cross-referencing) — so that
+    // coverage check happens once, at `initialize()` time instead (see game.ts).
+    if (config.marketDataset !== undefined) {
+      if (Object.keys(config.historicalPrices).length > 0 || config.corporateActions.length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['marketDataset'],
+          message:
+            'marketDataset and inline historicalPrices/corporateActions are mutually exclusive',
+        });
+      }
+      return;
+    }
+    if (Object.keys(config.historicalPrices).length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['historicalPrices'],
+        message: 'either historicalPrices or marketDataset must be provided',
+      });
+    }
     for (const ticker of config.marketDataUniverse) {
       const series = config.historicalPrices[ticker];
       if (series === undefined) {
@@ -531,6 +628,19 @@ export type StockMarket4Action = z.infer<typeof StockMarket4ActionSchema>;
 export interface StockMarket4State {
   participantIds: string[];
   config: StockMarket4Config;
+  /** Resolved once in `initialize()` from `config.marketDataset` when present, `null` when this
+   * match uses inline `historicalPrices`/`corporateActions` instead — see `game.ts`'s
+   * `securitiesAsOf`. Not serializable (a live SQLite handle) — consistent with every other `Map`
+   * already in this state; there is no save/resume mechanism for `StockMarket4State` yet (see
+   * docs/adr/0005-observation-vs-game-state.md's own consequences section). */
+  marketData: MarketDataProvider | null;
+  /** For a `gameType: 'FORWARD_SHADOW'` match: the earliest date every `marketDataUniverse`
+   * ticker is currently known through (see `game.ts`'s `forwardShadowCutoffDateFor`), resolved
+   * ONCE in `initialize()` and cached here rather than recomputed — `tradingCalendarFor` is a hot
+   * path called every round, and must stay the cheap, pure, in-memory function it already is (the
+   * same reason this game has never stored the calendar itself). Always `null` for
+   * `'HISTORICAL'`/`'SYNTHETIC'`, which always play the full nominal calendar. */
+  forwardShadowCutoffDate: CalendarDate | null;
   round: number;
   portfolios: Map<string, PortfolioAccount>;
   /** Fills from the most recently resolved round, per participant — empty before that
@@ -571,8 +681,13 @@ export interface StockMarket4Observation {
   round: number;
   totalRounds: number;
   opponentIds: string[];
+  /** This match's lifecycle discriminator (see the Game type section) — fixed for the whole
+   * match, purely informational. NOT the same axis as `marketDataMode` below; see that field's own
+   * doc comment for the distinction. */
+  gameType: GameType;
   /** Whether `securities` below is replaying real history or an organizer-supplied synthetic
-   * series (see the Market data mode section) — fixed for the whole match, purely informational. */
+   * series (see the Market data mode section) — fixed for the whole match, purely informational.
+   * NOT the same axis as `gameType` above — see the Game type section for why. */
   marketDataMode: MarketDataMode;
   /** The real calendar date this round's decision is being made for (spec §10/§27's historical
    * replay) — `null` only past the match's last trading day, when there's no further date to
@@ -676,6 +791,11 @@ export interface PerformanceMetrics {
 export interface StockMarket4Result {
   participantIds: string[];
   totalRounds: number;
+  /** This match's lifecycle discriminator — see the Game type section. Recorded on the result for
+   * the same reason `marketDataMode` below is: an audit trail/results dashboard shouldn't have to
+   * track it separately out of band. NOT the same axis as `marketDataMode` — see that field's own
+   * doc comment. */
+  gameType: GameType;
   /** Whether this match replayed real history or an organizer-supplied synthetic series — see
    * the Market data mode section. Recorded on the result so an audit trail/results dashboard
    * never has to track it separately out of band. */
