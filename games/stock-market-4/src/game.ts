@@ -1,4 +1,10 @@
 import { err, ok, type GameDefinition, type StandingOutcome } from '@thunderdome/engine';
+import {
+  createSqliteMarketDataProvider,
+  openMarketDataStore,
+  type MarketDataProvider,
+} from '@thunderdome/market-data';
+import { join } from 'node:path';
 import { resolveOrdersForPortfolio } from './execution/orders.js';
 import { generateTradingCalendar } from './market/calendar.js';
 import {
@@ -46,25 +52,82 @@ function tradingCalendarFor(config: StockMarket4Config): CalendarDate[] {
   return generateTradingCalendar(config.startDate, config.endDate, new Set(config.tradingHolidays));
 }
 
+/**
+ * Resolves `config.marketDataset` (when set) into a live `MarketDataProvider`, called once from
+ * `initialize()`. `null` when this match uses inline `historicalPrices`/`corporateActions`
+ * instead (the schema's `superRefine` already guarantees exactly one of the two is set — see
+ * `types.ts`).
+ *
+ * The dataset's ticker coverage against `config.marketDataUniverse` is checked HERE rather than
+ * in the config schema's own `superRefine`, because that validation needs to query the actual
+ * dataset — `parseConfig` deliberately stays a pure, in-memory function with no filesystem/
+ * database access (see `types.ts`'s doc comment on that `superRefine` branch).
+ *
+ * Note on resource lifecycle: the SQLite handle this opens is never explicitly closed — there is
+ * currently no `GameDefinition` teardown hook to call it from (see
+ * docs/adr/0005-observation-vs-game-state.md). Acceptable for now (a `node:sqlite` read-only
+ * handle on a local file has no meaningful external resource cost beyond process lifetime); worth
+ * revisiting if/when a long-running host process (e.g. a tournament runner) starts opening many
+ * of these per run.
+ */
+function buildMarketDataProvider(config: StockMarket4Config): MarketDataProvider | null {
+  if (config.marketDataset === undefined) return null;
+  const { id, version, storeDir } = config.marketDataset;
+
+  const storeResult = openMarketDataStore(join(storeDir, `${id}.sqlite`));
+  if (!storeResult.ok) {
+    throw new Error(`stock-market-4: ${storeResult.reason}`);
+  }
+  const providerResult = createSqliteMarketDataProvider(storeResult.value, { id, version });
+  if (!providerResult.ok) {
+    throw new Error(`stock-market-4: ${providerResult.reason}`);
+  }
+  const provider = providerResult.value;
+
+  const datasetTickers = provider.tickers();
+  const missingTickers = config.marketDataUniverse.filter(
+    (ticker) => !datasetTickers.includes(ticker),
+  );
+  if (missingTickers.length > 0) {
+    throw new Error(
+      `stock-market-4: marketDataUniverse declares ticker(s) not present in dataset "${id}" version "${version}": ${missingTickers.join(', ')}`,
+    );
+  }
+  if (config.benchmarkTicker !== undefined && !datasetTickers.includes(config.benchmarkTicker)) {
+    throw new Error(
+      `stock-market-4: benchmarkTicker "${config.benchmarkTicker}" is not present in dataset "${id}" version "${version}"`,
+    );
+  }
+  return provider;
+}
+
 /** Every declared security's market data as of `date` — `null` `bar`/date-less `history` never
  * leak a bar past `date` (see `market/historicalPrices.ts`'s `historicalBarsAsOf`). `date === null`
- * (past the match's last trading day) reports every security with no history and a `null` bar. */
+ * (past the match's last trading day) reports every security with no history and a `null` bar.
+ *
+ * `marketData` is `state.marketData` (see `initialize()`): when present (this match declared
+ * `config.marketDataset`), bars/actions come from the SQLite-backed provider instead of
+ * `config.historicalPrices`/`config.corporateActions` — everything downstream
+ * (`splitAdjustedBarsAsOf`, and every caller of THIS function) is completely unchanged either way,
+ * since the provider reproduces the exact same `DailyBar[]`/`CorporateAction[]` shapes. */
 function securitiesAsOf(
   config: StockMarket4Config,
+  marketData: MarketDataProvider | null,
   date: CalendarDate | null,
 ): SecurityMarketObservation[] {
   return config.marketDataUniverse.map((ticker) => {
-    const series = config.historicalPrices[ticker] ?? [];
+    const series =
+      marketData === null
+        ? (config.historicalPrices[ticker] ?? [])
+        : marketData.barsAsOf(ticker, date ?? config.endDate, Number.POSITIVE_INFINITY);
+    const actions =
+      marketData === null
+        ? config.corporateActions
+        : marketData.corporateActionsAsOf(ticker, date ?? config.endDate);
     const history =
       date === null
         ? []
-        : splitAdjustedBarsAsOf(
-            series,
-            config.corporateActions,
-            ticker,
-            date,
-            config.historicalContextDays,
-          );
+        : splitAdjustedBarsAsOf(series, actions, ticker, date, config.historicalContextDays);
     const latest = history.at(-1);
     return { ticker, bar: latest?.date === date ? latest : null, history };
   });
@@ -165,8 +228,23 @@ export const stockMarket4: GameDefinition<
   // whole tape (and the whole research timeline) up front. Everything else in config (dates,
   // tickers, fees, risk settings, ...) is uniform, static match-ruleset information with nothing
   // to redact.
+  //
+  // `marketDataset.storeDir` gets the same treatment for a different reason: it's a filesystem
+  // path into this HOST's `@thunderdome/market-data` store, not match data a bot could use to see
+  // the future — a bot has no legitimate use for it either way, so it's stripped while `id`/
+  // `version` (harmless identifiers) pass through.
   redactConfigForBots(config) {
-    return { ...config, historicalPrices: {}, corporateActions: [], researchTimeline: [] };
+    return {
+      ...config,
+      historicalPrices: {},
+      corporateActions: [],
+      researchTimeline: [],
+      ...(config.marketDataset === undefined
+        ? {}
+        : {
+            marketDataset: { id: config.marketDataset.id, version: config.marketDataset.version },
+          }),
+    };
   },
 
   // §3 — initialize. This game never uses `rng` (see the module doc comment above on
@@ -183,6 +261,7 @@ export const stockMarket4: GameDefinition<
     return {
       participantIds: [...participantIds],
       config,
+      marketData: buildMarketDataProvider(config),
       round: 0,
       portfolios: new Map(participantIds.map((id) => [id, createPortfolio(startingCashCents)])),
       lastFills: new Map(participantIds.map((id) => [id, []])),
@@ -206,7 +285,7 @@ export const stockMarket4: GameDefinition<
     const opponentIds = state.participantIds.filter((candidateId) => candidateId !== participantId);
     const calendar = tradingCalendarFor(state.config);
     const date = calendar[state.round] ?? null;
-    const securities = securitiesAsOf(state.config, date);
+    const securities = securitiesAsOf(state.config, state.marketData, date);
     const portfolio =
       state.portfolios.get(participantId) ?? createPortfolio(toCents(state.config.startingCapital));
     return {
@@ -217,7 +296,11 @@ export const stockMarket4: GameDefinition<
       date,
       securities,
       corporateActions:
-        date === null ? [] : visibleCorporateActions(state.config.corporateActions, date),
+        date === null
+          ? []
+          : state.marketData === null
+            ? visibleCorporateActions(state.config.corporateActions, date)
+            : state.marketData.corporateActionsAsOf(null, date),
       portfolio: portfolioObservationFor(
         portfolio,
         securities,
@@ -269,10 +352,19 @@ export const stockMarket4: GameDefinition<
       };
     }
 
-    const securities = securitiesAsOf(state.config, date);
+    const securities = securitiesAsOf(state.config, state.marketData, date);
     const barsByTicker = new Map(securities.map((security) => [security.ticker, security.bar]));
     const marksCents = markPricesCentsFor(securities);
     const risk = state.config.risk;
+    // Actions effective exactly TODAY (spec §40) — `settleCorporateActionsForPortfolio` and
+    // `roundEventData.corporateActionsSettled` below both filter to `action.date === date`
+    // internally/explicitly, so passing the broader "every action visible as of today" set from
+    // the provider is safe; it's `state.config.corporateActions` itself (empty in `marketDataset`
+    // mode) that would silently under-settle if used directly here.
+    const corporateActions =
+      state.marketData === null
+        ? state.config.corporateActions
+        : state.marketData.corporateActionsAsOf(null, date);
 
     const nextPortfolios = new Map(state.portfolios);
     const nextLastFills = new Map<string, Fill[]>();
@@ -283,11 +375,7 @@ export const stockMarket4: GameDefinition<
       const portfolio =
         state.portfolios.get(participantId) ??
         createPortfolio(toCents(state.config.startingCapital));
-      const settled = settleCorporateActionsForPortfolio(
-        portfolio,
-        state.config.corporateActions,
-        date,
-      );
+      const settled = settleCorporateActionsForPortfolio(portfolio, corporateActions, date);
       const orders = actions.get(participantId)?.orders ?? [];
       const { portfolio: filledPortfolio, fills: orderFills } = resolveOrdersForPortfolio(
         settled,
@@ -352,9 +440,7 @@ export const stockMarket4: GameDefinition<
       date,
       fills: Object.fromEntries(nextLastFills),
       marginCalledParticipantIds,
-      corporateActionsSettled: state.config.corporateActions.filter(
-        (action) => action.date === date,
-      ),
+      corporateActionsSettled: corporateActions.filter((action) => action.date === date),
     };
 
     return {
@@ -392,7 +478,8 @@ export const stockMarket4: GameDefinition<
   getResult(state) {
     const calendar = tradingCalendarFor(state.config);
     const finalDate = calendar.at(-1);
-    const finalSecurities = finalDate === undefined ? [] : securitiesAsOf(state.config, finalDate);
+    const finalSecurities =
+      finalDate === undefined ? [] : securitiesAsOf(state.config, state.marketData, finalDate);
     const marksCents = markPricesCentsFor(finalSecurities);
 
     const finalEquityCents: Record<string, number> = {};
@@ -418,14 +505,20 @@ export const stockMarket4: GameDefinition<
 
     const firstDate = calendar[0];
     const benchmarkTicker = state.config.benchmarkTicker;
+    const benchmarkSeries =
+      benchmarkTicker === undefined
+        ? []
+        : state.marketData === null
+          ? (state.config.historicalPrices[benchmarkTicker] ?? [])
+          : state.marketData.barsAsOf(
+              benchmarkTicker,
+              finalDate ?? state.config.endDate,
+              Number.POSITIVE_INFINITY,
+            );
     const benchmarkReturn =
       benchmarkTicker === undefined || firstDate === undefined || finalDate === undefined
         ? null
-        : benchmarkBuyAndHoldReturn(
-            state.config.historicalPrices[benchmarkTicker] ?? [],
-            firstDate,
-            finalDate,
-          );
+        : benchmarkBuyAndHoldReturn(benchmarkSeries, firstDate, finalDate);
 
     return {
       participantIds: state.participantIds,

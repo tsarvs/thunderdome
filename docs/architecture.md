@@ -74,6 +74,10 @@ packages/
   tournament-store/           persisted TournamentRecord read/write — one JSON file per
                                tournament, no database (see ADR-0009); no dependency on
                                runtime/registry/apps, so it's independently testable
+  market-data/                versioned, SQLite-backed market-data store behind a generic
+                               MarketDataProvider interface (see ADR-0010) — a narrow, explicit
+                               exception to §10's "no database" for market data only; no
+                               dependency on engine/games/bots
 
 games/
   <game-id>/                  real Yarn workspace members — rules implementations (RPS, Chess, …)
@@ -418,7 +422,11 @@ without touching the engine.
 
 ## 10. What's deliberately out of scope right now
 
-No database. No auth system. No HTTP API. No React app. No multi-language CI build matrix (the
+No database, except the one narrow, explicit exception documented in ADR-0010: `@thunderdome/
+market-data` uses SQLite for versioned market-data storage specifically, behind a
+`MarketDataProvider` interface no other package depends on directly. That ADR does not reopen this
+constraint generally — any other case for persistence still needs its own ADR making the same
+case. No auth system. No HTTP API. No React app. No multi-language CI build matrix (the
 Java bot, once it exists, is proven by `docker build`/`docker run` + a protocol handshake, not a
 Gradle CI job). No Yarn zero-installs/PnP. No Dependabot/Renovate. No release/publish pipeline. No
 telemetry/observability stack. No tournament formats beyond round robin and single elimination yet
@@ -437,3 +445,4 @@ sequential/no-hidden-information case it was meant to validate).
 - `docs/adr/0007-repository-enforcement.md`
 - `docs/adr/0008-toolchain-simplification.md`
 - `docs/adr/0009-tournament-persistence.md`
+- `docs/adr/0010-sqlite-market-data-store.md`

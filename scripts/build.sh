@@ -11,6 +11,7 @@ INDEPENDENT_PACKAGES=(
   "@thunderdome/research-core"
   "@thunderdome/research-fusion"
   "@thunderdome/research-quantum"
+  "@thunderdome/market-data"
   "@thunderdome/deck-of-cards"
   "@thunderdome/engine"
   "@thunderdome/runtime"

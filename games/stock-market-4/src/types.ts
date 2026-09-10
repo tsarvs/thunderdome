@@ -1,3 +1,4 @@
+import type { MarketDataProvider } from '@thunderdome/market-data';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
@@ -400,6 +401,30 @@ export type MarketDataMode = (typeof MARKET_DATA_MODES)[number];
 export const MarketDataModeSchema = z.enum(MARKET_DATA_MODES);
 
 // ---------------------------------------------------------------------------
+// Market dataset reference (roadmap Phase 1 — see docs/adr/0010-sqlite-market-data-store.md).
+// An ALTERNATIVE to declaring `historicalPrices`/`corporateActions` inline: a match may instead
+// point at a published, versioned dataset in a `@thunderdome/market-data` SQLite store, so a
+// competition stays reproducible against the exact dataset version it ran with even after that
+// dataset is later corrected (a correction publishes a new version; it never mutates an existing
+// one). The two are mutually exclusive (enforced below) — inline fields remain fully supported so
+// every existing match config keeps working unchanged; this is additive, not a replacement.
+// ---------------------------------------------------------------------------
+
+export const MarketDatasetRefSchema = z
+  .object({
+    id: z.string().min(1),
+    version: z.string().min(1),
+    /** Directory containing `<id>.sqlite`. Not something a match organizer typically hand-authors
+     * inline — resolved by whatever builds `configRaw` (e.g. a CLI default, mirroring
+     * `tournament-store`'s own `defaultStoreDir` convention) and merged in before `parseConfig`
+     * runs, so `parseConfig`/`initialize` themselves stay pure functions of their own `raw`/
+     * `config` input. Stripped from what a bot ever sees — see `redactConfigForBots` below. */
+    storeDir: z.string().min(1),
+  })
+  .strict();
+export type MarketDatasetRef = z.infer<typeof MarketDatasetRefSchema>;
+
+// ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
@@ -436,16 +461,26 @@ const BaseStockMarket4ConfigSchema = z.object({
   /** Every ticker in `marketDataUniverse` must have an entry here (checked below) — the actual
    * bars `market/historicalPrices.ts` replays day by day, whether that's real historical data or
    * an organizer-supplied synthetic series (see `marketDataMode` below and the Market data mode
-   * section above) — this field, and everything that reads it, is identical either way. */
-  historicalPrices: z.record(z.string().min(1), HistoricalPriceSeriesSchema),
-  /** Which kind of series `historicalPrices` actually holds for this match — a label only (see
-   * the Market data mode section above); defaults to `'historical'` since that's this game's
-   * original, primary mode. */
+   * section above) — this field, and everything that reads it, is identical either way.
+   *
+   * Defaults to `{}` because a match may instead declare `marketDataset` below and source its
+   * data from a `@thunderdome/market-data` store — the two are mutually exclusive (checked
+   * below), and exactly one must be provided. */
+  historicalPrices: z.record(z.string().min(1), HistoricalPriceSeriesSchema).default({}),
+  /** Which kind of series `historicalPrices` (or `marketDataset`) actually holds for this
+   * match — a label only (see the Market data mode section above); defaults to `'historical'`
+   * since that's this game's original, primary mode. */
   marketDataMode: MarketDataModeSchema.default('historical'),
   /** Every action's `ticker` must be in `marketDataUniverse` (checked below) — real historical
    * dividends/splits/reverse-splits/buybacks/acquisitions/delistings `market/corporateActions.ts`
-   * applies day by day alongside `historicalPrices`. */
+   * applies day by day alongside `historicalPrices`. Ignored when `marketDataset` is set — see
+   * that field's own doc comment. */
   corporateActions: z.array(CorporateActionSchema).default([]),
+  /** Alternative to `historicalPrices`/`corporateActions`: sources this match's market data from
+   * a published, versioned `@thunderdome/market-data` SQLite dataset instead of inline config —
+   * see the Market dataset reference section above. Mutually exclusive with the inline fields
+   * (checked below). */
+  marketDataset: MarketDatasetRefSchema.optional(),
   /** Fraction of trade notional charged as a fee on every fill (spec §29), same convention as
    * stock-market-3. */
   transactionFeeRate: z.number().min(0).max(1).default(0.001),
@@ -476,6 +511,30 @@ export const StockMarket4ConfigSchema = BaseStockMarket4ConfigSchema.strict()
     },
   )
   .superRefine((config, ctx) => {
+    // Market dataset reference vs. inline historicalPrices/corporateActions: mutually exclusive,
+    // and exactly one must be provided. When `marketDataset` is set, ticker-coverage/ordering
+    // checks against the ACTUAL dataset can't happen here — this is a pure, in-memory Zod schema
+    // with no filesystem/database access (the same "keep I/O out of schema validation" principle
+    // `@thunderdome/research-core` follows for its own dataset cross-referencing) — so that
+    // coverage check happens once, at `initialize()` time instead (see game.ts).
+    if (config.marketDataset !== undefined) {
+      if (Object.keys(config.historicalPrices).length > 0 || config.corporateActions.length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['marketDataset'],
+          message:
+            'marketDataset and inline historicalPrices/corporateActions are mutually exclusive',
+        });
+      }
+      return;
+    }
+    if (Object.keys(config.historicalPrices).length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['historicalPrices'],
+        message: 'either historicalPrices or marketDataset must be provided',
+      });
+    }
     for (const ticker of config.marketDataUniverse) {
       const series = config.historicalPrices[ticker];
       if (series === undefined) {
@@ -531,6 +590,12 @@ export type StockMarket4Action = z.infer<typeof StockMarket4ActionSchema>;
 export interface StockMarket4State {
   participantIds: string[];
   config: StockMarket4Config;
+  /** Resolved once in `initialize()` from `config.marketDataset` when present, `null` when this
+   * match uses inline `historicalPrices`/`corporateActions` instead — see `game.ts`'s
+   * `securitiesAsOf`. Not serializable (a live SQLite handle) — consistent with every other `Map`
+   * already in this state; there is no save/resume mechanism for `StockMarket4State` yet (see
+   * docs/adr/0005-observation-vs-game-state.md's own consequences section). */
+  marketData: MarketDataProvider | null;
   round: number;
   portfolios: Map<string, PortfolioAccount>;
   /** Fills from the most recently resolved round, per participant — empty before that
