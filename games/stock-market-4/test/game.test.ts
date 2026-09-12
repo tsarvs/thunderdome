@@ -519,6 +519,13 @@ describe('stockMarket4.resolve / isTerminal / getResult / getStandingOutcomes', 
       riskStats: { alice: ZERO_RISK_STATS, bob: ZERO_RISK_STATS },
       performanceMetrics: { alice: FLAT_PERFORMANCE_METRICS, bob: FLAT_PERFORMANCE_METRICS },
       benchmarkReturn: null,
+      // 2026-01-02 (first trading day) close 106 -> 2026-01-05 (final trading day) close 107 —
+      // see weekdayBars(startPrice=100)'s one-weekday-per-increment fixture.
+      securityPrices: [{ symbol: 'NVDA', startingPrice: 106, finalPrice: 107 }],
+      portfolioSummaries: {
+        alice: { cash: 100_000, equity: 100_000, bankrupt: false, positions: [] },
+        bob: { cash: 100_000, equity: 100_000, bankrupt: false, positions: [] },
+      },
     });
     expect(stockMarket4.getStandingOutcomes(result)).toEqual(
       PARTICIPANT_IDS.map((participantId) => ({

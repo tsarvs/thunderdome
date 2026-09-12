@@ -1,0 +1,696 @@
+import type { AdvancedSignalPolicy, ConfidenceCalibration, FusionFundamentalConfig, PortfolioPolicy, SecurityConfig, SignalLevel, SignalThresholds, StopLossPolicy, TrendFilterPolicy, VolatilitySizingPolicy } from './config.js';
+import { computeCorrelationScaleFactors, computeReturnsSeries } from './correlation.js';
+import type { DailyBar, OrderRequest, PortfolioObservation } from './marketTypes.js';
+import { applyThesisGroupCaps, type ThesisGroupCapPolicy } from './portfolio/optimizer.js';
+import { applyCorrelationScale, buildOrders, isStopLossTriggered, scaleTargetWeightForVolatility, spendableCentsFor, targetWeightForSignal } from './portfolio.js';
+import { computeResearchDelta, type ResearchDelta } from './research/delta.js';
+import { computeExposureMap, exposureFootprint, type ExposureMap } from './research/exposure.js';
+import { interpretResearchDelta, type ModelEffect } from './research/interpretEvents.js';
+import type { ResearchState } from './research/types.js';
+import { computeDailyVolatility, computeInformationGap, computePriceStabilityConfidence, computeSignal, computeTrailingReturn } from './signal.js';
+import { computeCompanyValuation } from './valuation/companyValue.js';
+import { computeFusionValue } from './valuation/fusionValue.js';
+import { computeMarketImpliedExpectationsFromScenarios } from './valuation/marketImplied.js';
+import { computeBlendedBaseValuePerShare } from './valuation/rollingBaseValue.js';
+import type { CompanyValuation, MarketImpliedExpectations } from './valuation/types.js';
+
+/**
+ * The full, structured record spec §16 requires for every decision (not only non-empty trades —
+ * a `HOLD` with `orders: []` is still recorded and still explainable, which is what the no-
+ * information test in `test/decision.test.ts` checks). Every field is derived from this round's
+ * actual model inputs — nothing here is free-form.
+ */
+export interface TradingDecision {
+  date: string | null;
+  security: string;
+  action: 'BUY' | 'SELL' | 'HOLD';
+  signalLevel: SignalLevel;
+  /** True when `signalLevel` only held because of `SignalThresholds.hysteresisBand` — see
+   * `signal.ts`'s `Signal.heldByHysteresis`. Threaded through so `../index.ts` doesn't need its
+   * own copy of this, and so a reader can tell "the position size logically changed" apart from
+   * "the model, if it recomputed fresh with no memory, would already have reverted this level." */
+  heldByHysteresis: boolean;
+  targetWeight: number | undefined;
+  researchChanges: string[];
+  modelEffects: string[];
+  valuationBefore: number | undefined;
+  valuationAfter: number;
+  /** The full base/fusion-derived/fusion-option breakdown behind `valuationAfter` (spec §9/§16) —
+   * exposed so a reader (or a test) can confirm which channel actually moved, not just the total. */
+  valuationBreakdown: CompanyValuation;
+  marketReaction: number | null;
+  valuationGap: number;
+  confidence: number;
+  rationale: string;
+  falsifiers: string[];
+  orders: OrderRequest[];
+  /** This security's multi-dimensional research exposure (spec §3) — never collapsed to one
+   * score. Used both for explainability and, at the portfolio level, to detect two securities
+   * betting on the same underlying commercialization pathway (see `portfolioAdjustmentNote`). */
+  exposure: ExposureMap;
+  /** What the CURRENT market price already implies about this security's fusion opportunity
+   * (spec §14), reverse-engineered from `valuation/marketImplied.ts` — `undefined` when this
+   * security has no modeled fusion revenue chain to invert (see that module's own doc comment). */
+  marketImplied: MarketImpliedExpectations | undefined;
+  /** Set only when the portfolio-level thesis-group cap (spec §20/§42) actually changed this
+   * security's target weight from what its OWN, independently-computed signal/sizing pipeline
+   * produced — i.e. exactly the case spec §25 describes: a stock-level signal and the final
+   * portfolio action can legitimately differ. `undefined` means this security's weight was never
+   * touched by that pass (the common case). */
+  portfolioAdjustmentNote: string | undefined;
+}
+
+/** What research does NOT establish for ELMT/Schwabmünchen (spec §9) — reported on every
+ * decision so a reader never mistakes this model's fair value for a fully-known figure. */
+export const KNOWN_VALUATION_UNKNOWNS: readonly string[] = [
+  'acquired historical revenue of the Schwabmünchen operation',
+  'acquired historical EBITDA/profitability of the Schwabmünchen operation',
+  'final purchase consideration for the acquisition',
+  'exact tungsten/molybdenum production capacity and current utilization',
+  'exact incremental EBIT margin ELMT will realize on the acquired operation',
+  'exact fusion-program customer revenue, if any, ELMT will ever realize',
+];
+
+function describeResearchChanges(delta: ResearchDelta): string[] {
+  const lines: string[] = [];
+  for (const event of delta.newEvents) {
+    lines.push(`New research event "${event.type}" (${event.id}) at ${event.timestamp}.`);
+  }
+  for (const relationship of delta.changedRelationships) {
+    lines.push(
+      `Relationship ${relationship.relationshipId} (${relationship.type}) status: ` +
+        `${relationship.previousStatus ?? '(none)'} -> ${relationship.currentStatus}.`,
+    );
+  }
+  for (const hypothesis of delta.changedHypotheses) {
+    lines.push(
+      `Hypothesis "${hypothesis.name}" confidence: ` +
+        `${hypothesis.previousConfidence ?? '(none)'} -> ${hypothesis.currentConfidence}.`,
+    );
+  }
+  for (const evidence of delta.newEvidence) {
+    lines.push(`New evidence (${evidence.id}): ${evidence.description}`);
+  }
+  return lines;
+}
+
+/**
+ * Shifts `thresholds` toward whichever side a confirmed `supplier_capture` change (see
+ * `research/interpretEvents.ts`) points — the mechanism this bot needs so that a genuine
+ * qualification/contract-tier change can actually cross a `SignalLevel` bucket boundary, not just
+ * nudge a dollar-denominated fair value that a security's own base price can swamp (see
+ * `config.ts`'s `AdvancedSignalPolicy` doc comment for why this exists as a SEPARATE channel from
+ * `ValuationSensitivities.supplierCaptureToFusionOptionPerShare`, which is kept, not replaced).
+ * An upgrade lowers `strongBuyThreshold`/`buyThreshold` (easier to earn a BUY); a downgrade raises
+ * `sellThreshold`/`strongSellThreshold` (easier to earn a SELL) — never both at once, and never
+ * touches the OPPOSITE side's thresholds (an upgrade never makes it harder to sell, a downgrade
+ * never makes it harder to buy). Passing through unchanged when no `supplier_capture` effect fired
+ * this round reproduces the original thresholds exactly.
+ */
+export function adjustThresholdsForSupplierCapture(
+  thresholds: SignalThresholds,
+  effects: ModelEffect[],
+  shift: number,
+): SignalThresholds {
+  const captureEffect = effects.find((effect) => effect.factor === 'supplier_capture');
+  if (captureEffect === undefined || captureEffect.direction === 'neutral') return thresholds;
+
+  const strength = captureEffect.magnitude * captureEffect.confidence;
+  const delta = strength * shift;
+  if (captureEffect.direction === 'positive') {
+    return {
+      ...thresholds,
+      strongBuyThreshold: thresholds.strongBuyThreshold - delta,
+      buyThreshold: thresholds.buyThreshold - delta,
+    };
+  }
+  return {
+    ...thresholds,
+    sellThreshold: thresholds.sellThreshold + delta,
+    strongSellThreshold: thresholds.strongSellThreshold + delta,
+  };
+}
+
+/**
+ * `AdvancedSignalPolicy`'s other half: turns a market-implied-valuation finding (`valuation/
+ * marketImplied.ts`) into the `externalConfidenceMultiplier` `signal.ts`'s `computeSignal` folds
+ * directly into `signalScore` — see that param's own doc comment for why it has to happen THERE,
+ * not as a cosmetic adjustment to the already-reported confidence number. `undefined` (no modeled
+ * fusion chain to invert) and `'within_range'` both mean no adjustment (`1`).
+ */
+export function marketImpliedConfidenceMultiplier(
+  marketImplied: MarketImpliedExpectations | undefined,
+  policy: AdvancedSignalPolicy,
+): number {
+  if (marketImplied === undefined) return 1;
+  if (marketImplied.impliedCaptureVsRange === 'above_bull_case') return policy.marketImpliedOptimismConfidencePenalty;
+  if (marketImplied.impliedCaptureVsRange === 'below_bear_case') return policy.marketImpliedUpsideConfidenceBoost;
+  return 1;
+}
+
+function collectFalsifiers(effects: ModelEffect[], currentState: ResearchState): string[] {
+  const falsifiers = new Set<string>();
+  for (const effect of effects) {
+    if (effect.factor === 'manufacturing_capability') {
+      falsifiers.add(
+        'If no fusion program relationship for the acquired operation ever moves off UNKNOWN ' +
+          'status, the fusion-option component of this valuation should be reduced toward zero.',
+      );
+    }
+    if (effect.sourceHypothesisId !== undefined) {
+      const hypothesis = currentState.hypotheses.find((h) => h.id === effect.sourceHypothesisId);
+      for (const falsifier of hypothesis?.falsifiers ?? []) {
+        falsifiers.add(falsifier.description);
+      }
+    }
+  }
+  return Array.from(falsifiers);
+}
+
+/**
+ * The full pipeline from spec's guiding principle: point-in-time snapshot -> delta -> event
+ * interpretation -> valuation -> signal -> portfolio target -> orders, wired together into one
+ * explainable `TradingDecision` FOR ONE SECURITY. Pure function of its inputs (spec §23
+ * determinism) — no clock, no randomness, no I/O. `signalThresholds`/`portfolioPolicy` are
+ * shared across every security in a multi-symbol portfolio (spec follow-up) — only `security`
+ * itself varies per call; see `computeTradingDecisions` below for the per-round, multi-security
+ * orchestration.
+ */
+export function computeTradingDecision(params: {
+  date: string | null;
+  security: SecurityConfig;
+  signalThresholds: SignalThresholds;
+  advancedSignal: AdvancedSignalPolicy;
+  portfolioPolicy: PortfolioPolicy;
+  previousResearchState: ResearchState | undefined;
+  currentResearchState: ResearchState;
+  currentPriceDollars: number;
+  previousPriceDollars: number | undefined;
+  previousFairValuePerShare: number | undefined;
+  /** The `signal.level` this bot returned on ITS OWN previous decision for THIS security (spec
+   * §17: only legitimately-knowable state) — omit (or `undefined`) on this security's first-ever
+   * decision. Drives `signal.ts`'s hysteresis; never anything about the game's own history. */
+  previousSignalLevel?: SignalLevel | undefined;
+  portfolio: PortfolioObservation;
+  /** v2-only: this security's own trailing real price history (`observation.securities[].history`
+   * — oldest first, NOT including today's own bar), used for two things: (1) recomputing
+   * `baseBusinessValuePerShare` from a rolling window instead of a frozen config constant (see
+   * `valuation/rollingBaseValue.ts`), and (2) `computePriceStabilityConfidence` (see
+   * `signal.ts`). An empty array (a security's first-ever round) means both fall back to their
+   * own "not enough data yet" defaults — the static config value, and full confidence
+   * respectively — never an invented number. */
+  priceHistory: DailyBar[];
+  /** v2-only: how far back / how sensitive the rolling valuation and price-stability confidence
+   * are — see `config.ts`'s `ConfidenceCalibration` doc comment. Configurable per-call (rather
+   * than a hardcoded default) specifically so a parameter sweep can vary it in-process. */
+  confidenceCalibration: ConfidenceCalibration;
+  /** v3-only: the momentum/trend confirmation filter — see `config.ts`'s `TrendFilterPolicy` doc
+   * comment. */
+  trendFilter: TrendFilterPolicy;
+  /** v4-only: inverse-volatility position-size scaling — see `config.ts`'s `VolatilitySizingPolicy`
+   * doc comment. */
+  volatilitySizing: VolatilitySizingPolicy;
+  /** v5-only: the trailing stop-loss — see `config.ts`'s `StopLossPolicy` doc comment. */
+  stopLoss: StopLossPolicy;
+  /** v6-only: this security's precomputed correlation-based size scale factor for THIS round (see
+   * `config.ts`'s `CorrelationSizingPolicy` and `correlation.ts`) — always in `[minScaleFactor,
+   * 1]`. Computed once across every priced security by `computeTradingDecisions` (the only place
+   * with visibility into every tracked security's history at once), not by this function itself. */
+  correlationScale: number;
+  /** Remaining buying power for THIS ROUND after any earlier securities in the same round have
+   * already claimed some (spec follow-up: multi-security portfolios) — defaults to
+   * `spendableCentsFor(portfolio)` (the account's actual total, cash-account-aware — see that
+   * function's own doc comment) when omitted, which reproduces the original single-security
+   * behavior exactly. See `computeTradingDecisions`. */
+  availableBuyingPowerCents?: number | undefined;
+  /** v2-only: the shrinking global short-exposure remainder for this round — see
+   * `portfolio.ts`'s `buildOrders` and `PortfolioPolicy.globalShortBudgetPct`. Omitted means
+   * uncapped (single-security callers). */
+  availableShortCapacityCents?: number | undefined;
+}): TradingDecision {
+  const delta = computeResearchDelta(params.previousResearchState, params.currentResearchState);
+  const effects = interpretResearchDelta(delta, params.currentResearchState, params.security.targetEntityId);
+  const exposure = computeExposureMap(params.currentResearchState, params.security.targetEntityId);
+
+  // v2: a BLEND of the static config assumption and a rolling trailing-window value — see
+  // `valuation/rollingBaseValue.ts`'s `computeBlendedBaseValuePerShare` doc comment for why a
+  // full replacement (v2's first cut) turned out to be a mean-reversion strategy in disguise.
+  const baseBusinessValue = computeBlendedBaseValuePerShare(
+    params.security.valuation.baseBusinessValuePerShare,
+    params.priceHistory,
+    params.confidenceCalibration.rollingWindowDays,
+    params.confidenceCalibration.rollingBlendWeight,
+  );
+
+  const fusionValueResult = computeFusionValue(params.security.valuation.fusion);
+  const valuation = computeCompanyValuation({
+    ticker: params.security.ticker,
+    asOf: params.currentResearchState.timestamp,
+    baseBusinessValue,
+    fusionValueResult,
+    fusionOptionValueBaseline: params.security.valuation.fusionOptionValueBaselinePerShare,
+    effects,
+    sensitivities: params.security.valuation.sensitivities,
+    sharesOutstanding: params.security.sharesOutstanding,
+    unknowns: [...KNOWN_VALUATION_UNKNOWNS],
+  });
+
+  const marketImplied = computeMarketImpliedExpectationsFromScenarios({
+    marketPricePerShare: params.currentPriceDollars,
+    baseBusinessValuePerShare: baseBusinessValue,
+    fusionOptionValuePerShare: valuation.fusionOptionValue,
+    fusion: params.security.valuation.fusion,
+    sharesOutstanding: params.security.sharesOutstanding,
+  });
+
+  const adjustedThresholds = adjustThresholdsForSupplierCapture(
+    params.signalThresholds,
+    effects,
+    params.advancedSignal.supplierCaptureThresholdShift,
+  );
+  const confidenceMultiplier = marketImpliedConfidenceMultiplier(marketImplied, params.advancedSignal);
+
+  const signal = computeSignal({
+    ticker: params.security.ticker,
+    fairValuePerShare: valuation.fairValue.base,
+    marketPrice: params.currentPriceDollars,
+    effects,
+    thresholds: adjustedThresholds,
+    previousLevel: params.previousSignalLevel,
+    externalConfidenceMultiplier: confidenceMultiplier,
+  });
+
+  // v2: `signal.confidence` alone (research-effect-based) sits at 1.0 on the overwhelming
+  // majority of rounds — see `computePriceStabilityConfidence`'s own doc comment for why that
+  // left the shorting gate never actually gating anything. Multiplying in a SECOND, independent,
+  // market-behavior-based factor means confidence can genuinely vary even when no research fired.
+  const priceStabilityConfidence = computePriceStabilityConfidence(
+    params.priceHistory,
+    params.confidenceCalibration.rollingWindowDays,
+    params.confidenceCalibration.calmDailyVolatility,
+    params.confidenceCalibration.chaoticDailyVolatility,
+    params.confidenceCalibration.confidenceFloor,
+  );
+  const confidence = signal.confidence * priceStabilityConfidence;
+
+  const informationGap = computeInformationGap({
+    currentFairValuePerShare: valuation.fairValue.base,
+    previousFairValuePerShare: params.previousFairValuePerShare,
+    currentPrice: params.currentPriceDollars,
+    previousPrice: params.previousPriceDollars,
+  });
+
+  const rawTargetWeight = targetWeightForSignal(signal.level, confidence, params.portfolioPolicy);
+
+  // v3: trend-confirmation veto — see config.ts's TrendFilterPolicy doc comment. Only gates NEW
+  // or larger exposure (a long entry, or a short entry); REDUCE/SELL/cover actions (anything that
+  // only shrinks risk) are never vetoed, since there's no "catching a falling knife" risk in
+  // reducing exposure.
+  const trailingReturn = computeTrailingReturn(params.priceHistory, params.currentPriceDollars, params.trendFilter.windowDays);
+  let targetWeight = rawTargetWeight;
+  let trendVetoNote = '';
+  if (trailingReturn !== undefined) {
+    const enteringLong = (signal.level === 'STRONG_BUY' || signal.level === 'BUY') && (rawTargetWeight ?? 0) > 0;
+    const enteringShort = signal.level === 'STRONG_SELL' && (rawTargetWeight ?? 0) < 0;
+    if (enteringLong && trailingReturn < -params.trendFilter.vetoThreshold) {
+      targetWeight = undefined; // hold instead of buying into a steep decline
+      trendVetoNote = ` Trend filter VETOED this ${signal.level} entry (trailing ${(trailingReturn * 100).toFixed(1)}% over ${String(params.trendFilter.windowDays)}d, past the -${(params.trendFilter.vetoThreshold * 100).toFixed(0)}% threshold) — holding instead of buying into a steep decline.`;
+    } else if (enteringShort && trailingReturn > params.trendFilter.vetoThreshold) {
+      targetWeight = 0; // flatten instead of shorting into a steep rally
+      trendVetoNote = ` Trend filter VETOED this STRONG_SELL short (trailing ${(trailingReturn * 100).toFixed(1)}% over ${String(params.trendFilter.windowDays)}d, past the +${(params.trendFilter.vetoThreshold * 100).toFixed(0)}% threshold) — flattening instead of shorting into a steep rally.`;
+    }
+  }
+
+  // v4: inverse-volatility position sizing — see config.ts's VolatilitySizingPolicy doc comment.
+  // Same trailing history/window `computePriceStabilityConfidence` above already used, applied to
+  // an independent purpose (position sizing, not confidence gating).
+  const dailyVolatility = computeDailyVolatility(params.priceHistory, params.confidenceCalibration.rollingWindowDays);
+  targetWeight = scaleTargetWeightForVolatility(targetWeight, dailyVolatility, params.volatilitySizing, params.portfolioPolicy.maxPositionWeight);
+
+  // v6: correlation-aware sizing — see config.ts's CorrelationSizingPolicy doc comment. Stacks
+  // multiplicatively with the volatility scale above (two independent, each self-capped factors),
+  // same pattern the trend filter and stop-loss also follow: each mechanism only ever adjusts what
+  // the PREVIOUS one already produced, never re-derives the whole decision from scratch.
+  targetWeight = applyCorrelationScale(targetWeight, params.correlationScale, params.portfolioPolicy.maxPositionWeight);
+
+  // v5: hard trailing stop-loss — the FINAL word, overriding the trend filter and volatility
+  // sizing above (and the signal itself). See config.ts's StopLossPolicy doc comment for why this
+  // is deliberately unconditional rather than another scaling factor.
+  let stopLossNote = '';
+  const existingPosition = params.portfolio.positions.find((p) => p.ticker === params.security.ticker);
+  if (
+    existingPosition !== undefined &&
+    isStopLossTriggered(existingPosition.shares, existingPosition.averageEntryPriceCents, params.currentPriceDollars, params.stopLoss.stopLossPct)
+  ) {
+    const entryPriceDollars = existingPosition.averageEntryPriceCents / 100;
+    const adverseMovePct =
+      existingPosition.shares > 0
+        ? ((entryPriceDollars - params.currentPriceDollars) / entryPriceDollars) * 100
+        : ((params.currentPriceDollars - entryPriceDollars) / entryPriceDollars) * 100;
+    targetWeight = 0;
+    stopLossNote = ` STOP-LOSS TRIGGERED: position ${adverseMovePct.toFixed(1)}% against entry $${entryPriceDollars.toFixed(2)}, past the ${(params.stopLoss.stopLossPct * 100).toFixed(0)}% threshold — flattening regardless of signal.`;
+  }
+
+  const orders = buildOrders({
+    ticker: params.security.ticker,
+    targetWeight,
+    priceDollars: params.currentPriceDollars,
+    portfolio: params.portfolio,
+    policy: params.portfolioPolicy,
+    availableBuyingPowerCents: params.availableBuyingPowerCents,
+    availableShortCapacityCents: params.availableShortCapacityCents,
+  });
+
+  const action: TradingDecision['action'] =
+    orders.length === 0 ? 'HOLD' : orders[0]!.side === 'BUY' ? 'BUY' : 'SELL';
+
+  const researchChanges = describeResearchChanges(delta);
+  const modelEffects = effects.map((effect) => effect.rationale);
+  const falsifiers = collectFalsifiers(effects, params.currentResearchState);
+
+  const reactionText =
+    informationGap.marketChange === null
+      ? 'no prior observation to compare market reaction against'
+      : `market moved ${(informationGap.marketChange * 100).toFixed(1)}% vs. our model's ` +
+        `${((informationGap.modelChange ?? 0) * 100).toFixed(1)}% fair-value change ` +
+        `(information gap ${((informationGap.informationGap ?? 0) * 100).toFixed(1)}%)`;
+
+  const rationale =
+    (delta.isEmpty
+      ? 'No research change since the previous decision. '
+      : `Research changed: ${researchChanges.join(' ')} `) +
+    (modelEffects.length > 0 ? `Modeled effects: ${modelEffects.join(' ')} ` : '') +
+    `${signal.rationale} ` +
+    `Price-stability confidence: ${(priceStabilityConfidence * 100).toFixed(0)}% -> combined confidence ${(confidence * 100).toFixed(0)}%. ` +
+    `${reactionText}.${trendVetoNote}${stopLossNote} ` +
+    (orders.length === 0
+      ? 'No trade: either no target-weight change was warranted or the resulting trade was below the minimum order size.'
+      : `Action: ${action} to move toward a ${((targetWeight ?? 0) * 100).toFixed(1)}% target weight.`);
+
+  return {
+    date: params.date,
+    security: params.security.ticker,
+    action,
+    signalLevel: signal.level,
+    heldByHysteresis: signal.heldByHysteresis,
+    targetWeight,
+    researchChanges,
+    modelEffects,
+    valuationBefore: params.previousFairValuePerShare,
+    valuationAfter: valuation.fairValue.base,
+    valuationBreakdown: valuation,
+    marketReaction: informationGap.marketChange,
+    valuationGap: signal.valuationGap,
+    confidence,
+    rationale,
+    falsifiers,
+    orders,
+    exposure,
+    marketImplied,
+    portfolioAdjustmentNote: undefined,
+  };
+}
+
+/** Per-security state a multi-symbol portfolio needs to remember between rounds (spec §17) —
+ * exactly the same three things `computeTradingDecision` always needed, just keyed by ticker now
+ * instead of held as bare closure variables. See `../index.ts`'s `createDecideAction`. */
+export interface PreviousSecurityState {
+  fairValuePerShare?: number;
+  priceDollars?: number | undefined;
+  signalLevel?: SignalLevel;
+}
+
+/** v2-only: how much a signal level competes for the round's shared cash — STRONG_BUY first, then
+ * BUY, everything else (HOLD/REDUCE/SELL/STRONG_SELL) last since none of those debit the budget
+ * below (a REDUCE/SELL/short either frees cash or spends none at all). Ties within a tier break by
+ * `Math.abs(valuationGap)` — see `computeTradingDecisions`. */
+function buyPriorityRank(level: SignalLevel): number {
+  if (level === 'STRONG_BUY') return 2;
+  if (level === 'BUY') return 1;
+  return 0;
+}
+
+/**
+ * The multi-security, per-round orchestration (spec follow-up: "scale to a portfolio of multiple
+ * symbols"): runs `computeTradingDecision` once per priced security against the SAME shared
+ * research snapshot, threading a single shrinking `availableBuyingPowerCents` budget through all
+ * of them so simultaneous BUY signals across different companies can never jointly overspend one
+ * account (spec §14: still no portfolio optimizer — just correct, sequential bookkeeping over one
+ * real constraint the game itself enforces). A security with no price in this round's observation
+ * is skipped entirely (no decision recorded for it) rather than treated as an error — the same way
+ * a single-security bot always tolerated a round with no research/price.
+ *
+ * v2, unlike v0/v1: execution order is NOT `config.securities` order — see `buyPriorityRank`. A
+ * fixed config-array order meant a mild BUY sitting earlier in the list could claim the round's
+ * cash before a STRONG_BUY sitting later in the list was even evaluated, purely by array position,
+ * not conviction — free money left on the table for no risk reduction. Fixing that means knowing
+ * every security's signal BEFORE deciding execution order, which means computing each one's
+ * decision TWICE: once with a throwaway `availableBuyingPowerCents: 0` purely to read its
+ * `signalLevel`/`valuationGap` (its `.orders`/`.action` from this call are meaningless and
+ * discarded), then once for real, in priority order, with the actual shrinking budget. This
+ * pipeline is pure, deterministic, cheap math (no I/O) — accepting one redundant pass here is a
+ * far smaller cost than threading a signal cache through two call sites for a backtest that's
+ * never going to be a hot loop.
+ *
+ * v2, unlike v0/v1: the starting budget itself is also smaller on purpose — see
+ * `PortfolioPolicy.emergencyCashReservePct`/`dryPowderTargetPct`'s own doc comments. Two DIFFERENT
+ * reserves, computed off two DIFFERENT bases (starting capital vs. current equity), both
+ * subtracted before anything is available to spend.
+ *
+ * Only debits the running budget for BUY orders; SELL proceeds are deliberately NOT credited back
+ * into the same round's budget (conservative — avoids assuming a same-round sell fills in time to
+ * fund a same-round buy). A SELL that opens/extends a short isn't debited from this budget either
+ * — this budget models long-side buying power only; short-margin consumption is left to the
+ * engine's own enforcement, same "no portfolio optimizer, just correct bookkeeping over one
+ * constraint" simplification `portfolio.ts`'s `buildOrders` already documents for itself.
+ */
+export function computeTradingDecisions(params: {
+  date: string | null;
+  config: FusionFundamentalConfig;
+  previousResearchState: ResearchState | undefined;
+  currentResearchState: ResearchState;
+  /** Current price per share, keyed by ticker — securities with no entry here are skipped. */
+  currentPricesByTicker: Map<string, number>;
+  /** v2-only: each security's own trailing real price history, keyed by ticker — see
+   * `computeTradingDecision`'s own `priceHistory` doc comment. A ticker with no entry is treated
+   * as no history yet (same as an explicit empty array). */
+  historyByTicker: Map<string, DailyBar[]>;
+  previousByTicker: Map<string, PreviousSecurityState>;
+  portfolio: PortfolioObservation;
+}): TradingDecision[] {
+  const pricedSecurities = params.config.securities.filter((security) =>
+    params.currentPricesByTicker.has(security.ticker),
+  );
+
+  // v6: correlation scale factors are computed ONCE per round, across every priced security's
+  // real trailing returns — this is the only place with visibility into every tracked security's
+  // history at once, unlike a single security's own decision. Reused for both the priority-order
+  // preview pass and the real pass below (it doesn't depend on budget or order results, only on
+  // price history that's already fully known before either pass runs).
+  const returnsByTicker = new Map(
+    pricedSecurities.map((security) => [
+      security.ticker,
+      computeReturnsSeries(params.historyByTicker.get(security.ticker) ?? [], params.config.correlationSizing.windowDays),
+    ]),
+  );
+  const correlationScaleByTicker = computeCorrelationScaleFactors(
+    returnsByTicker,
+    params.config.correlationSizing.concentrationPenalty,
+    params.config.correlationSizing.minScaleFactor,
+  );
+
+  const previewsByTicker = new Map(
+    pricedSecurities.map((security) => {
+      const previous = params.previousByTicker.get(security.ticker);
+      const preview = computeTradingDecision({
+        date: params.date,
+        security,
+        signalThresholds: params.config.signal,
+        advancedSignal: params.config.advancedSignal,
+        portfolioPolicy: params.config.portfolio,
+        previousResearchState: params.previousResearchState,
+        currentResearchState: params.currentResearchState,
+        currentPriceDollars: params.currentPricesByTicker.get(security.ticker)!,
+        priceHistory: params.historyByTicker.get(security.ticker) ?? [],
+        confidenceCalibration: params.config.confidenceCalibration,
+        trendFilter: params.config.trendFilter,
+        volatilitySizing: params.config.volatilitySizing,
+        stopLoss: params.config.stopLoss,
+        correlationScale: correlationScaleByTicker.get(security.ticker) ?? 1,
+        previousPriceDollars: previous?.priceDollars,
+        previousFairValuePerShare: previous?.fairValuePerShare,
+        previousSignalLevel: previous?.signalLevel,
+        portfolio: params.portfolio,
+        availableBuyingPowerCents: 0,
+        availableShortCapacityCents: 0,
+      });
+      return [security.ticker, preview] as const;
+    }),
+  );
+
+  const orderedSecurities = [...pricedSecurities].sort((a, b) => {
+    const previewA = previewsByTicker.get(a.ticker)!;
+    const previewB = previewsByTicker.get(b.ticker)!;
+    const rankDiff = buyPriorityRank(previewB.signalLevel) - buyPriorityRank(previewA.signalLevel);
+    if (rankDiff !== 0) return rankDiff;
+    return Math.abs(previewB.valuationGap) - Math.abs(previewA.valuationGap);
+  });
+
+  // Seeded from `spendableCentsFor`, NOT raw `portfolio.buyingPowerCents` — a plain cash account
+  // reports that as `0` (see that function's own doc comment), which would otherwise leave every
+  // security in the round thinking there's no budget at all, right from the first one. Then two
+  // v2-only reserves come off the top before anything else can claim it.
+  const startingCapitalCents = params.portfolio.equityHistory[0]?.equityCents ?? params.portfolio.equityCents;
+  const emergencyReserveCents = startingCapitalCents * params.config.portfolio.emergencyCashReservePct;
+  const dryPowderCents = params.portfolio.equityCents * params.config.portfolio.dryPowderTargetPct;
+  let remainingBuyingPowerCents = Math.max(
+    0,
+    spendableCentsFor(params.portfolio) - emergencyReserveCents - dryPowderCents,
+  );
+  // v2-only: the shared aggregate short budget — see `PortfolioPolicy.globalShortBudgetPct`'s own
+  // doc comment. Tracked the same shrinking-remainder way as the buy budget above.
+  let remainingShortCapacityCents = params.portfolio.equityCents * params.config.portfolio.globalShortBudgetPct;
+
+  const decisions: TradingDecision[] = [];
+  for (const security of orderedSecurities) {
+    const currentPriceDollars = params.currentPricesByTicker.get(security.ticker)!;
+    const previous = params.previousByTicker.get(security.ticker);
+    const decision = computeTradingDecision({
+      date: params.date,
+      security,
+      signalThresholds: params.config.signal,
+        advancedSignal: params.config.advancedSignal,
+      portfolioPolicy: params.config.portfolio,
+      previousResearchState: params.previousResearchState,
+      currentResearchState: params.currentResearchState,
+      currentPriceDollars,
+      priceHistory: params.historyByTicker.get(security.ticker) ?? [],
+        confidenceCalibration: params.config.confidenceCalibration,
+        trendFilter: params.config.trendFilter,
+        volatilitySizing: params.config.volatilitySizing,
+        stopLoss: params.config.stopLoss,
+        correlationScale: correlationScaleByTicker.get(security.ticker) ?? 1,
+      previousPriceDollars: previous?.priceDollars,
+      previousFairValuePerShare: previous?.fairValuePerShare,
+      previousSignalLevel: previous?.signalLevel,
+      portfolio: params.portfolio,
+      availableBuyingPowerCents: remainingBuyingPowerCents,
+      availableShortCapacityCents: remainingShortCapacityCents,
+    });
+
+    decisions.push(decision);
+
+    const priceCents = Math.round(currentPriceDollars * 100);
+    const positionBefore = params.portfolio.positions.find((p) => p.ticker === security.ticker);
+    const sharesBefore = positionBefore?.shares ?? 0;
+
+    for (const order of decision.orders) {
+      if (order.side === 'BUY') {
+        remainingBuyingPowerCents = Math.max(0, remainingBuyingPowerCents - order.quantity * priceCents);
+      } else {
+        // v2: how much of THIS SELL is genuinely NEW short exposure (as opposed to closing an
+        // existing long) — recomputed here from shares-before/after rather than exposed by
+        // `buildOrders` itself, so its return type (`OrderRequest[]`, the same shape every other
+        // caller/test expects) never had to change. A cover (shares moving toward zero) or a plain
+        // long-trim never counts here; only the portion that makes the short deeper than it
+        // already was does.
+        const sharesAfter = sharesBefore - order.quantity;
+        const shortBefore = Math.max(0, -sharesBefore);
+        const shortAfter = Math.max(0, -sharesAfter);
+        const newShortShares = Math.max(0, shortAfter - shortBefore);
+        if (newShortShares > 0) {
+          remainingShortCapacityCents = Math.max(0, remainingShortCapacityCents - newShortShares * priceCents);
+        }
+      }
+    }
+  }
+
+  return applyPortfolioLevelAdjustments({
+    decisions,
+    policy: params.config.thesisGroupCap,
+    portfolioPolicy: params.config.portfolio,
+    portfolio: params.portfolio,
+    currentPricesByTicker: params.currentPricesByTicker,
+  });
+}
+
+/**
+ * The portfolio-level pass (spec §20/§25): runs AFTER every security's own independently-sized
+ * decision is final, using `TradingDecision.exposure` (the only place with visibility into every
+ * tracked security's research exposure at once — a single security's own decision has no way to
+ * know what else is in the book, same reasoning `correlation.ts`'s cross-security pass already
+ * follows). `applyThesisGroupCaps` only ever SHRINKS a group's combined target weight, never grows
+ * it — orders are only regenerated for a security whose weight actually changed, using the
+ * account's real current spendable cash as the ceiling (safe: a shrink never needs MORE budget
+ * than the already-approved original order already assumed, so reusing the ORIGINAL per-security
+ * budget bookkeeping isn't needed here — `buildOrders`' own default omitted-budget fallback,
+ * `spendableCentsFor(portfolio)`, is always >= whatever was actually available).
+ */
+function applyPortfolioLevelAdjustments(params: {
+  decisions: TradingDecision[];
+  policy: ThesisGroupCapPolicy;
+  portfolioPolicy: PortfolioPolicy;
+  portfolio: PortfolioObservation;
+  currentPricesByTicker: Map<string, number>;
+}): TradingDecision[] {
+  const targetWeightByTicker = new Map(params.decisions.map((d) => [d.security, d.targetWeight]));
+  const exposureFootprintByTicker = new Map(params.decisions.map((d) => [d.security, exposureFootprint(d.exposure)]));
+
+  const { adjustedWeightByTicker, adjustments } = applyThesisGroupCaps({
+    targetWeightByTicker,
+    exposureFootprintByTicker,
+    policy: params.policy,
+  });
+
+  const noteByTicker = new Map<string, string>();
+  for (const adjustment of adjustments) {
+    for (const ticker of adjustment.group) noteByTicker.set(ticker, adjustment.note);
+  }
+
+  return params.decisions.map((decision) => {
+    const adjustedWeight = adjustedWeightByTicker.get(decision.security);
+    const note = noteByTicker.get(decision.security);
+    if (adjustedWeight === decision.targetWeight || note === undefined) return decision;
+
+    const priceDollars = params.currentPricesByTicker.get(decision.security);
+    if (priceDollars === undefined) return decision; // defensive; every decision here was priced
+
+    const orders = buildOrders({
+      ticker: decision.security,
+      targetWeight: adjustedWeight,
+      priceDollars,
+      portfolio: params.portfolio,
+      policy: params.portfolioPolicy,
+    });
+
+    return {
+      ...decision,
+      targetWeight: adjustedWeight,
+      orders,
+      action: orders.length === 0 ? 'HOLD' : orders[0]!.side === 'BUY' ? 'BUY' : 'SELL',
+      portfolioAdjustmentNote: note,
+      rationale: `${decision.rationale} PORTFOLIO ADJUSTMENT: ${note}`,
+    };
+  });
+}
+
+/** Human-readable, multi-line trace for dev/testing (spec §31) — callers decide where this goes
+ * (stderr, a log file); production `decideAction` behavior never depends on this being read. */
+export function formatStrategyTrace(decision: TradingDecision): string {
+  const lines = [
+    `[fusion-fundamental-v2] ${decision.date ?? '(no date)'} ${decision.security}`,
+    `  research changes: ${decision.researchChanges.length === 0 ? '(none)' : ''}`,
+    ...decision.researchChanges.map((line) => `    - ${line}`),
+    `  model effects: ${decision.modelEffects.length === 0 ? '(none)' : ''}`,
+    ...decision.modelEffects.map((line) => `    - ${line}`),
+    `  fair value: ${decision.valuationBefore?.toFixed(4) ?? '(none)'} -> ${decision.valuationAfter.toFixed(4)}`,
+    `  market reaction: ${decision.marketReaction === null ? '(none)' : `${(decision.marketReaction * 100).toFixed(2)}%`}`,
+    `  valuation gap: ${(decision.valuationGap * 100).toFixed(2)}%  confidence: ${(decision.confidence * 100).toFixed(0)}%`,
+    `  signal level: ${decision.signalLevel}${decision.heldByHysteresis ? ' (held by hysteresis)' : ''}`,
+    `  action: ${decision.action}${decision.targetWeight !== undefined ? ` (target weight ${(decision.targetWeight * 100).toFixed(1)}%)` : ''}`,
+    `  rationale: ${decision.rationale}`,
+    `  falsifiers: ${decision.falsifiers.length === 0 ? '(none)' : ''}`,
+    ...decision.falsifiers.map((line) => `    - ${line}`),
+  ];
+  return lines.join('\n');
+}

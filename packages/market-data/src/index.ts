@@ -12,6 +12,7 @@ export * from './schema/corporateAction.js';
 export * from './dataset/identity.js';
 export * from './store/db.js';
 export * from './store/ingest.js';
+export * from './store/append.js';
 export * from './store/queries.js';
 export * from './provider/provider.js';
 export * from './snapshot/snapshot.js';

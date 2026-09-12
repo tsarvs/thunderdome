@@ -1,0 +1,18 @@
+{
+  "id": "fusion-fundamental-v7",
+  "name": "Fusion Fundamental v7",
+  "version": "0.1.0",
+  "game": "stock-market-4",
+  "author": {
+    "name": "Thunderdome Maintainers",
+    "contact": "maintainers@example.com"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "The seventh version in the fusion-fundamental lineage: same single-security valuation -> discrete signal-bucket -> fixed-target-weight skeleton as v0-v6, extended with causal-graph exposure tracking (research/exposure.ts), market-implied-valuation reverse-engineering (valuation/marketImplied.ts), and cross-security thesis-group position caps (portfolio/optimizer.ts)."
+}

@@ -33,6 +33,10 @@ today.
 | Command              | Status                                                                                                      |
 | -------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `match run`          | Real — runs one match between two or more bots. See below.                                                  |
+| `match forward run`  | Real — runs (or resumes) one persistent, resumable forward match. See below.                                |
+| `match forward list` | Real — lists persisted forward match records. See below.                                                    |
+| `match forward inspect` | Real — prints one persisted forward match's details. See below.                                          |
+| `match forward preview` | Real — read-only "what would the bot do right now vs. its stored config," no persistence. See below.     |
 | `play`               | Real — a human, typing into this terminal, plays one interactive match against one or more bots. See below. |
 | `tournament run`     | Real — runs a round-robin or single-elimination tournament among two or more bots. See below.               |
 | `tournament list`    | Real — lists persisted tournament records. See below.                                                       |
@@ -124,6 +128,82 @@ out (`INIT_TIMEOUT`) even though the bot and image were fine — root-caused and
 first-write retry in `@thunderdome/runtime`; see
 [`scripts/README.md`](../../scripts/README.md#a-known-docker-reliability-issue-root-caused-and-fixed)
 for the full explanation. If you still see this, it's a new issue, not the old one.
+
+## `match forward run` / `list` / `inspect`
+
+```bash
+yarn thunderdome match forward run <matchId> <botId> [...moreBotIds] \
+  [--config '<json>' | --config-file <path>] [--store-dir <path>]
+yarn thunderdome match forward list [--store-dir <path>]
+yarn thunderdome match forward inspect <matchId> [--store-dir <path>]
+```
+
+Roadmap Phase 3's persistent, resumable forward-match lifecycle
+([`docs/adr/0013-forward-match-persistence.md`](../../docs/adr/0013-forward-match-persistence.md))
+— today this only works with a `stock-market-4` match whose config declares
+`"gameType": "FORWARD_SHADOW"` (see [`games/stock-market-4/README.md`](../../games/stock-market-4/README.md)),
+since it's the only game that currently exports the three functions (`serializeForwardState`/
+`resumeForwardState`/`isForwardMatchFullyResolved`) this command needs.
+
+Unlike `match run`, a forward match isn't played to completion in one invocation — it plays
+whatever's CURRENTLY known (a `FORWARD_SHADOW` match's dataset grows over real time via
+`@thunderdome/market-data`'s `appendBars`, see
+[`docs/adr/0012-incremental-market-data-growth.md`](../../docs/adr/0012-incremental-market-data-growth.md)),
+persists its progress after every round, and exits — resumable by running the exact same command
+again later, once more data has arrived:
+
+```bash
+yarn thunderdome match forward run fusion-live fusion-fundamental-v0 \
+  --config '{"gameType":"FORWARD_SHADOW","marketDataUniverse":["ELMT"],"marketDataset":{"id":"fusion","version":"1","storeDir":"./.thunderdome/market-data"},"startDate":"2026-09-01","endDate":"2026-12-31"}'
+```
+
+```
+Created forward match "fusion-live" (Stock Market 4).
+Building 1 bot image(s)...
+
+Forward match "fusion-live": played 3 new round(s) this invocation (3 total).
+Still resumable — more data may arrive later; re-run the same command to continue.
+```
+
+- `<matchId>` is REQUIRED and operator-chosen — never auto-generated. This is deliberate: a
+  forward match is meant to be found and resumed on purpose, not created by accident because
+  nobody remembered a random id.
+- `--config` (or `--config-file`) is only used (and one of them required) the FIRST time —
+  creating a new match. Resuming an existing one always uses its own stored config; passing either
+  on a resume invocation prints a warning and is ignored, rather than silently letting a later
+  invocation redefine history.
+- `--config-file <path>` reads the same JSON from a file instead of an inline argument — use it
+  once `--config`'s JSON gets too large for your shell's argv limit (a `researchTimeline` built
+  from a real research dataset routinely runs to megabytes; see
+  [`packages/research/fusion`](../../packages/research/fusion)'s
+  `emit:forward-config` script for generating one). `--config` and `--config-file` are mutually
+  exclusive.
+- Progress is persisted after every round resolved, not just once at the end of an invocation — a
+  crash mid-invocation loses at most the one round genuinely in flight.
+- Exits 0 whether the match is still active (more data may arrive later) or has fully resolved
+  through `config.endDate` — `match forward inspect <matchId>` shows which. Exits 1 for bad input,
+  an unrecognized/corrupt record, or a bot failing to initialize — the same categories `match run`
+  already reports on.
+- `match forward list`/`inspect` are pure reads against `.thunderdome/forward-matches/` (gitignored
+  local run state, override with `--store-dir`) — no Docker, no registry, mirroring `tournament
+  list`/`inspect`'s own read-only design.
+
+## `match forward preview`
+
+```bash
+yarn thunderdome match forward preview <matchId> --config-file <path> [--store-dir <path>]
+```
+
+Read-only "what would the bot's orders be right now, versus what they'd be against this match's
+own stored config" check — never persists anything (no round resolved, no `ForwardMatchRecord`
+write). Since this game has no intraday price data (daily bars only), the only thing that can
+differ within the same trading day is RESEARCH recorded after the match was created/last
+configured — pass a freshly regenerated config (e.g. re-run
+[`packages/research/fusion`](../../packages/research/fusion)'s `emit:forward-config` against the
+live research fixture) as `--config-file`; it must describe the same `marketDataUniverse`/
+`marketDataset`/`startDate` as the match's own stored config, differing only in
+`researchTimeline` (or similar). Prints, per bot, which securities' orders differ between "at
+stored config" and "right now," and why.
 
 ## `play`
 

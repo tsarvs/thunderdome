@@ -1,6 +1,7 @@
 import { createRng } from '@thunderdome/rng';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  runAvailableRounds,
   runMatch,
   type ActionCollector,
   type CollectedAction,
@@ -586,5 +587,169 @@ describe('runMatch: match-timeout (whole-match wall-clock safety net)', () => {
     });
 
     expect(outcome.status).toBe('completed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runAvailableRounds — the resumable-caller primitive `runMatch` is now a thin wrapper over
+// (roadmap Phase 3, docs/adr/0013-forward-match-persistence.md). These tests exercise exactly the
+// capabilities `runMatch` itself can't offer: starting from an already-in-progress state, and
+// observing `finalState` on every stopping condition (not just success).
+// ---------------------------------------------------------------------------
+
+describe('runAvailableRounds', () => {
+  it('drives an already-in-progress state to completion, not from scratch', async () => {
+    // Single-participant race, so there's no turn-alternation to reason about — the state after
+    // one manually-applied round is unambiguously "one round from the target."
+    const game = makeRaceGame(4);
+    const initial = game.initialize({ config: undefined, participantIds: ['p1'], rng });
+    // Simulates a resumed match: one round already resolved by SOME earlier call, outside this
+    // one — p1 is already at 2, needs one more round of +2 to reach the target of 4.
+    const resumedState = game.resolve({
+      state: initial,
+      actions: new Map([['p1', { increment: 2 }]]),
+      rng,
+    }).nextState;
+
+    const collector = new ScriptedCollector(() => ({ ok: true, action: { increment: 2 } }));
+    const outcome = await runAvailableRounds({
+      game,
+      state: resumedState,
+      participantIds: ['p1'],
+      rng,
+      collector,
+      defaultDeadlineMs: 1000,
+      matchDeadlineMs: 60_000,
+    });
+
+    expect(outcome.terminalOutcome).toEqual({
+      status: 'completed',
+      result: { winner: 'p1' },
+      standingOutcomes: [{ participantId: 'p1', rank: 1, outcome: 'win' }],
+    });
+    // Only the one remaining round is played/reported — the round already resolved before this
+    // call isn't replayed into `events`.
+    expect(outcome.events.length).toBe(1);
+    expect(outcome.finalState.scores.get('p1')).toBe(4);
+  });
+
+  it('exposes finalState as of the last successfully resolved round on forfeit', async () => {
+    const game = makeDuelGame(['p1', 'p2']);
+    const state = game.initialize({ config: undefined, participantIds: ['p1', 'p2'], rng });
+    const collector = new ScriptedCollector((args) =>
+      args.roundId === 1 && args.participantId === 'p2'
+        ? { ok: false, reason: 'timeout' }
+        : { ok: true, action: 5 },
+    );
+
+    const outcome = await runAvailableRounds({
+      game,
+      state,
+      participantIds: ['p1', 'p2'],
+      rng,
+      collector,
+      defaultDeadlineMs: 1000,
+      matchDeadlineMs: 60_000,
+    });
+
+    expect(outcome.terminalOutcome?.status).toBe('forfeit');
+    // Round 0 resolved (p1 wins it, both submitted 5) before round 1's forfeit stopped the loop —
+    // finalState must reflect that resolved round, not the pristine initial state.
+    expect(outcome.finalState.roundWins.get('p1')).toBe(1);
+  });
+
+  it('exposes finalState on match-timeout, so a caller can persist progress and retry later', async () => {
+    const game = makeRaceGame(4);
+    const state = game.initialize({ config: undefined, participantIds: ['p1', 'p2'], rng });
+    const collector = new ScriptedCollector(() => ({ ok: true, action: { increment: 0 } }));
+    let elapsedMs = 0;
+    const now = () => {
+      elapsedMs += 10;
+      return elapsedMs;
+    };
+
+    const outcome = await runAvailableRounds({
+      game,
+      state,
+      participantIds: ['p1', 'p2'],
+      rng,
+      collector,
+      defaultDeadlineMs: 1000,
+      matchDeadlineMs: 100,
+      now,
+    });
+
+    expect(outcome.terminalOutcome?.status).toBe('match-timeout');
+    expect(outcome.finalState).toBeDefined();
+  });
+
+  it('honors startingRoundId, continuing round-id numbering rather than restarting at 0', async () => {
+    const game = makeRaceGame(2);
+    const state = game.initialize({ config: undefined, participantIds: ['p1'], rng });
+    const collector = new ScriptedCollector(() => ({ ok: true, action: { increment: 2 } }));
+
+    await runAvailableRounds({
+      game,
+      state,
+      participantIds: ['p1'],
+      rng,
+      collector,
+      defaultDeadlineMs: 1000,
+      matchDeadlineMs: 60_000,
+      startingRoundId: 7,
+    });
+
+    expect(collector.calls[0]?.roundId).toBe(7);
+  });
+
+  it('awaits onRoundResolved before requesting the next round\'s actions', async () => {
+    const game = makeRaceGame(4);
+    const state = game.initialize({ config: undefined, participantIds: ['p1'], rng });
+    const order: string[] = [];
+    const collector = new ScriptedCollector((args) => {
+      order.push(`request:${String(args.roundId)}`);
+      return { ok: true, action: { increment: 2 } };
+    });
+
+    await runAvailableRounds({
+      game,
+      state,
+      participantIds: ['p1'],
+      rng,
+      collector,
+      defaultDeadlineMs: 1000,
+      matchDeadlineMs: 60_000,
+      onRoundResolved: async () => {
+        await Promise.resolve(); // force a genuine async hop, not a same-tick no-op
+        order.push('hook-done');
+      },
+    });
+
+    // Two rounds needed to reach the target (+2 each); if the hook weren't awaited, round 1
+    // would be requested before round 0's hook finished — this order proves it is, for both
+    // rounds (the second hook-done, for round 1, fires after the match is already terminal).
+    expect(order).toEqual(['request:0', 'hook-done', 'request:1', 'hook-done']);
+  });
+
+  it('propagates a rejecting onRoundResolved rather than silently playing further unpersisted rounds', async () => {
+    const game = makeRaceGame(4);
+    const state = game.initialize({ config: undefined, participantIds: ['p1'], rng });
+    const collector = new ScriptedCollector(() => ({ ok: true, action: { increment: 2 } }));
+
+    await expect(
+      runAvailableRounds({
+        game,
+        state,
+        participantIds: ['p1'],
+        rng,
+        collector,
+        defaultDeadlineMs: 1000,
+        matchDeadlineMs: 60_000,
+        onRoundResolved: () => {
+          throw new Error('persist failed');
+        },
+      }),
+    ).rejects.toThrow('persist failed');
+    expect(collector.calls.length).toBe(1);
   });
 });

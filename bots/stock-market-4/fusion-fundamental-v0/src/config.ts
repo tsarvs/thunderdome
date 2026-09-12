@@ -267,6 +267,167 @@ const FREEMELT_SECURITY: SecurityConfig = {
 };
 
 /**
+ * Syntec Optics (NASDAQ:OPTX) — real daily closes, stockanalysis.com, pulled 2026-09-10.
+ * `bear`/`base`/`bull` = lowest/last/highest real close over the 2026-07-01..2026-08-31 window
+ * (see `backtest/optxHistoricalPrices.ts`). `sharesOutstanding`: ~40.28M (stockanalysis.com,
+ * approximate, as of 2026-09-10 — not a July/August-specific figure). Fusion channel is zero (see
+ * `NO_FUSION_ASSUMPTIONS`) — Syntec supplies specialized OPTICS, not the tungsten-component chain
+ * ELMT's formula models; it has disclosed fusion-reactor optics orders but no named customer/
+ * program, so that shows up only as `fusionOptionValueBaselinePerShare` (the same ~3%/9%-of-base
+ * ratio every non-ELMT security uses), never a quantified fusion revenue line.
+ */
+const OPTX_SECURITY: SecurityConfig = {
+  ticker: 'OPTX',
+  targetEntityId: 'entity-syntec-optics',
+  sharesOutstanding: 40_280_000,
+  valuation: {
+    baseBusinessValuePerShare: { bear: 5.88, base: 8.19, bull: 12.17 },
+    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.25, bull: 0.74 },
+    fusion: NO_FUSION_ASSUMPTIONS,
+    sensitivities: {
+      manufacturingCapabilityToBaseValuePerShare: 0.73,
+      manufacturingCapabilityToFusionOptionPerShare: 0.2,
+      hypothesisConfidenceToFusionOptionPerShare: 0.12,
+    },
+  },
+};
+
+/**
+ * General Fusion (NASDAQ:GFUZ) — real daily closes, stockanalysis.com, pulled 2026-09-10.
+ * `bear`/`base`/`bull` = lowest/last/highest real close over its real trading window
+ * (2026-07-13, its IPO date, through 2026-08-31 — see `backtest/gfuzHistoricalPrices.ts`).
+ * `sharesOutstanding`: ~73.84M (stockanalysis.com, approximate, as of 2026-09-10). Fusion channel
+ * is zero (see `NO_FUSION_ASSUMPTIONS`) — unlike ELMT/Furukawa/etc., General Fusion is a pure-play
+ * pre-revenue REACTOR DEVELOPER, not a component supplier, so ELMT's tungsten-component-order
+ * formula has no analog here at all; its entire real trading range already reflects the market's
+ * own fusion-inclusive view, which is exactly what `baseBusinessValuePerShare` captures. The same
+ * small `fusionOptionValueBaselinePerShare` bucket is kept anyway, for structural consistency with
+ * every other tracked security, not because there's a distinct unquantified upside on top.
+ */
+const GFUZ_SECURITY: SecurityConfig = {
+  ticker: 'GFUZ',
+  targetEntityId: 'entity-general-fusion',
+  sharesOutstanding: 73_840_000,
+  valuation: {
+    baseBusinessValuePerShare: { bear: 6.73, base: 8.1, bull: 13.76 },
+    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.24, bull: 0.73 },
+    fusion: NO_FUSION_ASSUMPTIONS,
+    sensitivities: {
+      manufacturingCapabilityToBaseValuePerShare: 0.72,
+      manufacturingCapabilityToFusionOptionPerShare: 0.19,
+      hypothesisConfidenceToFusionOptionPerShare: 0.12,
+    },
+  },
+};
+
+/**
+ * Fujikura Ltd. (TSE:5803) — real daily closes, stockanalysis.com, pulled 2026-09-11, converted
+ * from JPY at that day's USD/JPY spot rate (153.58, Reuters) — see
+ * `backtest/fujikuraHistoricalPrices.ts`. `base` = most recent USD close (2026-08-31); `bear`/
+ * `bull` = lowest/highest USD close over the same real window. `sharesOutstanding`: 1,655,659,296
+ * (Fujikura FY2026 financial disclosure, as of 2026-03-31, post 6-for-1 split). Fusion channel is
+ * zero (see `NO_FUSION_ASSUMPTIONS`) — Fujikura has a REAL, evidenced HTS-wire supply relationship
+ * with CFS (same evidence class as `FURUKAWA_SECURITY`'s), but that's a wire business, not the
+ * tungsten-component chain ELMT's formula models; `fusionOptionValueBaselinePerShare` (~3%/9% of
+ * base, the same ratio every non-ELMT security uses) is the only channel that can move for it
+ * right now.
+ */
+const FUJIKURA_SECURITY: SecurityConfig = {
+  ticker: 'FUJIKURA', // no US-listed ticker; see backtest note on cross-exchange securities
+  targetEntityId: 'entity-fujikura',
+  sharesOutstanding: 1_655_659_296,
+  valuation: {
+    baseBusinessValuePerShare: { bear: 24.22, base: 35.84, bull: 39.58 },
+    fusionOptionValueBaselinePerShare: { bear: 0, base: 1.08, bull: 3.23 },
+    fusion: NO_FUSION_ASSUMPTIONS,
+    sensitivities: {
+      manufacturingCapabilityToBaseValuePerShare: 3.19,
+      manufacturingCapabilityToFusionOptionPerShare: 0.86,
+      hypothesisConfidenceToFusionOptionPerShare: 0.53,
+    },
+  },
+};
+
+/**
+ * Sumitomo Electric Industries, Ltd. (TSE:5802) — real daily closes, stockanalysis.com, pulled
+ * 2026-09-11, converted from JPY at that day's USD/JPY spot rate (153.58, Reuters) — see
+ * `backtest/sumitomoHistoricalPrices.ts`. `base` = most recent USD close (2026-08-31); `bear`/
+ * `bull` = lowest/highest USD close over the same real window. `sharesOutstanding`: ~3.12B (S&P
+ * Global Market Intelligence, as of 2026-06-30, post 4-for-1 split effective 2026-07-01). Fusion
+ * channel is zero (see `NO_FUSION_ASSUMPTIONS`) — Sumitomo (with A.L.M.T.) has a REAL, evidenced
+ * ITER tungsten-monoblock production contract (~¥3.5B, dated 2021), but that revenue is already
+ * fully absorbed into its real trading range; `fusionOptionValueBaselinePerShare` is the only
+ * channel that can move for it right now.
+ */
+const SUMITOMO_SECURITY: SecurityConfig = {
+  ticker: 'SUMITOMO', // no US-listed ticker; see backtest note on cross-exchange securities
+  targetEntityId: 'entity-sumitomo',
+  sharesOutstanding: 3_120_000_000,
+  valuation: {
+    baseBusinessValuePerShare: { bear: 13.43, base: 14.46, bull: 18.45 },
+    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.43, bull: 1.3 },
+    fusion: NO_FUSION_ASSUMPTIONS,
+    sensitivities: {
+      manufacturingCapabilityToBaseValuePerShare: 1.29,
+      manufacturingCapabilityToFusionOptionPerShare: 0.34,
+      hypothesisConfidenceToFusionOptionPerShare: 0.21,
+    },
+  },
+};
+
+/**
+ * Kennametal Inc. (NYSE:KMT) — real daily closes, stockanalysis.com, pulled 2026-09-11. `bear`/
+ * `base`/`bull` = lowest/last/highest real close over the 2026-07-01..2026-08-31 window (see
+ * `backtest/kmtHistoricalPrices.ts`). `sharesOutstanding`: 76,219,022 (Kennametal SEC filing, as
+ * of 2026-07-31). Fusion channel is zero (see `NO_FUSION_ASSUMPTIONS`) — the research dataset's
+ * own `commodityTrap` assertion names Kennametal explicitly as a caution case: general tungsten
+ * exposure through tooling and materials is not the same as capturing fusion economics, so this
+ * bot treats it exactly like every other non-ELMT security rather than inventing a fusion channel
+ * the evidence doesn't support.
+ */
+const KMT_SECURITY: SecurityConfig = {
+  ticker: 'KMT',
+  targetEntityId: 'entity-kennametal',
+  sharesOutstanding: 76_219_022,
+  valuation: {
+    baseBusinessValuePerShare: { bear: 29.27, base: 29.34, bull: 36.06 },
+    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.88, bull: 2.64 },
+    fusion: NO_FUSION_ASSUMPTIONS,
+    sensitivities: {
+      manufacturingCapabilityToBaseValuePerShare: 2.61,
+      manufacturingCapabilityToFusionOptionPerShare: 0.7,
+      hypothesisConfidenceToFusionOptionPerShare: 0.43,
+    },
+  },
+};
+
+/**
+ * American Superconductor Corporation (NASDAQ:AMSC) — real daily closes, stockanalysis.com,
+ * pulled 2026-09-11. `bear`/`base`/`bull` = lowest/last/highest real close over the
+ * 2026-07-01..2026-08-31 window (see `backtest/amscHistoricalPrices.ts`). `sharesOutstanding`:
+ * 48,442,143 (AMSC Form 10-Q, as of 2026-07-31). Fusion channel is zero (see
+ * `NO_FUSION_ASSUMPTIONS`) — the research dataset has no evidenced fusion-specific relationship
+ * for AMSC yet (grid/power-electronics superconductor business, not a named fusion supplier), so
+ * `fusionOptionValueBaselinePerShare` carries only the same small structural placeholder every
+ * other tracked security gets, not a quantified opportunity.
+ */
+const AMSC_SECURITY: SecurityConfig = {
+  ticker: 'AMSC',
+  targetEntityId: 'entity-amsc',
+  sharesOutstanding: 48_442_143,
+  valuation: {
+    baseBusinessValuePerShare: { bear: 26.64, base: 28.71, bull: 39.92 },
+    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.86, bull: 2.58 },
+    fusion: NO_FUSION_ASSUMPTIONS,
+    sensitivities: {
+      manufacturingCapabilityToBaseValuePerShare: 2.56,
+      manufacturingCapabilityToFusionOptionPerShare: 0.69,
+      hypothesisConfidenceToFusionOptionPerShare: 0.42,
+    },
+  },
+};
+
+/**
  * v0's portfolio: ELMT, Furukawa, Vitzro Nextech, Almonty, and Freemelt — each a real, currently-
  * traded ticker with its own anchored valuation assumptions (spec follow-up: "scale to a
  * portfolio of multiple symbols"). Add more `SecurityConfig` entries to `securities` as new
@@ -276,7 +437,7 @@ const FREEMELT_SECURITY: SecurityConfig = {
  * exception per security, anchored to that security's own real trading range instead.
  */
 export const DEFAULT_FUSION_FUNDAMENTAL_CONFIG: FusionFundamentalConfig = {
-  securities: [ELMT_SECURITY, FURUKAWA_SECURITY, VITZRO_NEXTECH_SECURITY, ALMONTY_SECURITY, FREEMELT_SECURITY],
+  securities: [ELMT_SECURITY, FURUKAWA_SECURITY, VITZRO_NEXTECH_SECURITY, ALMONTY_SECURITY, FREEMELT_SECURITY, OPTX_SECURITY, GFUZ_SECURITY, FUJIKURA_SECURITY, SUMITOMO_SECURITY, KMT_SECURITY, AMSC_SECURITY],
   signal: {
     strongBuyThreshold: 0.15,
     buyThreshold: 0.05,

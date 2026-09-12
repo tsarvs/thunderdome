@@ -4,3 +4,4 @@
  * NOT the complete fusion research database (see README.md and spec §37).
  */
 export * from './fixture.js';
+export * from './timeline.js';

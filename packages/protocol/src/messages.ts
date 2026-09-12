@@ -87,7 +87,13 @@ export const ErrorPayloadSchema = z
 
 export const MatchEndPayloadSchema = z.object({
   result: z.unknown(),
-  reason: z.enum(['completed', 'aborted']),
+  /** `'suspended'` (roadmap Phase 3 — see docs/adr/0013-forward-match-persistence.md): a
+   * `match forward run` invocation ending because it ran out of currently-available data, not
+   * because the match is actually over — distinct from `'aborted'` (something went wrong) and
+   * `'completed'` (genuinely done). A bot doesn't need to treat this specially: `bot-sdk-js`'s
+   * `runBot()` exits cleanly on any `match-end` regardless of `reason` — this exists purely so the
+   * signal a bot (or a human reading logs) receives is honest about why the process is exiting. */
+  reason: z.enum(['completed', 'aborted', 'suspended']),
 });
 
 // ---------------------------------------------------------------------------

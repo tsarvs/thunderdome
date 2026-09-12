@@ -784,6 +784,38 @@ export interface PerformanceMetrics {
   sharpeRatio: number | null;
 }
 
+/** One tradable security's opening vs. closing price over the whole match — same shape as
+ * stock-market-3's `SecurityPriceSummary`, so a caller (e.g. `apps/cli`'s generic
+ * `printSecurityPriceTable`) can report a before/after per symbol without knowing which game it's
+ * looking at. */
+export interface SecurityPriceSummary {
+  symbol: string;
+  startingPrice: number;
+  finalPrice: number;
+}
+
+/** One held position within a `PortfolioSummary`, marked at the match's final closes — dollars,
+ * not cents, matching `SecurityPriceSummary`/`PortfolioSummary`'s own convention (this is a
+ * reporting shape, not part of the cents-only internal accounting path). */
+export interface PositionSummary {
+  symbol: string;
+  shares: number;
+  averageEntryPrice: number;
+  marketValue: number;
+  unrealizedPnl: number;
+}
+
+/** One participant's final cash/positions/equity — same shape as stock-market-3's
+ * `PortfolioSummary`, again so `printPortfolioSummaries` picks it up generically. `bankrupt` is
+ * derived as final equity `<= 0`; this game has no separate participant-insolvency concept yet
+ * (see `RiskStats` — only borrow fees/margin calls/forced liquidations are tracked). */
+export interface PortfolioSummary {
+  cash: number;
+  equity: number;
+  bankrupt: boolean;
+  positions: PositionSummary[];
+}
+
 // TODO: this is where a real game reports who won. This placeholder never has a winner — see
 // getStandingOutcomes in game.ts, which always reports a draw for it. Real per-participant
 // performance (`performanceMetrics` below) now exists to rank on, once the results phase decides
@@ -812,7 +844,84 @@ export interface StockMarket4Result {
    * match actually played, for comparison against `performanceMetrics`. `null` when no
    * `benchmarkTicker` was declared, or its series has no bar in that range to compare against. */
   benchmarkReturn: number | null;
+  /** Every security in `config.marketDataUniverse`'s opening vs. closing price over the match. */
+  securityPrices: SecurityPriceSummary[];
+  /** Each participant's final cash/positions/equity — a portfolio snapshot at match end. */
+  portfolioSummaries: Record<string, PortfolioSummary>;
 }
+
+// ---------------------------------------------------------------------------
+// Forward-match snapshot (roadmap Phase 3 — see docs/adr/0013-forward-match-persistence.md). A
+// JSON-serializable projection of `StockMarket4State`'s resumable parts (everything except the
+// live, non-serializable `marketData` handle) — see `game.ts`'s `serializeForwardState`/
+// `resumeForwardState`. Given a real Zod schema — unlike most of this file's `TState`-adjacent
+// shapes, which never cross a trust boundary — because a snapshot's whole purpose is round-tripping
+// through external persistence (`@thunderdome/forward-match-store`, which keeps it fully opaque)
+// before coming back as untrusted `unknown`. This is the same "validate at the boundary"
+// discipline `StockMarket4ConfigSchema` already applies to organizer-supplied config; `game.ts`'s
+// `resumeForwardState` is where that boundary actually is, since the store never inspects this
+// shape itself.
+// ---------------------------------------------------------------------------
+
+const PositionSchema = z
+  .object({
+    shares: z.number(),
+    averageEntryPriceCents: z.number(),
+    realizedPnlCents: z.number(),
+  })
+  .strict();
+
+/** A `PortfolioAccount` with its own nested `positions` Map flattened to entries — JSON has no
+ * Map, so both levels of `StockMarket4State`'s Map-of-Maps need this transformation. */
+const SerializedPortfolioAccountSchema = z
+  .object({
+    cashCents: z.number(),
+    positions: z.array(z.tuple([z.string(), PositionSchema])),
+  })
+  .strict();
+export type SerializedPortfolioAccount = z.infer<typeof SerializedPortfolioAccountSchema>;
+
+const FillSchema = z
+  .object({
+    ticker: z.string(),
+    side: OrderSideSchema,
+    kind: OrderKindSchema,
+    requestedQuantity: z.number(),
+    filledQuantity: z.number(),
+    priceCents: z.number(),
+    feeCents: z.number(),
+  })
+  .strict();
+
+const RiskStatsSchema = z
+  .object({
+    borrowFeesPaidCents: z.number(),
+    marginCalls: z.number(),
+    forcedLiquidations: z.number(),
+  })
+  .strict();
+
+const EquityPointSchema = z
+  .object({
+    date: CalendarDateSchema,
+    equityCents: z.number(),
+  })
+  .strict();
+
+export const StockMarket4ForwardSnapshotSchema = z
+  .object({
+    /** Bumped on any future incompatible shape change; `resumeForwardState` refuses an
+     * unrecognized version rather than guessing how to interpret it. */
+    snapshotVersion: z.literal(1),
+    round: z.number().int().nonnegative(),
+    forwardShadowCutoffDate: CalendarDateSchema.nullable(),
+    portfolios: z.array(z.tuple([z.string(), SerializedPortfolioAccountSchema])),
+    lastFills: z.array(z.tuple([z.string(), z.array(FillSchema)])),
+    riskStats: z.array(z.tuple([z.string(), RiskStatsSchema])),
+    equityHistory: z.array(z.tuple([z.string(), z.array(EquityPointSchema)])),
+  })
+  .strict();
+export type StockMarket4ForwardSnapshot = z.infer<typeof StockMarket4ForwardSnapshotSchema>;
 
 // ---------------------------------------------------------------------------
 // Audit trail (spec's audit-trail requirement) — `resolve()`'s `RoundEvent.data` (engine/

@@ -77,7 +77,15 @@ packages/
   market-data/                versioned, SQLite-backed market-data store behind a generic
                                MarketDataProvider interface (see ADR-0010) — a narrow, explicit
                                exception to §10's "no database" for market data only; no
-                               dependency on engine/games/bots
+                               dependency on engine/games/bots. appendBars (see ADR-0012) grows an
+                               already-published version incrementally, for a forward match's
+                               dataset to genuinely grow over its lifetime.
+  forward-match-store/        persisted ForwardMatchRecord read/write — one JSON file per forward
+                               match, no database (see ADR-0013); atomic writes + a three-way
+                               found/not-found/corrupt load outcome (both stricter than
+                               tournament-store's own conventions); no dependency on
+                               engine/games/bots — a forward match's opaque config/snapshot are
+                               entirely the owning game's concern
 
 games/
   <game-id>/                  real Yarn workspace members — rules implementations (RPS, Chess, …)
@@ -447,3 +455,5 @@ sequential/no-hidden-information case it was meant to validate).
 - `docs/adr/0009-tournament-persistence.md`
 - `docs/adr/0010-sqlite-market-data-store.md`
 - `docs/adr/0011-explicit-game-types.md`
+- `docs/adr/0012-incremental-market-data-growth.md`
+- `docs/adr/0013-forward-match-persistence.md`

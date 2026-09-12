@@ -17,6 +17,7 @@ INDEPENDENT_PACKAGES=(
   "@thunderdome/runtime"
   "@thunderdome/tournament-formats"
   "@thunderdome/tournament-store"
+  "@thunderdome/forward-match-store"
   "@thunderdome/bot-sdk-js"
   "@thunderdome/game-sdk"
   "@thunderdome/registry"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PortfolioPolicy } from '../src/config.js';
-import { buildOrders, targetWeightForSignal } from '../src/portfolio.js';
+import { buildOrders, spendableCentsFor, targetWeightForSignal } from '../src/portfolio.js';
 import { emptyPortfolio, portfolioWithPosition } from './support/fixtures.js';
 
 // rebalanceToleranceWeight: 0 here so every existing test below keeps testing exactly what it
@@ -80,6 +80,60 @@ describe('buildOrders', () => {
     const portfolio = emptyPortfolio(1_000_000);
     // target 0.001 of $10,000 equity = $10 -> below $50 minimum
     const orders = buildOrders({ ticker: 'ELMT', targetWeight: 0.001, priceDollars: 20, portfolio, policy });
+    expect(orders).toEqual([]);
+  });
+});
+
+describe('spendableCentsFor', () => {
+  it('returns cashCents when buyingPowerCents is 0 (a plain cash account)', () => {
+    const portfolio = emptyPortfolio(10_000_000);
+    expect(portfolio.buyingPowerCents).toBe(0); // the real stock-market-4 cash-account default
+    expect(spendableCentsFor(portfolio)).toBe(10_000_000);
+  });
+
+  it('returns buyingPowerCents itself when it is actually positive (a margin account with room)', () => {
+    const portfolio = { ...emptyPortfolio(10_000_000), buyingPowerCents: 2_500_000 };
+    expect(spendableCentsFor(portfolio)).toBe(2_500_000);
+  });
+
+  it('never returns a negative number, even against negative cash', () => {
+    const portfolio = { ...emptyPortfolio(-500_000), buyingPowerCents: 0 };
+    expect(spendableCentsFor(portfolio)).toBe(0);
+  });
+});
+
+describe('buildOrders cash-account mode (regression)', () => {
+  // Real bug this guards against: buildOrders/computeTradingDecisions used to size a BUY
+  // directly off `portfolio.buyingPowerCents`, which is `0` by stock-market-4's own contract for
+  // a plain cash account (games/stock-market-4/README.md's "Risk & financing" section) — meaning
+  // this bot could reach a correct STRONG_BUY/BUY signal and still always emit `{ orders: [] }}`
+  // against the real engine's default risk settings, silently, forever. Caught by running the
+  // real bot against the real engine (games/stock-market-4/scripts/runFusionFundamentalV0.ts),
+  // not by this bot's own test suite — because `emptyPortfolio`/`portfolioWithPosition` used to
+  // default `buyingPowerCents` to `cashCents` too, masking exactly this. See
+  // `src/portfolio.ts`'s `spendableCentsFor` for the fix.
+  it('still buys correctly when buyingPowerCents is 0 but cashCents is real (no availableBuyingPowerCents override)', () => {
+    const portfolio = emptyPortfolio(10_000_000); // buyingPowerCents: 0, cashCents: $100,000
+    const orders = buildOrders({ ticker: 'ELMT', targetWeight: 0.1, priceDollars: 20, portfolio, policy });
+    // target = $10,000 -> 500 shares at $20 — identical to the plain "buys shares..." test above,
+    // proving cash-account mode (buyingPowerCents: 0) behaves exactly like the non-cash-mode
+    // fixture used to, not like "no money at all."
+    expect(orders).toEqual([{ kind: 'MARKET', ticker: 'ELMT', side: 'BUY', quantity: 500 }]);
+  });
+
+  it('an explicit availableBuyingPowerCents of 0 still means "no room" — not a signal to fall back to cash', () => {
+    // Distinguishes the two `0`s: `portfolio.buyingPowerCents === 0` (cash-account mode, meaning
+    // "check cashCents instead") vs. `availableBuyingPowerCents === 0` (a multi-security round's
+    // already-exhausted shrinking remainder, meaning "genuinely nothing left this round").
+    const portfolio = emptyPortfolio(10_000_000);
+    const orders = buildOrders({
+      ticker: 'ELMT',
+      targetWeight: 0.1,
+      priceDollars: 20,
+      portfolio,
+      policy,
+      availableBuyingPowerCents: 0,
+    });
     expect(orders).toEqual([]);
   });
 });

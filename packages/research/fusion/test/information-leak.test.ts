@@ -160,7 +160,13 @@ describe('point-in-time test: the Freemelt / F4E JT-60SA order (announced 2026-0
       (r) => r.id === FUSION_FIXTURE_IDS.relationships.freemeltJt60sa,
     );
     expect(relationship).toBeUndefined();
-    expect(JSON.stringify(snapshot)).not.toContain('Freemelt');
+    // NOT a blanket `.not.toContain('Freemelt')`/`.not.toContain('JT-60SA')` — the portfolio
+    // research update (Sept 2026) added genuinely earlier Freemelt evidence (an Aug 11 Saab
+    // Dynamics order), so the entity is legitimately knowable well before this specific order; and
+    // "JT-60SA" is independently, legitimately mentioned in Walter Tosto's own (much earlier)
+    // supply-history evidence, unrelated to Freemelt. A fact this specific to THIS order is the
+    // right leak check instead: its own order quantity/value shouldn't appear this early.
+    expect(JSON.stringify(snapshot)).not.toContain('33,000 tungsten-based components');
   });
 
   it('is present from the moment of the announcement', () => {

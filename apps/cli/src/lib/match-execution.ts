@@ -164,19 +164,56 @@ export async function abortActiveMatch(): Promise<void> {
   );
 }
 
-/** Spins up a fresh container per participant, runs one real match, tears them down —
- * guaranteed by the `try`/`catch`/`finally` below regardless of *how* things go wrong: a later
- * participant's own container failing to start, a bot failing to initialize, or `runMatch()`
- * itself throwing unexpectedly all still leave zero containers behind. */
-export async function runSingleMatch(args: RunSingleMatchArgs): Promise<SingleMatchOutcome> {
+/** Removes each lifecycle from the interrupt handler's tracking set — call once a caller's own
+ * work with lifecycles `startBotLifecycles` returned is finished, success or failure (see
+ * `runSingleMatch`/`runHumanMatch` below, and `commands/matchForward.ts`'s own use of it). */
+export function untrackLifecycles(lifecycles: ReadonlyMap<string, BotLifecycle>): void {
+  for (const lifecycle of lifecycles.values()) {
+    activeLifecycles.delete(lifecycle);
+  }
+}
+
+export interface StartBotLifecyclesArgs {
+  game: AnyGameDefinition;
+  gameEntry: GameRegistryEntry;
+  config: unknown;
+  matchId: string;
+  /** Which participants to start a container + init handshake for. */
+  participantIds: readonly string[];
+  /** The full roster reported in each started bot's own `init` payload. Defaults to
+   * `participantIds` when omitted; only needs to differ when a match includes a seat that never
+   * gets its own container (e.g. `runHumanMatch`'s human) — that seat still belongs in every
+   * bot's own opponent-awareness roster, without ever being one of the ids this function starts a
+   * container for. */
+  roster?: readonly string[];
+  imageTagsByBotId: ReadonlyMap<string, string>;
+  /** The one entropy boundary every participant's `rngSeed` derives from (ADR-0004) — a real
+   * tournament's own seed for `match run`/`tournament run`, or a forward match's own persisted
+   * `matchSeed` for `match forward run` (roadmap Phase 3) — this function itself has no opinion
+   * on which. */
+  tournamentSeed: Buffer;
+}
+
+/**
+ * Spins up one container per participant and completes its init handshake — the shared first
+ * half of `runSingleMatch`'s, `runHumanMatch`'s, and (roadmap Phase 3) `match forward run`'s own
+ * bot-startup loop; extracted so none of them duplicate it. Guarantees, via its own
+ * `try`/`catch`, that a later participant's container failing to start or initialize still tears
+ * down every lifecycle started so far — including removing each from `activeLifecycles`, so a
+ * caller that never gets a `Map` back (this function threw) has nothing left to clean up itself.
+ * A caller that DOES get a `Map` back owns tearing those down (and untracking them) once ITS OWN
+ * later work (e.g. `runMatch` itself) finishes or fails — see `runSingleMatch` below for that
+ * second half.
+ */
+export async function startBotLifecycles(
+  args: StartBotLifecyclesArgs,
+): Promise<Map<string, BotLifecycle>> {
   const { game, gameEntry, config, matchId, participantIds, imageTagsByBotId, tournamentSeed } =
     args;
-  const roster = [...participantIds];
-  const matchRng = createRng(deriveSeed(tournamentSeed, 'match', matchId));
-
+  const roster = [...(args.roster ?? participantIds)];
   const lifecycles = new Map<string, BotLifecycle>();
   try {
-    for (const participantId of roster) {
+    for (const participantId of participantIds) {
       const imageTag = imageTagsByBotId.get(participantId);
       if (imageTag === undefined) {
         throw new Error(`unreachable: no image built for participant "${participantId}"`);
@@ -211,7 +248,38 @@ export async function runSingleMatch(args: RunSingleMatchArgs): Promise<SingleMa
         throw new Error(`${participantId} failed to initialize: ${initOutcome.detail}`);
       }
     }
+    return lifecycles;
+  } catch (error) {
+    await Promise.all(
+      [...lifecycles.values()].map((lifecycle) =>
+        lifecycle.finish({ result: null, reason: 'aborted' }),
+      ),
+    );
+    untrackLifecycles(lifecycles);
+    throw error;
+  }
+}
 
+/** Runs one real match against already-started lifecycles, tears them down once it's done —
+ * guaranteed by the `try`/`catch`/`finally` below regardless of *how* things go wrong: `runMatch()`
+ * itself throwing unexpectedly still leaves zero containers behind. Spins up those lifecycles via
+ * `startBotLifecycles` first, whose own guarantee covers container-startup failures the same way. */
+export async function runSingleMatch(args: RunSingleMatchArgs): Promise<SingleMatchOutcome> {
+  const { game, gameEntry, config, matchId, participantIds, imageTagsByBotId, tournamentSeed } =
+    args;
+  const roster = [...participantIds];
+  const matchRng = createRng(deriveSeed(tournamentSeed, 'match', matchId));
+
+  const lifecycles = await startBotLifecycles({
+    game,
+    gameEntry,
+    config,
+    matchId,
+    participantIds: roster,
+    imageTagsByBotId,
+    tournamentSeed,
+  });
+  try {
     const outcome = await runMatch({
       game,
       config,
@@ -242,10 +310,8 @@ export async function runSingleMatch(args: RunSingleMatchArgs): Promise<SingleMa
       ...(outcome.result !== undefined ? { result: outcome.result } : {}),
     };
   } catch (error) {
-    // Whatever went wrong — a sibling's container failing to start, a bot failing to
-    // initialize, or `runMatch()` itself throwing — every lifecycle tracked so far still gets
-    // torn down. `finish()` on an already-terminated lifecycle (e.g. the one whose own
-    // `initialize()` just failed) is a safe no-op, so this needs no special-casing per failure.
+    // `runMatch()` itself threw — every lifecycle still gets torn down. `finish()` on an
+    // already-terminated lifecycle is a safe no-op, so this needs no special-casing.
     await Promise.all(
       [...lifecycles.values()].map((lifecycle) =>
         lifecycle.finish({ result: null, reason: 'aborted' }),
@@ -253,9 +319,7 @@ export async function runSingleMatch(args: RunSingleMatchArgs): Promise<SingleMa
     );
     throw error;
   } finally {
-    for (const lifecycle of lifecycles.values()) {
-      activeLifecycles.delete(lifecycle);
-    }
+    untrackLifecycles(lifecycles);
   }
 }
 
@@ -306,7 +370,19 @@ export async function runHumanMatch(args: RunHumanMatchArgs): Promise<SingleMatc
   const matchRng = createRng(deriveSeed(tournamentSeed, 'match', matchId));
   const writeStream = output ?? process.stdout;
 
-  const lifecycles = new Map<string, BotLifecycle>();
+  // Throws with full self-cleanup (containers torn down, activeLifecycles untracked) on any
+  // bot's own startup/init failure — nothing else for this function to clean up in that case,
+  // since the human collector below doesn't exist yet.
+  const lifecycles = await startBotLifecycles({
+    game,
+    gameEntry,
+    config,
+    matchId,
+    participantIds: botParticipantIds,
+    roster, // includes humanParticipantId — a seat every bot's init roster must list
+    imageTagsByBotId: botImageTagsByBotId,
+    tournamentSeed,
+  });
   const collector = new TerminalHumanCollector({
     humanParticipantId,
     game,
@@ -318,42 +394,6 @@ export async function runHumanMatch(args: RunHumanMatchArgs): Promise<SingleMatc
   });
 
   try {
-    for (const botParticipantId of botParticipantIds) {
-      const imageTag = botImageTagsByBotId.get(botParticipantId);
-      if (imageTag === undefined) {
-        throw new Error(`unreachable: no image built for bot "${botParticipantId}"`);
-      }
-      const botProcess = new DockerBotProcess({
-        imageRef: imageTag,
-        matchId,
-        participantId: botParticipantId,
-        resourceLimits: DEFAULT_RESOURCE_LIMITS,
-      });
-      await botProcess.start();
-      const lifecycle = new BotLifecycle({ process: botProcess, matchId });
-      // Tracked immediately, same reasoning as runSingleMatch: a later bot's own start()/
-      // initialize() failing still tears every earlier one (and the human collector) down, via
-      // the catch block below.
-      lifecycles.set(botParticipantId, lifecycle);
-      activeLifecycles.add(lifecycle);
-
-      const rngSeedHex = seedToHex(deriveSeed(tournamentSeed, 'bot', matchId, botParticipantId));
-      const initOutcome = await lifecycle.initialize(
-        {
-          gameId: gameEntry.manifest.id,
-          gameVersion: gameEntry.manifest.version,
-          participantId: botParticipantId,
-          roster,
-          rngSeed: rngSeedHex,
-          config: game.redactConfigForBots?.(config) ?? config,
-        },
-        { initTimeoutMs: 10_000 },
-      );
-      if (!initOutcome.ok) {
-        throw new Error(`${botParticipantId} failed to initialize: ${initOutcome.detail}`);
-      }
-    }
-
     const outcome = await runMatch({
       game,
       config,
@@ -398,9 +438,7 @@ export async function runHumanMatch(args: RunHumanMatchArgs): Promise<SingleMatc
     );
     throw error;
   } finally {
-    for (const lifecycle of lifecycles.values()) {
-      activeLifecycles.delete(lifecycle);
-    }
+    untrackLifecycles(lifecycles);
     collector.close();
   }
 }

@@ -1,6 +1,6 @@
 import type { FusionFundamentalConfig, PortfolioPolicy, SecurityConfig, SignalLevel, SignalThresholds } from './config.js';
 import type { OrderRequest, PortfolioObservation } from './marketTypes.js';
-import { buildOrders, targetWeightForSignal } from './portfolio.js';
+import { buildOrders, spendableCentsFor, targetWeightForSignal } from './portfolio.js';
 import { computeResearchDelta, type ResearchDelta } from './research/delta.js';
 import { interpretResearchDelta, type ModelEffect } from './research/interpretEvents.js';
 import type { ResearchState } from './research/types.js';
@@ -116,13 +116,14 @@ export function computeTradingDecision(params: {
   /** The `signal.level` this bot returned on ITS OWN previous decision for THIS security (spec
    * §17: only legitimately-knowable state) — omit (or `undefined`) on this security's first-ever
    * decision. Drives `signal.ts`'s hysteresis; never anything about the game's own history. */
-  previousSignalLevel?: SignalLevel;
+  previousSignalLevel?: SignalLevel | undefined;
   portfolio: PortfolioObservation;
   /** Remaining buying power for THIS ROUND after any earlier securities in the same round have
    * already claimed some (spec follow-up: multi-security portfolios) — defaults to
-   * `portfolio.buyingPowerCents` (the account's actual total) when omitted, which reproduces the
-   * original single-security behavior exactly. See `computeTradingDecisions`. */
-  availableBuyingPowerCents?: number;
+   * `spendableCentsFor(portfolio)` (the account's actual total, cash-account-aware — see that
+   * function's own doc comment) when omitted, which reproduces the original single-security
+   * behavior exactly. See `computeTradingDecisions`. */
+  availableBuyingPowerCents?: number | undefined;
 }): TradingDecision {
   const delta = computeResearchDelta(params.previousResearchState, params.currentResearchState);
   const effects = interpretResearchDelta(delta, params.currentResearchState, params.security.targetEntityId);
@@ -217,7 +218,7 @@ export function computeTradingDecision(params: {
  * instead of held as bare closure variables. See `../index.ts`'s `createDecideAction`. */
 export interface PreviousSecurityState {
   fairValuePerShare?: number;
-  priceDollars?: number;
+  priceDollars?: number | undefined;
   signalLevel?: SignalLevel;
 }
 
@@ -247,7 +248,10 @@ export function computeTradingDecisions(params: {
   portfolio: PortfolioObservation;
 }): TradingDecision[] {
   const decisions: TradingDecision[] = [];
-  let remainingBuyingPowerCents = params.portfolio.buyingPowerCents;
+  // Seeded from `spendableCentsFor`, NOT raw `portfolio.buyingPowerCents` — a plain cash account
+  // reports that as `0` (see that function's own doc comment), which would otherwise leave every
+  // security in the round thinking there's no budget at all, right from the first one.
+  let remainingBuyingPowerCents = spendableCentsFor(params.portfolio);
 
   for (const security of params.config.securities) {
     const currentPriceDollars = params.currentPricesByTicker.get(security.ticker);

@@ -8,7 +8,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.test.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "emit:forward-config": "tsx --tsconfig tsconfig.test.json scripts/emitForwardMatchConfig.ts",
+    "apply:research-update": "tsx --tsconfig tsconfig.test.json scripts/applyResearchUpdate.ts",
+    "list:entities": "tsx --tsconfig tsconfig.test.json scripts/printKnownEntities.ts"
   },
   "dependencies": {
     "@thunderdome/research-core": "^0.1.0"

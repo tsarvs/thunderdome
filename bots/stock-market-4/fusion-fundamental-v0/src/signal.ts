@@ -142,7 +142,7 @@ export function computeSignal(params: {
   thresholds: SignalThresholds;
   /** Omit (or pass `undefined`) for no hysteresis — a bot's first-ever decision, or any caller
    * that just wants the plain, stateless threshold classification. */
-  previousLevel?: SignalLevel;
+  previousLevel?: SignalLevel | undefined;
 }): Signal {
   const valuationGap = computeValuationGap(params.fairValuePerShare, params.marketPrice);
   const confidence = computeSignalConfidence(params.effects);

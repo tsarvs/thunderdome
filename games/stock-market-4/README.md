@@ -16,6 +16,314 @@ One round = one real trading day.
 import { game as stockMarket4 } from '@thunderdome/game-stock-market-4';
 ```
 
+**New here?** Read the [Quickstart](#quickstart) below first — it walks through supplying data,
+writing a config, feeding in research, and submitting orders with copy-pasteable examples. Every
+section after it goes deeper into the reasoning behind each piece, for once you're past "how do I
+make this run."
+
+- [Quickstart](#quickstart)
+  - [1. Supply market data](#1-supply-market-data)
+  - [2. Write a config](#2-write-a-config)
+  - [3. Run a match](#3-run-a-match)
+  - [4. Feed in research (optional)](#4-feed-in-research-optional)
+  - [5. Create and execute orders](#5-create-and-execute-orders)
+- [Running a real forward-shadow match (beginner walkthrough)](#running-a-real-forward-shadow-match-beginner-walkthrough) —
+  no code, just the CLI: seeding a dataset, wiring in research, creating/resuming a match, and
+  checking in on it
+- [You supply the data](#you-supply-the-data) — the full data-model reference
+- [Game type](#game-type) — historical replay vs. forward/shadow
+- [Corporate actions](#corporate-actions)
+- [Orders & execution](#orders--execution) — the full mechanics reference
+- [Risk & financing](#risk--financing-configrisk)
+- [The research boundary](#the-research-boundary) — the full research reference
+- [Benchmarks & metrics](#benchmarks--metrics)
+- [Results, ranking, and determinism](#results-ranking-and-determinism)
+- [Setup and winning](#setup-and-winning)
+- [What this game deliberately isn't](#what-this-game-deliberately-isnt)
+- [Good to know](#good-to-know)
+
+## Quickstart
+
+This walks through the four things you need to run a match: data, config, (optionally) research,
+and orders. Everything here works with plain objects — no database, no Docker, no CLI — so you can
+follow along in a `.ts` scratch file or a test.
+
+### 1. Supply market data
+
+There's no built-in price feed. You hand in every bar a bot will ever see, keyed by ticker:
+
+```ts
+const historicalPrices = {
+  ACME: [
+    { date: '2026-01-05', open: 100, high: 102, low: 99, close: 101, volume: 500_000 },
+    { date: '2026-01-06', open: 101, high: 103, low: 100, close: 102.5, volume: 480_000 },
+    { date: '2026-01-07', open: 102.5, high: 104, low: 101, close: 103, volume: 510_000 },
+    { date: '2026-01-08', open: 103, high: 105, low: 102, close: 104.5, volume: 495_000 },
+    { date: '2026-01-09', open: 104.5, high: 106, low: 103, close: 105, volume: 520_000 },
+  ],
+};
+```
+
+Real historical data (pulled from wherever you like) or a synthetic series you generate yourself
+both work identically — see [You supply the data](#you-supply-the-data) below for the full
+picture, including the SQLite-backed alternative (`config.marketDataset`) for a dataset too big to
+hand-write inline, or one that needs to grow over time.
+
+### 2. Write a config
+
+```ts
+const config = {
+  startDate: '2026-01-05',
+  endDate: '2026-01-09',
+  marketDataUniverse: ['ACME'], // every ticker this match trades — must have a historicalPrices entry
+  historicalPrices,
+  startingCapital: 100_000, // optional — this is already the default
+};
+```
+
+That's a complete, valid config — everything else (`risk`, `transactionFeeRate`, `gameType`, ...)
+has a sensible default. Validate it the same way the engine does:
+
+```ts
+const parsed = stockMarket4.parseConfig(config);
+if (!parsed.ok) throw new Error(parsed.reason); // e.g. a typo'd date, or a ticker missing from historicalPrices
+```
+
+### 3. Run a match
+
+The fastest way to see this play out is the real CLI, against real bots, with zero setup beyond
+what's already in this repo — `match run` needs at least two bot ids sharing this game:
+
+```bash
+yarn thunderdome match run <botId> <botId> --config '{"startDate":"2026-01-05","endDate":"2026-01-09",...}'
+```
+
+For a single bot on its own — evaluating one strategy rather than a head-to-head — use
+`match forward run` instead (below); it's the same real engine, just without the two-participant
+minimum. See [`apps/cli/README.md`](../../apps/cli/README.md#match-run) for the full command
+reference and
+[`bots/stock-market-4/fusion-fundamental-v0/README.md`](../../bots/stock-market-4/fusion-fundamental-v0/README.md)
+for a fully worked solo example against that bot's own real tracked securities.
+
+To drive it yourself in code instead (what the engine itself does under the hood — useful for
+writing a test, or a quick sanity check without Docker):
+
+```ts
+import { createRng } from '@thunderdome/rng';
+
+const rng = createRng(Buffer.alloc(16)); // unused — this game is fully deterministic, never reads rng
+
+const state0 = stockMarket4.initialize({ config: parsed.value, participantIds: ['alice'], rng });
+
+const observation = stockMarket4.getObservation(state0, 'alice');
+// observation.securities[0] -> { ticker: 'ACME', bar: {...2026-01-05 bar...}, history: [...] }
+
+const { nextState } = stockMarket4.resolve({
+  state: state0,
+  actions: new Map([['alice', { orders: [{ kind: 'MARKET', ticker: 'ACME', side: 'BUY', quantity: 10 }] }]]),
+  rng,
+});
+
+stockMarket4.isTerminal(nextState); // false — 3 more trading days left
+```
+
+### 4. Feed in research (optional)
+
+`config.researchTimeline` is a list of `{ date, payload }` entries — `payload` can be *anything*,
+the game never looks inside it. The simplest possible version:
+
+```ts
+const researchTimeline = [
+  { date: '2026-01-06', payload: { headline: 'ACME beats earnings', sentiment: 'bullish' } },
+];
+```
+
+A bot decides what a `research.payload` even means; this game just delivers the latest one whose
+`date` has arrived, via `observation.research`. The real, structured way to build one — what
+[`fusion-fundamental-v0`](../../bots/stock-market-4/fusion-fundamental-v0/README.md) actually
+uses — is [`@thunderdome/research-core`](../../packages/research/core/README.md)'s
+`createResearchSnapshot(dataset, timestamp)`, called once per date you want to reveal:
+
+```ts
+import { createResearchSnapshot } from '@thunderdome/research-core';
+import { createFusionFixtureDataset } from '@thunderdome/research-fusion';
+
+const dataset = createFusionFixtureDataset();
+const researchTimeline = [
+  { date: '2026-01-05', payload: createResearchSnapshot(dataset, '2026-01-05T00:00:00Z') },
+  { date: '2026-01-08', payload: createResearchSnapshot(dataset, '2026-01-08T00:00:00Z') },
+];
+```
+
+Full picture, including why the game never imports `research-core` itself, in
+[The research boundary](#the-research-boundary) below.
+
+### 5. Create and execute orders
+
+A bot's `decideAction` (or, if you're driving the game directly, whatever you pass as that
+participant's `action`) returns a batch of orders:
+
+```ts
+const action = {
+  orders: [
+    { kind: 'MARKET', ticker: 'ACME', side: 'BUY', quantity: 10 },
+    { kind: 'LIMIT', ticker: 'ACME', side: 'SELL', quantity: 5, limitPrice: 110 },
+  ],
+};
+```
+
+- `MARKET` always fills, at that day's close.
+- `LIMIT` only fills if the day's range would plausibly have crossed `limitPrice` (low ≤ limit for
+  a BUY, high ≥ limit for a SELL) — otherwise it's reported with `filledQuantity: 0`, not an error.
+- Orders don't rest — each round's batch is evaluated only for that round. Want another chance
+  tomorrow? Submit again.
+- What actually happened is in next round's `observation.fills` — never silently swallowed, even
+  a `0`-filled order is reported so a bot can tell "I asked and nothing happened" from "I never
+  asked."
+
+Full mechanics, including how a batch is order-independent within a round (a SELL right after a
+BUY sees the position that BUY just opened), in [Orders & execution](#orders--execution) below.
+
+---
+
+## Running a real forward-shadow match (beginner walkthrough)
+
+Everything above shows the game's API in isolation — plain objects, no setup. This section is the
+"I just want to actually run this" path: real CLI commands, copy-pasteable from the repo root, no
+code required. It uses `fusion-fundamental-v6` (see its own
+[README](../../bots/stock-market-4/fusion-fundamental-v6/README.md)) and the real price history
+several `fusion-fundamental-*` bot versions share as the worked example — swap in your own bot/data
+once you've got the shape.
+
+### What you need first
+
+- **Docker Desktop running.** Every bot plays inside its own container — this is true for every
+  match this repo runs, not just forward ones.
+- **`yarn install` once, at the repo root.**
+- Run every command below **from the repo root**, not a subdirectory — the CLI resolves bots and
+  games relative to wherever you invoke it from, and silently reports "no bots found" if you're in
+  the wrong place.
+
+### What "forward-shadow" actually means, in practice
+
+A `'HISTORICAL'` match plays a fixed window of prices you already have, start to finish, in one
+sitting, then it's over. A `'FORWARD_SHADOW'` match instead plays against a dataset that's still
+growing in the real world: you run it today, it plays every real trading day currently known and
+then stops (not an error — `list`/`inspect` show it as `active`, "still resumable"); you run the
+*exact same command* again next week, once more real bars have actually happened, and it picks up
+exactly where it left off, with the bot's portfolio and history intact. Nothing about a bot's own
+decision logic changes — only how much real data currently exists to show it.
+
+### Step 1 — seed a price dataset
+
+You need real daily bars before anything else can run. This repo already has a seeded, versioned
+dataset for the 11 companies `fusion-fundamental-v0`/`v6` track — seed it once:
+
+```bash
+yarn workspace @thunderdome/market-data run seed:fusion-fundamental-v0
+```
+
+This publishes dataset id `fusion-fundamental-v0` (check its own script,
+[`packages/market-data/scripts/seedFusionFundamentalV0.ts`](../../packages/market-data/scripts/seedFusionFundamentalV0.ts),
+for the current `DATASET_VERSION` — it bumps whenever the published data itself is corrected) into
+`.thunderdome/market-data/` (gitignored local state, not committed). See
+[`@thunderdome/market-data`'s own README](../../packages/market-data/README.md) for the full
+picture, including tracking a brand-new ticker of your own.
+
+**Growing it later, with no LLM and no manual data-entry**, once you want more recent real prices
+than what's currently seeded:
+
+```bash
+yarn workspace @thunderdome/market-data run fetch:append-bars -- \
+  --dataset-id fusion-fundamental-v0 --dataset-version <the version you seeded> \
+  --store-dir ./.thunderdome/market-data
+```
+
+This fetches straight from Yahoo Finance's public chart API and only ever adds bars strictly after
+each ticker's own current latest known date — safe to just re-run whenever, with no dates to
+figure out yourself. Add `--dry-run` to preview without writing. (If you'd rather hand-supply
+prices from somewhere else, `append:bars` in that same package takes a plain JSON file instead —
+see its own script for the exact shape.)
+
+### Step 2 — (optional, but usually worth it) wire in research
+
+**Without this step, most real bots will just hold cash forever.** A bot like
+`fusion-fundamental-v6` decides what to trade based on `observation.research` (see
+[The research boundary](#the-research-boundary) below) — with an empty `researchTimeline`
+(the default), it correctly has nothing to react to and sits out every round, which looks like a
+bug the first time you see it but isn't one.
+
+If your bot uses [`@thunderdome/research-fusion`](../../packages/research/fusion/README.md)'s
+fixture (as every `fusion-fundamental-*` version does), generate a real `researchTimeline` from it:
+
+```bash
+STORE_DIR="$(pwd)/.thunderdome/market-data"
+(cd packages/research/fusion && yarn run emit:forward-config --silent -- \
+  --market-dataset-id fusion-fundamental-v0 --market-dataset-version <the version you seeded> \
+  --start-date 2026-07-13 --end-date 2026-12-31 --as-of-date "$(date +%F)" \
+  --universe ELMT,FURUKAWA,VITZRONEXTECH,ALM,FREEM,OPTX,GFUZ,FUJIKURA,SUMITOMO,KMT,AMSC \
+  --store-dir "$STORE_DIR") \
+  > ./.thunderdome/preview-configs/my-match.json
+```
+
+This writes a complete match config (universe, dataset, dates, AND a real `researchTimeline` built
+from the current fixture) to a file — a real one routinely runs to megabytes, well past what a
+shell allows as an inline argument, which is exactly why this writes to a file rather than
+printing something you'd paste inline. `--start-date` matters: pick one that's actually within
+every tracked ticker's real trading history (a company that IPO'd partway through your dataset's
+window has no earlier data to show, real or otherwise — check
+[`@thunderdome/market-data`'s README](../../packages/market-data/README.md) if a ticker isn't
+covering the range you expected). `--end-date` should be far in the future (e.g. the end of the
+year) — **not** "today," or your match will immediately flip to `completed` the moment real data
+catches up to it, rather than staying `active`/resumable for the long haul.
+
+### Step 3 — create the match
+
+```bash
+yarn thunderdome match forward run my-match fusion-fundamental-v6 \
+  --config-file ./.thunderdome/preview-configs/my-match.json
+```
+
+`--config-file` (or inline `--config '<json>'` for something small enough to type) is only needed
+this FIRST time, to create the match — its `<matchId>` (`my-match` here) is yours to choose, and is
+how you find it again later. This plays every real trading day currently known, then stops and
+reports itself `active`/"still resumable."
+
+### Step 4 — resume it later, whenever more real data has landed
+
+```bash
+yarn thunderdome match forward run my-match fusion-fundamental-v6
+```
+
+Same command, no config needed this time (a stored match always uses the config it was created
+with — passing one again just prints a warning and is ignored). Run Step 1's `fetch:append-bars`
+first if you want fresh prices to actually be there to play against.
+
+### Step 5 — check in on it
+
+```bash
+yarn thunderdome match forward list                 # every forward match you've created
+yarn thunderdome match forward inspect my-match      # this one's status, round count, participants
+```
+
+### Step 6 — (optional) see what the bot would do right now, without playing a round
+
+Re-run Step 2's command first (same `--start-date`/`--end-date`/dataset, `--as-of-date` set to
+today) to overwrite `my-match.json` with a config that reflects any research added since the match
+was created — that's the whole point of previewing:
+
+```bash
+yarn thunderdome match forward preview my-match --config-file ./.thunderdome/preview-configs/my-match.json
+```
+
+Read-only: never persists a round or changes the match. Reports which securities' orders differ
+between the match's own stored config and this freshly-generated one — or plainly says there's no
+new round to preview yet if the price dataset hasn't grown past what's already been played.
+
+Full flag reference for every command above: [`apps/cli/README.md`](../../apps/cli/README.md#match-forward-run--list--inspect).
+
+---
+
 ## You supply the data
 
 There is no procedural price engine in this game, historical or synthetic. `config.historicalPrices`
@@ -62,11 +370,16 @@ earliest date every ticker in `config.marketDataUniverse` is currently known thr
 cleanly at "ran out of real data" instead of playing a tail of empty rounds up to a possibly-distant
 `endDate`.
 
-**This is still a bounded, single-process, non-resumable run.** A `FORWARD_SHADOW` match plays
-exactly what's currently published, once, then ends — like any other match. It is not yet
-resumable: re-running it later against a dataset that has since grown starts a brand-new match from
-round 0, with no memory of the previous run's portfolio/state. Making it resumable across process
-restarts is separate, later roadmap work.
+**Directly via `GameDefinition`, a `FORWARD_SHADOW` match is still a bounded, single-process run**
+that plays exactly what's currently published, then ends. Resumability across process restarts —
+picking a match back up later, once the dataset has grown, with no loss of portfolio/state — is
+layered on top via three additional exported functions this module provides but `GameDefinition`
+itself has no hook for: `serializeForwardState`, `resumeForwardState`, and
+`isForwardMatchFullyResolved` (which one, not `isTerminal`, tells you whether a `FORWARD_SHADOW`
+match is genuinely done versus just out of data for now). See
+[`docs/adr/0013-forward-match-persistence.md`](../../docs/adr/0013-forward-match-persistence.md)
+for the full design, and `apps/cli`'s `match forward run` for the operational entry point that
+actually uses them.
 
 ## Corporate actions
 
@@ -193,5 +506,5 @@ solo against real history is a complete match on its own, reported as a solo win
   `getObservation` itself: `historicalPrices`/`corporateActions`/`researchTimeline` each hold the
   FULL match (every future bar, action, and research entry), so the wire copy of config a bot
   actually receives via `init` has all three stripped to their empty shape.
-- 206 tests across 12 files cover every module in this package — see `test/` for the full suite,
+- 229 tests across 15 files cover every module in this package — see `test/` for the full suite,
   organized to mirror `src/`.

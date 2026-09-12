@@ -150,6 +150,33 @@ describe('computeTradingDecisions (multi-symbol)', () => {
     // ...leaving nothing for CCC.
     expect(decisions[2]!.orders).toEqual([]);
   });
+
+  it('seeds the shared budget from real cash, not from buyingPowerCents (regression)', () => {
+    // Real bug this guards against: `computeTradingDecisions` used to seed
+    // `remainingBuyingPowerCents` directly from `portfolio.buyingPowerCents`, which is `0` for a
+    // plain cash account (`emptyPortfolio`'s real default — see its own doc comment) — so EVERY
+    // security in the round, starting with the very first, would see a budget of exactly `0` and
+    // never buy anything, even with a fresh, fully-cash, no-position account. `buildOrders`'s own
+    // fallback (`spendableCentsFor`) can't fix this on its own, because a multi-security round
+    // always passes an EXPLICIT `availableBuyingPowerCents` (even when it's `0`), which
+    // `buildOrders` correctly trusts as-is — see `src/decision.ts`'s own fix.
+    const config: FusionFundamentalConfig = {
+      securities: [makeSecurity('AAA', 'entity-a')],
+      signal: signalThresholds,
+      portfolio: portfolioPolicy,
+    };
+    const decisions = computeTradingDecisions({
+      date: '2026-09-10',
+      config,
+      previousResearchState: undefined,
+      currentResearchState: emptyResearchState(),
+      currentPricesByTicker: new Map([['AAA', 20]]),
+      previousByTicker: new Map(),
+      portfolio: emptyPortfolio(1_000_000), // buyingPowerCents: 0, cashCents: $10,000
+    });
+
+    expect(decisions[0]!.orders).toEqual([{ kind: 'MARKET', ticker: 'AAA', side: 'BUY', quantity: 250 }]);
+  });
 });
 
 describe('createDecideAction (multi-symbol integration)', () => {

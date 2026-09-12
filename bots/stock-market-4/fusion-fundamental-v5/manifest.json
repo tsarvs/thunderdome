@@ -1,0 +1,18 @@
+{
+  "id": "fusion-fundamental-v5",
+  "name": "Fusion Fundamental v5",
+  "version": "0.1.0",
+  "game": "stock-market-4",
+  "author": {
+    "name": "Thunderdome Maintainers",
+    "contact": "maintainers@example.com"
+  },
+  "runtime": {
+    "language": "node"
+  },
+  "interface": {
+    "transport": "stdio"
+  },
+  "protocolVersion": "^1.0",
+  "description": "fusion-fundamental-v0 plus shorting: when the valuation gap is deeply negative AND confidence clears a stricter, dedicated bar (shorting is a materially higher-risk move than sizing a long — capped downside vs. theoretically unbounded), opens a conservatively-sized short instead of only flattening to cash. Tuned hysteresis/rebalance-tolerance from a real July-August 2026 parameter sweep. Requires config.risk.allowShortSelling to actually take effect; behaves identically to v0 in a plain cash-only match."
+}

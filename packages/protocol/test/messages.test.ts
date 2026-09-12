@@ -108,6 +108,15 @@ describe('ProtocolMessageSchema — one valid example per message type', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it('match-end with reason "suspended" (roadmap Phase 3 — a forward match pausing, not ending)', () => {
+    const result = ProtocolMessageSchema.safeParse({
+      ...base,
+      type: 'match-end',
+      payload: { result: null, reason: 'suspended' },
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe('cross-field validation', () => {

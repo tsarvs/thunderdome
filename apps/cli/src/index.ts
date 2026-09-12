@@ -4,6 +4,12 @@ import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { runCleanupCommand } from './commands/cleanup.js';
 import { runMatchCommand } from './commands/match.js';
+import {
+  runMatchForwardInspectCommand,
+  runMatchForwardListCommand,
+  runMatchForwardRunCommand,
+} from './commands/matchForward.js';
+import { runMatchForwardPreviewCommand } from './commands/matchForwardPreview.js';
 import { runPlayCommand } from './commands/play.js';
 import {
   runTournamentCommand,
@@ -41,6 +47,33 @@ Commands:
   cleanup      Force-remove any leftover Thunderdome bot containers`);
 }
 
+/** Routed directly off argv[0], ahead of the generic flag parse below, so `match forward run`'s
+ * own `--config`/`--store-dir` flags are never mistaken for top-level CLI flags — one level
+ * deeper than `runTournamentSubcommand`'s own `run`/`list`/`inspect`/`replay` dispatch, since
+ * `forward` is itself a group of subcommands nested under `match` (roadmap Phase 3 — see
+ * docs/adr/0013-forward-match-persistence.md). */
+async function runMatchForwardSubcommand(argv: readonly string[]): Promise<number> {
+  const [subcommand, ...rest] = argv;
+  const rootDir = process.cwd();
+  if (subcommand === 'run') {
+    return runMatchForwardRunCommand(rest, { rootDir });
+  }
+  if (subcommand === 'list') {
+    return runMatchForwardListCommand(rest, { rootDir });
+  }
+  if (subcommand === 'inspect') {
+    return runMatchForwardInspectCommand(rest, { rootDir });
+  }
+  if (subcommand === 'preview') {
+    return runMatchForwardPreviewCommand(rest, { rootDir });
+  }
+  console.error(
+    `Unknown match forward subcommand: "${String(subcommand)}". Only "run", "list", "inspect", ` +
+      `and "preview" exist today.`,
+  );
+  return 1;
+}
+
 /** Routed directly off argv[0], ahead of the generic flag parse below, so `match run`'s own
  * `--config` flag is never mistaken for a top-level CLI flag. */
 async function runMatchSubcommand(argv: readonly string[]): Promise<number> {
@@ -52,7 +85,10 @@ async function runMatchSubcommand(argv: readonly string[]): Promise<number> {
   if (subcommand === 'run') {
     return runMatchCommand(rest, { rootDir: process.cwd() });
   }
-  console.error(`Unknown match subcommand: "${subcommand}". Only "run" exists today.`);
+  if (subcommand === 'forward') {
+    return runMatchForwardSubcommand(rest);
+  }
+  console.error(`Unknown match subcommand: "${subcommand}". Only "run" and "forward" exist today.`);
   return 1;
 }
 

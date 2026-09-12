@@ -13,7 +13,7 @@ import {
   visibleCorporateActions,
 } from './market/corporateActions.js';
 import { benchmarkBuyAndHoldReturn, computePerformanceMetrics } from './metrics/performance.js';
-import { toCents } from './money.js';
+import { toCents, toDollars } from './money.js';
 import { researchAsOf } from './research/timeline.js';
 import {
   createPortfolio,
@@ -27,18 +27,23 @@ import { forceLiquidatePortfolio } from './portfolio/liquidation.js';
 import {
   StockMarket4ActionSchema,
   StockMarket4ConfigSchema,
+  StockMarket4ForwardSnapshotSchema,
   type CalendarDate,
   type EquityPoint,
   type Fill,
   type PerformanceMetrics,
   type PortfolioAccount,
   type PortfolioObservation,
+  type PortfolioSummary,
+  type PositionSummary,
   type RiskConfig,
   type RiskStats,
   type RoundEventData,
   type SecurityMarketObservation,
+  type SecurityPriceSummary,
   type StockMarket4Action,
   type StockMarket4Config,
+  type StockMarket4ForwardSnapshot,
   type StockMarket4Observation,
   type StockMarket4Result,
   type StockMarket4State,
@@ -89,6 +94,24 @@ function forwardShadowCutoffDateFor(
     if (cutoff === null || latest < cutoff) cutoff = latest;
   }
   return cutoff;
+}
+
+/** Throws unless at least one trading day is actually playable against `cutoff` — shared by
+ * `initialize()` and `resumeForwardState` (roadmap Phase 3) so the two entry points that can
+ * produce a `FORWARD_SHADOW` state can never drift apart on this check. Not a `Result` — matches
+ * every other setup-fatal condition in this file (see `buildMarketDataProvider`), since neither
+ * caller has a `Result`-returning contract to honor (`initialize()` per `GameDefinition`; a
+ * resume path has no such contract either). */
+function assertHasPlayableDays(config: StockMarket4Config, cutoff: CalendarDate | null): void {
+  const playableDays = tradingCalendarFor(config).filter(
+    (date) => cutoff === null || date <= cutoff,
+  );
+  if (playableDays.length === 0) {
+    throw new Error(
+      `stock-market-4: FORWARD_SHADOW match has no playable trading days — dataset's latest ` +
+        `known date (${cutoff ?? 'none'}) is before startDate (${config.startDate})`,
+    );
+  }
 }
 
 /**
@@ -308,16 +331,7 @@ export const stockMarket4: GameDefinition<
         throw new Error('stock-market-4: FORWARD_SHADOW requires a resolved marketData provider');
       }
       forwardShadowCutoffDate = forwardShadowCutoffDateFor(config, marketData);
-      const playableDays = tradingCalendarFor(config).filter(
-        (date) => forwardShadowCutoffDate === null || date <= forwardShadowCutoffDate,
-      );
-      if (playableDays.length === 0) {
-        throw new Error(
-          `stock-market-4: FORWARD_SHADOW match has no playable trading days — dataset's latest ` +
-            `known date (${forwardShadowCutoffDate ?? 'none'}) is before startDate ` +
-            `(${config.startDate})`,
-        );
-      }
+      assertHasPlayableDays(config, forwardShadowCutoffDate);
     }
 
     return {
@@ -568,6 +582,48 @@ export const stockMarket4: GameDefinition<
     }
 
     const firstDate = calendar[0];
+    const firstSecurities =
+      firstDate === undefined ? [] : securitiesAsOf(state.config, state.marketData, firstDate);
+
+    // Best-known close at or before each boundary date, not a strict "bar dated exactly here" —
+    // `history.at(-1)` (unlike `security.bar`) still reports a price on a name that isn't listed
+    // yet / has no trade that exact day, which is what a "before -> after" table should show
+    // rather than silently dropping the symbol.
+    const securityPrices: SecurityPriceSummary[] = state.config.marketDataUniverse.map(
+      (ticker, index) => ({
+        symbol: ticker,
+        startingPrice: firstSecurities[index]?.history.at(-1)?.close ?? 0,
+        finalPrice: finalSecurities[index]?.history.at(-1)?.close ?? 0,
+      }),
+    );
+
+    const portfolioSummaries: Record<string, PortfolioSummary> = {};
+    for (const participantId of state.participantIds) {
+      const portfolio =
+        state.portfolios.get(participantId) ??
+        createPortfolio(toCents(state.config.startingCapital));
+      const positions: PositionSummary[] = [...portfolio.positions.entries()].map(
+        ([ticker, position]) => {
+          const markCents = marksCents.get(ticker) ?? 0;
+          const marketValueCents = position.shares * markCents;
+          return {
+            symbol: ticker,
+            shares: position.shares,
+            averageEntryPrice: toDollars(position.averageEntryPriceCents),
+            marketValue: toDollars(marketValueCents),
+            unrealizedPnl: toDollars(marketValueCents - position.shares * position.averageEntryPriceCents),
+          };
+        },
+      );
+      const equity = finalEquityCents[participantId] ?? 0;
+      portfolioSummaries[participantId] = {
+        cash: toDollars(portfolio.cashCents),
+        equity: toDollars(equity),
+        bankrupt: equity <= 0,
+        positions,
+      };
+    }
+
     const benchmarkTicker = state.config.benchmarkTicker;
     const benchmarkSeries =
       benchmarkTicker === undefined
@@ -593,6 +649,8 @@ export const stockMarket4: GameDefinition<
       riskStats,
       performanceMetrics,
       benchmarkReturn,
+      securityPrices,
+      portfolioSummaries,
     };
   },
 
@@ -622,3 +680,119 @@ export const stockMarket4: GameDefinition<
   // §8 — resourceLimits (opaque to the engine; see docs/guides/security-model.md)
   resourceLimits: { cpus: 0.5, memoryMb: 128, turnTimeoutMs: 5000 },
 };
+
+// ---------------------------------------------------------------------------
+// Forward-match resumability (roadmap Phase 3 — see docs/adr/0013-forward-match-persistence.md).
+// These three functions are NOT part of `GameDefinition` — that contract has no serialize/resume
+// hook, and isn't being extended to gain one (only this one game needs this today). A caller that
+// knows it's holding a concrete `stockMarket4` (not a generic `GameDefinition<...>`) imports these
+// directly, the same way it would import any other named export from this module.
+// ---------------------------------------------------------------------------
+
+/** Flattens the resumable parts of `state` into a plain, `JSON.stringify`-safe snapshot — the
+ * save-time counterpart to `resumeForwardState`. Deliberately omits `marketData`/`config`/
+ * `participantIds`; see `StockMarket4ForwardSnapshot`'s own doc comment for why. */
+export function serializeForwardState(state: StockMarket4State): StockMarket4ForwardSnapshot {
+  return {
+    snapshotVersion: 1,
+    round: state.round,
+    forwardShadowCutoffDate: state.forwardShadowCutoffDate,
+    portfolios: [...state.portfolios].map(([participantId, portfolio]) => [
+      participantId,
+      { cashCents: portfolio.cashCents, positions: [...portfolio.positions] },
+    ]),
+    lastFills: [...state.lastFills],
+    riskStats: [...state.riskStats],
+    equityHistory: [...state.equityHistory],
+  };
+}
+
+/**
+ * Rebuilds a live `StockMarket4State` from a persisted snapshot — the resume-time counterpart to
+ * `initialize()`, used INSTEAD of it (never in addition to it) whenever a `FORWARD_SHADOW` match
+ * is picked back up in a new process.
+ *
+ * `marketData` and `forwardShadowCutoffDate` are ALWAYS rebuilt fresh from the live dataset —
+ * NEVER read off `snapshot.forwardShadowCutoffDate` — because the dataset may have grown since the
+ * snapshot was taken (that's the entire point of resuming). Re-deriving both from scratch is what
+ * makes a resumed bot receive exactly what it would have received had the process never stopped:
+ * never less, from a stale cutoff that's since been superseded by newly-published data; never
+ * more, since `securitiesAsOf`'s own point-in-time filtering is completely unchanged and still
+ * gates everything on the CURRENT round's date, not on when the provider handle happened to open.
+ *
+ * `snapshot` is `unknown`, not `StockMarket4ForwardSnapshot` — validated here via
+ * `StockMarket4ForwardSnapshotSchema`, the same "validate at the boundary" discipline
+ * `parseConfig` already applies to organizer-supplied config. This is the actual trust boundary
+ * for a snapshot's shape: `@thunderdome/forward-match-store` keeps it fully opaque (`unknown`) on
+ * its own end, so nothing upstream of this function ever checks it.
+ *
+ * Throws, matching `initialize()`'s own setup-fatal convention — this has no `Result`-returning
+ * contract to honor, since it isn't part of `GameDefinition`.
+ */
+export function resumeForwardState(args: {
+  config: StockMarket4Config;
+  participantIds: readonly string[];
+  snapshot: unknown;
+}): StockMarket4State {
+  const { config, participantIds } = args;
+  if (config.gameType !== 'FORWARD_SHADOW') {
+    throw new Error('stock-market-4: resumeForwardState is only meaningful for a FORWARD_SHADOW match');
+  }
+  const parsed = StockMarket4ForwardSnapshotSchema.safeParse(args.snapshot);
+  if (!parsed.success) {
+    throw new Error(
+      `stock-market-4: invalid forward snapshot: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`,
+    );
+  }
+  const snapshot = parsed.data;
+  const marketData = buildMarketDataProvider(config);
+  if (marketData === null) {
+    throw new Error('stock-market-4: FORWARD_SHADOW requires a resolved marketData provider');
+  }
+  const forwardShadowCutoffDate = forwardShadowCutoffDateFor(config, marketData);
+  assertHasPlayableDays(config, forwardShadowCutoffDate);
+
+  const nominalLength = tradingCalendarFor(config).length;
+  if (snapshot.round > nominalLength) {
+    throw new Error(
+      `stock-market-4: snapshot round ${String(snapshot.round)} exceeds this config's own ` +
+        `nominal calendar length (${String(nominalLength)}) — resuming against the wrong config?`,
+    );
+  }
+
+  return {
+    participantIds: [...participantIds],
+    config,
+    marketData,
+    forwardShadowCutoffDate,
+    round: snapshot.round,
+    portfolios: new Map(
+      snapshot.portfolios.map(([participantId, portfolio]) => [
+        participantId,
+        { cashCents: portfolio.cashCents, positions: new Map(portfolio.positions) },
+      ]),
+    ),
+    lastFills: new Map(snapshot.lastFills),
+    riskStats: new Map(snapshot.riskStats),
+    equityHistory: new Map(snapshot.equityHistory),
+  };
+}
+
+/**
+ * True only once real, published data has caught up through `config.endDate` — as opposed to
+ * `isTerminal(state)`, which ALSO becomes true merely because currently-known data has run out
+ * for now (a `FORWARD_SHADOW` match waiting on tomorrow's bar looks identically "terminal" to one
+ * that's genuinely finished, since both have `state.round >= effectiveTradingCalendar(state).length`).
+ * A caller managing a persisted forward match's lifecycle (never the engine, and never this game's
+ * own `isTerminal`) uses this — not `isTerminal` — to decide whether to mark that match complete or
+ * leave it active for a future resume. Always `true` for `'HISTORICAL'`/`'SYNTHETIC'`, where
+ * `isTerminal` already means "genuinely done" with no such ambiguity.
+ */
+export function isForwardMatchFullyResolved(
+  state: Pick<StockMarket4State, 'config' | 'forwardShadowCutoffDate'>,
+): boolean {
+  if (state.config.gameType !== 'FORWARD_SHADOW') return true;
+  return (
+    state.forwardShadowCutoffDate !== null && state.forwardShadowCutoffDate >= state.config.endDate
+  );
+}

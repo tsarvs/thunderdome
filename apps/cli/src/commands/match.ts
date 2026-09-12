@@ -4,6 +4,7 @@
 // and @thunderdome/runtime — the registry-driven successor to an earlier ad hoc scrimmage script
 // that proved the same wiring by hand against a hardcoded bot list.
 import { parseArgs } from 'node:util';
+import { readFile } from 'node:fs/promises';
 import type { RoundEvent } from '@thunderdome/engine';
 import { generateTournamentSeed } from '@thunderdome/rng';
 import {
@@ -14,7 +15,8 @@ import {
 } from '../lib/match-execution.js';
 
 const USAGE =
-  'Usage: thunderdome match run <botId> <botId> [...moreBotIds] [--config \'{"totalRounds":300}\']';
+  'Usage: thunderdome match run <botId> <botId> [...moreBotIds] ' +
+  '[--config \'{"totalRounds":300}\' | --config-file <path>]';
 
 /** Printing every round is fine for a handful of rounds, but floods the terminal at 300 — past
  * this threshold, just report how many rounds were played and let the final standings speak.
@@ -224,6 +226,47 @@ export function printPortfolioSummaries(result: unknown): void {
   }
 }
 
+/** Same "read it generically off `result`" idiom as the printers above, for stock-market-4's own
+ * `performanceMetrics`/`benchmarkReturn` (games/stock-market-4/src/types.ts's `PerformanceMetrics`
+ * — `totalReturn`, `maxDrawdown`, `annualizedVolatility`, and a `sharpeRatio` that's `null` on a
+ * flat/no-trade equity curve rather than a divide-by-zero artifact). A no-op for any other game's
+ * result shape, since none currently reports per-participant performance metrics this way. */
+export function printPerformanceMetrics(result: unknown): void {
+  if (typeof result !== 'object' || result === null) {
+    return;
+  }
+  const { performanceMetrics, benchmarkReturn } = result as Record<string, unknown>;
+  if (typeof performanceMetrics !== 'object' || performanceMetrics === null) {
+    return;
+  }
+  const entries = Object.entries(performanceMetrics as Record<string, unknown>);
+  if (entries.length === 0) {
+    return;
+  }
+  console.log('  Portfolio statistics:');
+  for (const [participantId, metricsRaw] of entries) {
+    if (typeof metricsRaw !== 'object' || metricsRaw === null) {
+      continue;
+    }
+    const { totalReturn, maxDrawdown, annualizedVolatility, sharpeRatio } =
+      metricsRaw as Record<string, unknown>;
+    if (
+      typeof totalReturn !== 'number' ||
+      typeof maxDrawdown !== 'number' ||
+      typeof annualizedVolatility !== 'number'
+    ) {
+      continue;
+    }
+    const sharpeLabel = typeof sharpeRatio === 'number' ? sharpeRatio.toFixed(2) : 'n/a';
+    console.log(
+      `    ${participantId}: return ${(totalReturn * 100).toFixed(1)}%, max drawdown ${(maxDrawdown * 100).toFixed(1)}%, volatility ${(annualizedVolatility * 100).toFixed(1)}%, Sharpe ${sharpeLabel}`,
+    );
+  }
+  if (typeof benchmarkReturn === 'number') {
+    console.log(`    (benchmark buy-and-hold return: ${(benchmarkReturn * 100).toFixed(1)}%)`);
+  }
+}
+
 export interface MatchRunOptions {
   /** Repo root to scan games/ and bots/ under. */
   rootDir: string;
@@ -235,13 +278,17 @@ export async function runMatchCommand(
 ): Promise<number> {
   const { positionals, values } = parseArgs({
     args: argv as string[],
-    options: { config: { type: 'string', default: '{}' } },
+    options: { config: { type: 'string' }, 'config-file': { type: 'string' } },
     allowPositionals: true,
   });
 
   const botIds = positionals;
   if (botIds.length < 2) {
     console.error(USAGE);
+    return 1;
+  }
+  if (values.config !== undefined && values['config-file'] !== undefined) {
+    console.error(`--config and --config-file are mutually exclusive.\n${USAGE}`);
     return 1;
   }
 
@@ -252,9 +299,24 @@ export async function runMatchCommand(
   }
   const { entries, gameEntry } = resolved;
 
+  // A researchTimeline-bearing config can run to megabytes — comfortably past a shell's argv
+  // length limit for inline `--config` — same rationale as `match forward run`'s own
+  // `--config-file` (see that command's own doc comment).
+  let configString = values.config ?? '{}';
+  if (values['config-file'] !== undefined) {
+    try {
+      configString = await readFile(values['config-file'], 'utf8');
+    } catch (error) {
+      console.error(
+        `Could not read --config-file "${values['config-file']}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return 1;
+    }
+  }
+
   let configRaw: unknown;
   try {
-    configRaw = JSON.parse(values.config);
+    configRaw = JSON.parse(configString);
   } catch (error) {
     console.error(
       `--config is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
@@ -300,6 +362,7 @@ export async function runMatchCommand(
   printStockPriceRange(outcome.result);
   printSecurityPriceTable(outcome.result);
   printPortfolioSummaries(outcome.result);
+  printPerformanceMetrics(outcome.result);
   console.log();
 
   if (outcome.status === 'forfeit') {

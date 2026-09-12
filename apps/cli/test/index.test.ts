@@ -53,7 +53,7 @@ describe('thunderdome CLI', () => {
       const code = await run(['match', 'not-a-real-subcommand']);
       expect(code).toBe(1);
       expect(error).toHaveBeenCalledWith(
-        'Unknown match subcommand: "not-a-real-subcommand". Only "run" exists today.',
+        'Unknown match subcommand: "not-a-real-subcommand". Only "run" and "forward" exist today.',
       );
       error.mockRestore();
     });
@@ -63,6 +63,27 @@ describe('thunderdome CLI', () => {
       const code = await run(['match', 'run', 'only-rock']);
       expect(code).toBe(1);
       expect(error).toHaveBeenCalledWith(expect.stringContaining('Usage: thunderdome match run'));
+      error.mockRestore();
+    });
+
+    it('exits 1 and prints an error for an unknown "match forward" subcommand', async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const code = await run(['match', 'forward', 'not-a-real-subcommand']);
+      expect(code).toBe(1);
+      expect(error).toHaveBeenCalledWith(
+        'Unknown match forward subcommand: "not-a-real-subcommand". Only "run", "list", ' +
+          '"inspect", and "preview" exist today.',
+      );
+      error.mockRestore();
+    });
+
+    it('exits 1 with a usage message when "match forward run" gets no matchId/bot ids', async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const code = await run(['match', 'forward', 'run']);
+      expect(code).toBe(1);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining('Usage: thunderdome match forward run'),
+      );
       error.mockRestore();
     });
   });

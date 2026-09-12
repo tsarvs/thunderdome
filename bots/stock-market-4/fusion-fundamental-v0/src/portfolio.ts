@@ -23,9 +23,23 @@ export function targetWeightForSignal(level: SignalLevel, policy: PortfolioPolic
 }
 
 /**
+ * The real spendable limit for a NEW buy, in either account mode. stock-market-4's own contract
+ * (see games/stock-market-4/README.md's "Risk & financing" section) reports `buyingPowerCents` as
+ * exactly `0` whenever margin/short-selling is off — a plain cash account's real limit is
+ * `cashCents` itself, not buying power (a margin-only concept). Trusting `buyingPowerCents`
+ * unconditionally would leave this bot permanently unable to buy anything under the engine's
+ * default (cash-only) risk settings, even with a perfectly correct signal — this is exactly the
+ * bug this function exists to prevent regressing; see `test/portfolio.test.ts`'s dedicated
+ * "cash-account mode" tests.
+ */
+export function spendableCentsFor(portfolio: PortfolioObservation): number {
+  return portfolio.buyingPowerCents > 0 ? portfolio.buyingPowerCents : Math.max(0, portfolio.cashCents);
+}
+
+/**
  * Translates a target weight into ordinary stock-market-4 `OrderRequest`s (spec §15) — no second
  * execution system, just "how many shares to buy or sell to move toward the target," clamped to
- * what the observation itself reports is actually available (`buyingPowerCents`, current shares
+ * what the observation itself reports is actually available (`spendableCentsFor`, current shares
  * held). The game remains responsible for fees/margin/accounting; this only decides direction and
  * quantity. Returns `[]` whenever there's nothing worth doing: no forced target, the position is
  * already within `rebalanceToleranceWeight` of the target (spec follow-up: on a genuinely
@@ -35,10 +49,11 @@ export function targetWeightForSignal(level: SignalLevel, policy: PortfolioPolic
  * `minOrderNotionalCents` (spec §15's `{ orders: [] }` case).
  *
  * `availableBuyingPowerCents` (spec follow-up: multi-security portfolios) defaults to
- * `portfolio.buyingPowerCents` — the account's actual total buying power — but a caller
- * processing several securities in one round should pass a shrinking remainder instead, so two
- * securities that both want to buy can never jointly commit more cash than the account actually
- * has. See `decision.ts`'s `computeTradingDecisions` for where that's threaded through.
+ * `spendableCentsFor(portfolio)` when omitted, which reproduces the original single-security
+ * behavior exactly — but a caller processing several securities in one round should pass a
+ * shrinking remainder instead (itself SEEDED from `spendableCentsFor`, not raw
+ * `buyingPowerCents` — see `decision.ts`'s `computeTradingDecisions`), so two securities that both
+ * want to buy can never jointly commit more cash than the account actually has.
  */
 export function buildOrders(params: {
   ticker: string;
@@ -46,7 +61,7 @@ export function buildOrders(params: {
   priceDollars: number;
   portfolio: PortfolioObservation;
   policy: PortfolioPolicy;
-  availableBuyingPowerCents?: number;
+  availableBuyingPowerCents?: number | undefined;
 }): OrderRequest[] {
   if (params.targetWeight === undefined) return [];
   if (params.priceDollars <= 0) return [];
@@ -77,7 +92,13 @@ export function buildOrders(params: {
   }
 
   if (deltaCents > 0) {
-    const buyingPowerCents = Math.max(0, params.availableBuyingPowerCents ?? params.portfolio.buyingPowerCents);
+    // An explicit `availableBuyingPowerCents` (the shrinking multi-security remainder —
+    // `computeTradingDecisions` in decision.ts) is trusted as-is, including `0` ("no margin/cash
+    // room left THIS round"). Only when it's omitted entirely (a direct, single-security caller)
+    // does this fall back to `spendableCentsFor`, which is the cash-account-aware fix itself —
+    // see that function's own doc comment for why `portfolio.buyingPowerCents` alone isn't safe
+    // to trust here.
+    const buyingPowerCents = Math.max(0, params.availableBuyingPowerCents ?? spendableCentsFor(params.portfolio));
     const buyCents = Math.min(deltaCents, buyingPowerCents);
     const quantity = Math.floor(buyCents / priceCents);
     if (quantity <= 0) return [];
