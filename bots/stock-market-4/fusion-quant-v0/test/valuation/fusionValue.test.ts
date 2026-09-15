@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeFusionValue } from '../../src/valuation/fusionValue.js';
-import type { FusionValuationAssumptions } from '../../src/valuation/types.js';
+import { computeFusionValue, type FusionValuationAssumptions } from '../../src/valuation/fusionValue.js';
 
 function constant(value: number) {
   return { bear: value, base: value, bull: value };

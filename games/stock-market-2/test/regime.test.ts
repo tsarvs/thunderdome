@@ -14,8 +14,12 @@ describe('REGIME_PROFILES', () => {
     const crisis = REGIME_PROFILES.CRISIS;
     for (const regime of MARKET_REGIMES) {
       if (regime === 'CRISIS') continue;
-      expect(crisis.volatilityMultiplier).toBeGreaterThanOrEqual(REGIME_PROFILES[regime].volatilityMultiplier);
-      expect(crisis.liquidityMultiplier).toBeLessThanOrEqual(REGIME_PROFILES[regime].liquidityMultiplier);
+      expect(crisis.volatilityMultiplier).toBeGreaterThanOrEqual(
+        REGIME_PROFILES[regime].volatilityMultiplier,
+      );
+      expect(crisis.liquidityMultiplier).toBeLessThanOrEqual(
+        REGIME_PROFILES[regime].liquidityMultiplier,
+      );
     }
   });
 });

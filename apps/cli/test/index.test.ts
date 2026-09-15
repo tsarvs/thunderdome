@@ -72,7 +72,7 @@ describe('thunderdome CLI', () => {
       expect(code).toBe(1);
       expect(error).toHaveBeenCalledWith(
         'Unknown match forward subcommand: "not-a-real-subcommand". Only "run", "list", ' +
-          '"inspect", and "preview" exist today.',
+          '"inspect", "preview", "refresh", and "status" exist today.',
       );
       error.mockRestore();
     });

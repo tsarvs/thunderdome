@@ -45,7 +45,8 @@ function describeTrade(trade: unknown): string | null {
   const symbolLabel = typeof symbol === 'string' ? `${symbol} ` : '';
   const forcedLabel = forced === true ? ' (forced liquidation)' : '';
   if (typeof buyerParticipantId === 'string') {
-    const counterparty = typeof sellerParticipantId === 'string' ? sellerParticipantId : 'the market';
+    const counterparty =
+      typeof sellerParticipantId === 'string' ? sellerParticipantId : 'the market';
     return `${buyerParticipantId} bought ${String(quantity)} ${symbolLabel}@ ${price} from ${counterparty}${forcedLabel}`;
   }
   if (typeof sellerParticipantId === 'string') {
@@ -70,7 +71,9 @@ function describeTradesFor(data: unknown): string[] | null {
   // still yields `any[]` — these explicit `unknown[]` annotations are what keep that `any` from
   // leaking into `all` below (an unsafe spread otherwise).
   const tradesArray: unknown[] = Array.isArray(trades) ? trades : [];
-  const forcedLiquidationsArray: unknown[] = Array.isArray(forcedLiquidations) ? forcedLiquidations : [];
+  const forcedLiquidationsArray: unknown[] = Array.isArray(forcedLiquidations)
+    ? forcedLiquidations
+    : [];
   const all = [...tradesArray, ...forcedLiquidationsArray];
   const lines: string[] = [];
   for (const trade of all) {
@@ -132,8 +135,15 @@ export function printStockPriceRange(result: unknown): void {
   if (typeof result !== 'object' || result === null) {
     return;
   }
-  const { startingStockPrice, finalStockPrice, startingPrice, finalPrice, indexStartingPrice, indexFinalPrice, indexSymbol } =
-    result as Record<string, unknown>;
+  const {
+    startingStockPrice,
+    finalStockPrice,
+    startingPrice,
+    finalPrice,
+    indexStartingPrice,
+    indexFinalPrice,
+    indexSymbol,
+  } = result as Record<string, unknown>;
   const starting =
     typeof startingStockPrice === 'number'
       ? startingStockPrice
@@ -141,7 +151,11 @@ export function printStockPriceRange(result: unknown): void {
         ? startingPrice
         : indexStartingPrice;
   const final =
-    typeof finalStockPrice === 'number' ? finalStockPrice : typeof finalPrice === 'number' ? finalPrice : indexFinalPrice;
+    typeof finalStockPrice === 'number'
+      ? finalStockPrice
+      : typeof finalPrice === 'number'
+        ? finalPrice
+        : indexFinalPrice;
   if (typeof starting === 'number' && typeof final === 'number') {
     const label = typeof indexSymbol === 'string' ? `${indexSymbol} price` : 'stock price';
     console.log(`  (${label}: $${starting.toFixed(2)} → $${final.toFixed(2)})`);
@@ -166,12 +180,19 @@ export function printSecurityPriceTable(result: unknown): void {
       continue;
     }
     const { symbol, startingPrice, finalPrice } = entry as Record<string, unknown>;
-    if (typeof symbol !== 'string' || typeof startingPrice !== 'number' || typeof finalPrice !== 'number') {
+    if (
+      typeof symbol !== 'string' ||
+      typeof startingPrice !== 'number' ||
+      typeof finalPrice !== 'number'
+    ) {
       continue;
     }
-    const changePct = startingPrice !== 0 ? ((finalPrice - startingPrice) / startingPrice) * 100 : 0;
+    const changePct =
+      startingPrice !== 0 ? ((finalPrice - startingPrice) / startingPrice) * 100 : 0;
     const sign = changePct >= 0 ? '+' : '';
-    console.log(`    ${symbol}: $${startingPrice.toFixed(2)} -> $${finalPrice.toFixed(2)} (${sign}${changePct.toFixed(1)}%)`);
+    console.log(
+      `    ${symbol}: $${startingPrice.toFixed(2)} -> $${finalPrice.toFixed(2)} (${sign}${changePct.toFixed(1)}%)`,
+    );
   }
 }
 
@@ -199,7 +220,9 @@ export function printPortfolioSummaries(result: unknown): void {
       continue;
     }
     const bankruptLabel = bankrupt === true ? ' [BANKRUPT]' : '';
-    console.log(`    ${participantId}: equity $${equity.toFixed(2)}, cash $${cash.toFixed(2)}${bankruptLabel}`);
+    console.log(
+      `    ${participantId}: equity $${equity.toFixed(2)}, cash $${cash.toFixed(2)}${bankruptLabel}`,
+    );
     if (!Array.isArray(positions) || positions.length === 0) {
       console.log('      (no open positions)');
       continue;
@@ -208,7 +231,8 @@ export function printPortfolioSummaries(result: unknown): void {
       if (typeof positionRaw !== 'object' || positionRaw === null) {
         continue;
       }
-      const { symbol, shares, averageEntryPrice, marketValue, unrealizedPnl } = positionRaw as Record<string, unknown>;
+      const { symbol, shares, averageEntryPrice, marketValue, unrealizedPnl } =
+        positionRaw as Record<string, unknown>;
       if (
         typeof symbol !== 'string' ||
         typeof shares !== 'number' ||
@@ -248,8 +272,10 @@ export function printPerformanceMetrics(result: unknown): void {
     if (typeof metricsRaw !== 'object' || metricsRaw === null) {
       continue;
     }
-    const { totalReturn, maxDrawdown, annualizedVolatility, sharpeRatio } =
-      metricsRaw as Record<string, unknown>;
+    const { totalReturn, maxDrawdown, annualizedVolatility, sharpeRatio } = metricsRaw as Record<
+      string,
+      unknown
+    >;
     if (
       typeof totalReturn !== 'number' ||
       typeof maxDrawdown !== 'number' ||

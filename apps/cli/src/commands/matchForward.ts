@@ -14,7 +14,13 @@ import {
   type ForwardMatchRecord,
 } from '@thunderdome/forward-match-store';
 import { runAvailableRounds } from '@thunderdome/engine';
-import { createRng, deriveSeed, generateTournamentSeed, seedFromHex, seedToHex } from '@thunderdome/rng';
+import {
+  createRng,
+  deriveSeed,
+  generateTournamentSeed,
+  seedFromHex,
+  seedToHex,
+} from '@thunderdome/rng';
 import { DockerActionCollector } from '@thunderdome/runtime';
 import type { GameRegistryEntry } from '@thunderdome/registry';
 import {
@@ -230,7 +236,9 @@ export async function runMatchForwardRunCommand(
     }
     const configResult = game.parseConfig(record.config);
     if (!configResult.ok) {
-      console.error(`Cannot resume "${matchId}": stored config is no longer valid: ${configResult.reason}`);
+      console.error(
+        `Cannot resume "${matchId}": stored config is no longer valid: ${configResult.reason}`,
+      );
       return 1;
     }
     state = forwardModule.resumeForwardState({
@@ -238,7 +246,9 @@ export async function runMatchForwardRunCommand(
       participantIds: record.participantIds,
       snapshot: record.snapshot,
     });
-    console.log(`Resuming forward match "${matchId}" (${String(record.roundsPlayed)} round(s) played so far).`);
+    console.log(
+      `Resuming forward match "${matchId}" (${String(record.roundsPlayed)} round(s) played so far).`,
+    );
   }
 
   console.log(`Building ${String(entries.length)} bot image(s)...`);
@@ -291,9 +301,17 @@ export async function runMatchForwardRunCommand(
       forfeited
         ? { result: null, reason: 'aborted' }
         : fullyResolved
-          ? { result: outcome.terminalOutcome?.status === 'completed' ? outcome.terminalOutcome.result : null, reason: 'completed' }
+          ? {
+              result:
+                outcome.terminalOutcome?.status === 'completed'
+                  ? outcome.terminalOutcome.result
+                  : null,
+              reason: 'completed',
+            }
           : { result: null, reason: 'suspended' };
-    await Promise.all([...lifecycles.values()].map((lifecycle) => lifecycle.finish(matchEndPayload)));
+    await Promise.all(
+      [...lifecycles.values()].map((lifecycle) => lifecycle.finish(matchEndPayload)),
+    );
 
     if (forfeited && outcome.terminalOutcome?.status === 'forfeit') {
       record = {

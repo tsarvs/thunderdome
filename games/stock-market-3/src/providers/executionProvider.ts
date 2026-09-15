@@ -1,4 +1,9 @@
-import { StockMarket3ActionSchema, type PublicOpenOrder, type StockMarket3Action, type StockMarket3State } from '../types.js';
+import {
+  StockMarket3ActionSchema,
+  type PublicOpenOrder,
+  type StockMarket3Action,
+  type StockMarket3State,
+} from '../types.js';
 import { buildObservation } from '../observation/buildObservation.js';
 
 /**
@@ -12,7 +17,9 @@ import { buildObservation } from '../observation/buildObservation.js';
  * way, same as this game's own `exchange/matchingEngine.ts`).
  */
 export interface ExecutionProvider {
-  validateOrders(raw: unknown): { ok: true; action: StockMarket3Action } | { ok: false; reason: string };
+  validateOrders(
+    raw: unknown,
+  ): { ok: true; action: StockMarket3Action } | { ok: false; reason: string };
   getOpenOrders(participantId: string): PublicOpenOrder[];
 }
 

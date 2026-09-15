@@ -209,8 +209,15 @@ export interface RunAvailableRoundsOutcome<TState, TResult> {
 export async function runAvailableRounds<TConfig, TState, TObservation, TAction, TResult>(
   args: RunAvailableRoundsArgs<TConfig, TState, TObservation, TAction, TResult>,
 ): Promise<RunAvailableRoundsOutcome<TState, TResult>> {
-  const { game, participantIds, rng, collector, defaultDeadlineMs, matchDeadlineMs, onRoundResolved } =
-    args;
+  const {
+    game,
+    participantIds,
+    rng,
+    collector,
+    defaultDeadlineMs,
+    matchDeadlineMs,
+    onRoundResolved,
+  } = args;
   const now = args.now ?? Date.now;
   const startedAt = now();
   let state = args.state;
@@ -229,7 +236,14 @@ export async function runAvailableRounds<TConfig, TState, TObservation, TAction,
       };
     }
 
-    const roundResult = await playOneRound({ game, state, roundId, rng, collector, defaultDeadlineMs });
+    const roundResult = await playOneRound({
+      game,
+      state,
+      roundId,
+      rng,
+      collector,
+      defaultDeadlineMs,
+    });
 
     if (roundResult.kind === 'forfeit') {
       return {

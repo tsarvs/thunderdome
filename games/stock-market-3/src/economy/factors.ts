@@ -1,6 +1,11 @@
 import type { Rng } from '@thunderdome/engine';
 import { gaussian } from '../rngUtil.js';
-import { ECONOMIC_FACTORS, type EconomicFactor, type EconomicFactorValues, type MarketRegime } from '../types.js';
+import {
+  ECONOMIC_FACTORS,
+  type EconomicFactor,
+  type EconomicFactorValues,
+  type MarketRegime,
+} from '../types.js';
 import { REGIME_PROFILES } from './regime.js';
 
 /** Per-factor Ornstein-Uhlenbeck parameters — hidden simulator constants (spec §60: don't expose
@@ -35,15 +40,16 @@ const FACTOR_PARAMS: Record<EconomicFactor, { speed: number; volatility: number 
  * only correlate this round's move with this round's upstream surprise, which is exactly the
  * "commodity shock also nudges inflation" relationship the spec describes.
  */
-const CROSS_FACTOR_LINKS: readonly { from: EconomicFactor; to: EconomicFactor; weight: number }[] = [
-  // Commodity prices -> inflation -> interest rates -> growth (spec §8's first example chain).
-  { from: 'COMMODITY_PRICES', to: 'INFLATION', weight: 0.15 },
-  { from: 'INFLATION', to: 'INTEREST_RATES', weight: 0.2 },
-  { from: 'INTEREST_RATES', to: 'GROWTH', weight: -0.15 },
-  // Growth deterioration -> risk appetite -> liquidity/flows (spec §8's second example chain).
-  { from: 'GROWTH', to: 'RISK_APPETITE', weight: 0.25 },
-  { from: 'RISK_APPETITE', to: 'LIQUIDITY', weight: 0.2 },
-];
+const CROSS_FACTOR_LINKS: readonly { from: EconomicFactor; to: EconomicFactor; weight: number }[] =
+  [
+    // Commodity prices -> inflation -> interest rates -> growth (spec §8's first example chain).
+    { from: 'COMMODITY_PRICES', to: 'INFLATION', weight: 0.15 },
+    { from: 'INFLATION', to: 'INTEREST_RATES', weight: 0.2 },
+    { from: 'INTEREST_RATES', to: 'GROWTH', weight: -0.15 },
+    // Growth deterioration -> risk appetite -> liquidity/flows (spec §8's second example chain).
+    { from: 'GROWTH', to: 'RISK_APPETITE', weight: 0.25 },
+    { from: 'RISK_APPETITE', to: 'LIQUIDITY', weight: 0.2 },
+  ];
 
 export function initialEconomicFactors(): EconomicFactorValues {
   const values = {} as EconomicFactorValues;
@@ -59,17 +65,23 @@ export function initialEconomicFactors(): EconomicFactorValues {
  * shock-coupled, not level-coupled). Every factor's own shock is drawn in one pass before any
  * cross-link is applied, so a link never depends on order of iteration or another link having
  * already run. */
-export function stepEconomicFactors(previous: EconomicFactorValues, regime: MarketRegime, rng: Rng): EconomicFactorValues {
+export function stepEconomicFactors(
+  previous: EconomicFactorValues,
+  regime: MarketRegime,
+  rng: Rng,
+): EconomicFactorValues {
   const profile = REGIME_PROFILES[regime];
   const shocks = {} as EconomicFactorValues;
   for (const factor of ECONOMIC_FACTORS) {
-    shocks[factor] = gaussian(rng) * FACTOR_PARAMS[factor].volatility * profile.volatilityMultiplier;
+    shocks[factor] =
+      gaussian(rng) * FACTOR_PARAMS[factor].volatility * profile.volatilityMultiplier;
   }
 
   const next = {} as EconomicFactorValues;
   for (const factor of ECONOMIC_FACTORS) {
     const mean = profile.factorMeanShift[factor] ?? 0;
-    next[factor] = previous[factor] + FACTOR_PARAMS[factor].speed * (mean - previous[factor]) + shocks[factor];
+    next[factor] =
+      previous[factor] + FACTOR_PARAMS[factor].speed * (mean - previous[factor]) + shocks[factor];
   }
   for (const link of CROSS_FACTOR_LINKS) {
     next[link.to] += link.weight * shocks[link.from];

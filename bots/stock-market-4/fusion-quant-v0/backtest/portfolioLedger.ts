@@ -1,4 +1,4 @@
-import type { OrderRequest, PortfolioObservation, PositionObservation } from '../src/marketTypes.js';
+import type { OrderRequest, PortfolioObservation, PositionObservation } from '@thunderdome/quant-sdk-js';
 
 /**
  * Applies fills the same simple way stock-market-4 itself would for a MARKET order (spec: the

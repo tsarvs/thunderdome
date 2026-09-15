@@ -1,6 +1,10 @@
 import { createRng } from '@thunderdome/rng';
 import { describe, expect, it } from 'vitest';
-import { computeAvailability, resolveRound, type ResolveRoundArgs } from '../src/exchange/matchingEngine.js';
+import {
+  computeAvailability,
+  resolveRound,
+  type ResolveRoundArgs,
+} from '../src/exchange/matchingEngine.js';
 import {
   RiskConfigSchema,
   type LiquiditySnapshot,
@@ -14,10 +18,19 @@ const CASH = 1_000_000; // $10,000.00
 const DEFAULT_RISK: RiskConfig = RiskConfigSchema.parse({});
 
 function portfolio(overrides: Partial<StockMarket2Portfolio> = {}): StockMarket2Portfolio {
-  return { cashCents: CASH, shares: 0, averageEntryPriceCents: 0, realizedPnlCents: 0, bankrupt: false, ...overrides };
+  return {
+    cashCents: CASH,
+    shares: 0,
+    averageEntryPriceCents: 0,
+    realizedPnlCents: 0,
+    bankrupt: false,
+    ...overrides,
+  };
 }
 
-function portfolios(overrides: Record<string, Partial<StockMarket2Portfolio>> = {}): Map<string, StockMarket2Portfolio> {
+function portfolios(
+  overrides: Record<string, Partial<StockMarket2Portfolio>> = {},
+): Map<string, StockMarket2Portfolio> {
   const ids = new Set(['alice', 'bob', ...Object.keys(overrides)]);
   return new Map([...ids].map((id) => [id, portfolio(overrides[id])]));
 }
@@ -52,13 +65,18 @@ describe('resolveRound — market orders against synthetic liquidity', () => {
     const result = resolveRound(
       baseArgs({
         pendingLiquidity: { bids: [], asks: [{ priceCents: 10010, quantity: 100 }] },
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }],
+        ]),
       }),
     );
     expect(result.trades).toEqual([
       { buyerParticipantId: 'alice', sellerParticipantId: null, priceCents: 10010, quantity: 10 },
     ]);
-    expect(result.portfolios.get('alice')).toMatchObject({ cashCents: CASH - 10 * 10010, shares: 10 });
+    expect(result.portfolios.get('alice')).toMatchObject({
+      cashCents: CASH - 10 * 10010,
+      shares: 10,
+    });
   });
 
   it('fills a market sell against the best bid level', () => {
@@ -66,13 +84,18 @@ describe('resolveRound — market orders against synthetic liquidity', () => {
       baseArgs({
         pendingLiquidity: { bids: [{ priceCents: 9990, quantity: 100 }], asks: [] },
         portfolios: portfolios({ alice: { shares: 10 } }),
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }],
+        ]),
       }),
     );
     expect(result.trades).toEqual([
       { buyerParticipantId: null, sellerParticipantId: 'alice', priceCents: 9990, quantity: 10 },
     ]);
-    expect(result.portfolios.get('alice')).toMatchObject({ cashCents: CASH + 10 * 9990, shares: 0 });
+    expect(result.portfolios.get('alice')).toMatchObject({
+      cashCents: CASH + 10 * 9990,
+      shares: 0,
+    });
   });
 
   it('walks multiple price levels when one level is insufficient, producing worse blended prices (slippage)', () => {
@@ -86,7 +109,9 @@ describe('resolveRound — market orders against synthetic liquidity', () => {
             { priceCents: 10030, quantity: 5 },
           ],
         },
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 12 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 12 }] }],
+        ]),
       }),
     );
     expect(result.trades).toEqual([
@@ -101,31 +126,37 @@ describe('resolveRound — market orders against synthetic liquidity', () => {
     const result = resolveRound(
       baseArgs({
         pendingLiquidity: { bids: [], asks: [{ priceCents: 10010, quantity: 5 }] },
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 100 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 100 }] }],
+        ]),
       }),
     );
     expect(result.portfolios.get('alice')?.shares).toBe(5);
     expect(result.openOrders).toEqual([]);
   });
 
-  it('caps a market buy by the buyer\'s own cash, not just by liquidity', () => {
+  it("caps a market buy by the buyer's own cash, not just by liquidity", () => {
     const result = resolveRound(
       baseArgs({
         portfolios: portfolios({ alice: { cashCents: 10010 * 3 } }), // affords exactly 3 shares
         pendingLiquidity: { bids: [], asks: [{ priceCents: 10010, quantity: 100 }] },
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }],
+        ]),
       }),
     );
     expect(result.portfolios.get('alice')?.shares).toBe(3);
     expect(result.portfolios.get('alice')?.cashCents).toBe(0);
   });
 
-  it('caps a market sell by the seller\'s own held shares', () => {
+  it("caps a market sell by the seller's own held shares", () => {
     const result = resolveRound(
       baseArgs({
         portfolios: portfolios({ alice: { shares: 3 } }),
         pendingLiquidity: { bids: [{ priceCents: 9990, quantity: 100 }], asks: [] },
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }],
+        ]),
       }),
     );
     expect(result.portfolios.get('alice')?.shares).toBe(0);
@@ -138,7 +169,14 @@ describe('resolveRound — limit orders', () => {
       baseArgs({
         pendingLiquidity: { bids: [], asks: [{ priceCents: 10010, quantity: 100 }] },
         actions: actionsOf([
-          ['alice', { orders: [{ kind: 'LIMIT', side: 'BUY', quantity: 10, limitPrice: 100.0, timeInForce: 'DAY' }] }],
+          [
+            'alice',
+            {
+              orders: [
+                { kind: 'LIMIT', side: 'BUY', quantity: 10, limitPrice: 100.0, timeInForce: 'DAY' },
+              ],
+            },
+          ],
         ]),
       }),
     );
@@ -151,7 +189,14 @@ describe('resolveRound — limit orders', () => {
       baseArgs({
         pendingLiquidity: { bids: [], asks: [{ priceCents: 10010, quantity: 100 }] },
         actions: actionsOf([
-          ['alice', { orders: [{ kind: 'LIMIT', side: 'BUY', quantity: 10, limitPrice: 100.1, timeInForce: 'DAY' }] }],
+          [
+            'alice',
+            {
+              orders: [
+                { kind: 'LIMIT', side: 'BUY', quantity: 10, limitPrice: 100.1, timeInForce: 'DAY' },
+              ],
+            },
+          ],
         ]),
       }),
     );
@@ -164,7 +209,14 @@ describe('resolveRound — limit orders', () => {
     const result = resolveRound(
       baseArgs({
         actions: actionsOf([
-          ['alice', { orders: [{ kind: 'LIMIT', side: 'BUY', quantity: 10, limitPrice: 99.0, timeInForce: 'GTC' }] }],
+          [
+            'alice',
+            {
+              orders: [
+                { kind: 'LIMIT', side: 'BUY', quantity: 10, limitPrice: 99.0, timeInForce: 'GTC' },
+              ],
+            },
+          ],
         ]),
       }),
     );
@@ -185,8 +237,22 @@ describe('resolveRound — limit orders', () => {
       baseArgs({
         portfolios: portfolios({ bob: { shares: 10 } }),
         actions: actionsOf([
-          ['alice', { orders: [{ kind: 'LIMIT', side: 'BUY', quantity: 10, limitPrice: 101, timeInForce: 'DAY' }] }],
-          ['bob', { orders: [{ kind: 'LIMIT', side: 'SELL', quantity: 10, limitPrice: 99, timeInForce: 'DAY' }] }],
+          [
+            'alice',
+            {
+              orders: [
+                { kind: 'LIMIT', side: 'BUY', quantity: 10, limitPrice: 101, timeInForce: 'DAY' },
+              ],
+            },
+          ],
+          [
+            'bob',
+            {
+              orders: [
+                { kind: 'LIMIT', side: 'SELL', quantity: 10, limitPrice: 99, timeInForce: 'DAY' },
+              ],
+            },
+          ],
         ]),
       }),
     );
@@ -199,21 +265,42 @@ describe('resolveRound — limit orders', () => {
     const result = resolveRound(
       baseArgs({
         actions: actionsOf([
-          ['alice', { orders: [{ kind: 'LIMIT', side: 'BUY', quantity: 10, limitPrice: 99, timeInForce: 'DAY' }] }],
-          ['bob', { orders: [{ kind: 'LIMIT', side: 'SELL', quantity: 10, limitPrice: 101, timeInForce: 'DAY' }] }],
+          [
+            'alice',
+            {
+              orders: [
+                { kind: 'LIMIT', side: 'BUY', quantity: 10, limitPrice: 99, timeInForce: 'DAY' },
+              ],
+            },
+          ],
+          [
+            'bob',
+            {
+              orders: [
+                { kind: 'LIMIT', side: 'SELL', quantity: 10, limitPrice: 101, timeInForce: 'DAY' },
+              ],
+            },
+          ],
         ]),
       }),
     );
     expect(result.trades).toEqual([]);
   });
 
-  it('a market order takes the resting limit order\'s own price', () => {
+  it("a market order takes the resting limit order's own price", () => {
     const result = resolveRound(
       baseArgs({
         portfolios: portfolios({ bob: { shares: 10 } }),
         actions: actionsOf([
           ['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }],
-          ['bob', { orders: [{ kind: 'LIMIT', side: 'SELL', quantity: 10, limitPrice: 99, timeInForce: 'DAY' }] }],
+          [
+            'bob',
+            {
+              orders: [
+                { kind: 'LIMIT', side: 'SELL', quantity: 10, limitPrice: 99, timeInForce: 'DAY' },
+              ],
+            },
+          ],
         ]),
       }),
     );
@@ -237,9 +324,7 @@ describe('resolveRound — limit orders', () => {
         openOrders: [resting],
         nextOrderSequence: 1,
         portfolios: portfolios({ bob: { shares: 10 } }),
-        actions: actionsOf([
-          ['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 4 }] }],
-        ]),
+        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 4 }] }]]),
       }),
     );
     expect(result.trades).toEqual([
@@ -303,7 +388,7 @@ describe('resolveRound — cancellation', () => {
 });
 
 describe('resolveRound — self-trade prevention', () => {
-  it('does not match a participant\'s new order against their own resting order', () => {
+  it("does not match a participant's new order against their own resting order", () => {
     const resting: RestingOrder = {
       id: 'alice:0',
       participantId: 'alice',
@@ -316,7 +401,9 @@ describe('resolveRound — self-trade prevention', () => {
     const result = resolveRound(
       baseArgs({
         openOrders: [resting],
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }],
+        ]),
       }),
     );
     expect(result.trades).toEqual([]);
@@ -346,7 +433,9 @@ describe('resolveRound — self-trade prevention', () => {
       baseArgs({
         openOrders: [aliceResting, bobResting],
         portfolios: portfolios({ alice: { shares: 10 }, bob: { shares: 10 } }),
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }],
+        ]),
       }),
     );
     expect(result.trades).toEqual([
@@ -361,8 +450,22 @@ describe('resolveRound — deterministic equal-price priority', () => {
       baseArgs({
         pendingLiquidity: { bids: [], asks: [{ priceCents: 10000, quantity: 5 }] },
         actions: actionsOf([
-          ['alice', { orders: [{ kind: 'LIMIT', side: 'BUY', quantity: 5, limitPrice: 100, timeInForce: 'DAY' }] }],
-          ['bob', { orders: [{ kind: 'LIMIT', side: 'BUY', quantity: 5, limitPrice: 100, timeInForce: 'DAY' }] }],
+          [
+            'alice',
+            {
+              orders: [
+                { kind: 'LIMIT', side: 'BUY', quantity: 5, limitPrice: 100, timeInForce: 'DAY' },
+              ],
+            },
+          ],
+          [
+            'bob',
+            {
+              orders: [
+                { kind: 'LIMIT', side: 'BUY', quantity: 5, limitPrice: 100, timeInForce: 'DAY' },
+              ],
+            },
+          ],
         ]),
         rng: createRng(Buffer.alloc(16, 42)),
       });
@@ -374,8 +477,22 @@ describe('resolveRound — deterministic equal-price priority', () => {
       baseArgs({
         pendingLiquidity: { bids: [], asks: [{ priceCents: 10000, quantity: 5 }] },
         actions: actionsOf([
-          ['alice', { orders: [{ kind: 'LIMIT', side: 'BUY', quantity: 5, limitPrice: 100, timeInForce: 'DAY' }] }],
-          ['bob', { orders: [{ kind: 'LIMIT', side: 'BUY', quantity: 5, limitPrice: 100, timeInForce: 'DAY' }] }],
+          [
+            'alice',
+            {
+              orders: [
+                { kind: 'LIMIT', side: 'BUY', quantity: 5, limitPrice: 100, timeInForce: 'DAY' },
+              ],
+            },
+          ],
+          [
+            'bob',
+            {
+              orders: [
+                { kind: 'LIMIT', side: 'BUY', quantity: 5, limitPrice: 100, timeInForce: 'DAY' },
+              ],
+            },
+          ],
         ]),
         rng,
       });
@@ -391,9 +508,33 @@ describe('resolveRound — deterministic equal-price priority', () => {
 describe('computeAvailability', () => {
   it('subtracts reserved cash/shares from resting orders owned by the participant', () => {
     const openOrders: RestingOrder[] = [
-      { id: 'a:0', participantId: 'alice', side: 'BUY', limitPriceCents: 10000, timeInForce: 'GTC', quantity: 3, submittedRound: 0 },
-      { id: 'a:1', participantId: 'alice', side: 'SELL', limitPriceCents: 11000, timeInForce: 'GTC', quantity: 2, submittedRound: 0 },
-      { id: 'b:0', participantId: 'bob', side: 'BUY', limitPriceCents: 10000, timeInForce: 'GTC', quantity: 100, submittedRound: 0 },
+      {
+        id: 'a:0',
+        participantId: 'alice',
+        side: 'BUY',
+        limitPriceCents: 10000,
+        timeInForce: 'GTC',
+        quantity: 3,
+        submittedRound: 0,
+      },
+      {
+        id: 'a:1',
+        participantId: 'alice',
+        side: 'SELL',
+        limitPriceCents: 11000,
+        timeInForce: 'GTC',
+        quantity: 2,
+        submittedRound: 0,
+      },
+      {
+        id: 'b:0',
+        participantId: 'bob',
+        side: 'BUY',
+        limitPriceCents: 10000,
+        timeInForce: 'GTC',
+        quantity: 100,
+        submittedRound: 0,
+      },
     ];
     const result = computeAvailability(portfolio({ shares: 5 }), openOrders, 'alice');
     expect(result).toEqual({ availableCashCents: CASH - 3 * 10000, availableShares: 3 });
@@ -407,7 +548,9 @@ describe('resolveRound — short selling and margin (config.risk.allowShortSelli
     const result = resolveRound(
       baseArgs({
         pendingLiquidity: { bids: [{ priceCents: 9990, quantity: 100 }], asks: [] },
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }],
+        ]),
       }),
     );
     expect(result.trades).toEqual([]);
@@ -419,7 +562,9 @@ describe('resolveRound — short selling and margin (config.risk.allowShortSelli
       baseArgs({
         risk: MARGIN_RISK,
         pendingLiquidity: { bids: [{ priceCents: 9990, quantity: 100 }], asks: [] },
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }],
+        ]),
       }),
     );
     expect(result.portfolios.get('alice')?.shares).toBe(-10);
@@ -431,7 +576,9 @@ describe('resolveRound — short selling and margin (config.risk.allowShortSelli
       baseArgs({
         risk: RiskConfigSchema.parse({ allowShortSelling: true, borrowableShares: 6 }),
         pendingLiquidity: { bids: [{ priceCents: 9990, quantity: 100 }], asks: [] },
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }],
+        ]),
       }),
     );
     expect(result.portfolios.get('alice')?.shares).toBe(-6);
@@ -443,7 +590,9 @@ describe('resolveRound — short selling and margin (config.risk.allowShortSelli
         risk: RiskConfigSchema.parse({ allowShortSelling: true, initialMarginRatio: 1 }),
         portfolios: portfolios({ alice: { cashCents: 50_000 } }), // equity $500 -> buying power $500 @ initialMarginRatio 1
         pendingLiquidity: { bids: [{ priceCents: 10000, quantity: 100 }], asks: [] },
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 10 }] }],
+        ]),
       }),
     );
     expect(result.portfolios.get('alice')?.shares).toBe(-5); // $500 buying power / $100 per share
@@ -453,9 +602,13 @@ describe('resolveRound — short selling and margin (config.risk.allowShortSelli
     const result = resolveRound(
       baseArgs({
         risk: MARGIN_RISK,
-        portfolios: portfolios({ alice: { cashCents: 0, shares: -10, averageEntryPriceCents: 10000 } }),
+        portfolios: portfolios({
+          alice: { cashCents: 0, shares: -10, averageEntryPriceCents: 10000 },
+        }),
         pendingLiquidity: { bids: [], asks: [{ priceCents: 9000, quantity: 100 }] },
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }],
+        ]),
       }),
     );
     expect(result.portfolios.get('alice')?.shares).toBe(0);
@@ -468,7 +621,9 @@ describe('resolveRound — short selling and margin (config.risk.allowShortSelli
         risk: MARGIN_RISK,
         portfolios: portfolios({ alice: { bankrupt: true, cashCents: 1_000_000 } }),
         pendingLiquidity: { bids: [], asks: [{ priceCents: 9000, quantity: 100 }] },
-        actions: actionsOf([['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }]]),
+        actions: actionsOf([
+          ['alice', { orders: [{ kind: 'MARKET', side: 'BUY', quantity: 10 }] }],
+        ]),
       }),
     );
     expect(result.trades).toEqual([]);

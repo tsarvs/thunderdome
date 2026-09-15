@@ -17,7 +17,13 @@ export function gaussian(rng: Rng): number {
  * shock scaled by `volatility`. The shared building block behind every hidden economic factor,
  * company fundamental, and analyst estimate in this game — "reverts toward some anchor, with
  * noise on top" is the one stochastic idiom used everywhere. */
-export function ouStep(args: { current: number; mean: number; speed: number; volatility: number; rng: Rng }): number {
+export function ouStep(args: {
+  current: number;
+  mean: number;
+  speed: number;
+  volatility: number;
+  rng: Rng;
+}): number {
   const { current, mean, speed, volatility, rng } = args;
   return current + speed * (mean - current) + volatility * gaussian(rng);
 }

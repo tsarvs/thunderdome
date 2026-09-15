@@ -19,7 +19,10 @@ describe('generateSyntheticEvent', () => {
 
   it('impactReturn is exactly 0 for NO_NEWS and nonzero otherwise, with the correct sign', () => {
     for (let seed = 0; seed < 200; seed++) {
-      const { event, impactReturn } = generateSyntheticEvent('SIDEWAYS', createRng(Buffer.alloc(16, seed + 1)));
+      const { event, impactReturn } = generateSyntheticEvent(
+        'SIDEWAYS',
+        createRng(Buffer.alloc(16, seed + 1)),
+      );
       if (event.type === 'NO_NEWS') {
         expect(impactReturn).toBe(0);
       } else if (event.type === 'POSITIVE_NEWS' || event.type === 'EARNINGS_BEAT') {

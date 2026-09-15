@@ -10,6 +10,8 @@ import {
   runMatchForwardRunCommand,
 } from './commands/matchForward.js';
 import { runMatchForwardPreviewCommand } from './commands/matchForwardPreview.js';
+import { runMatchForwardRefreshCommand } from './commands/matchForwardRefresh.js';
+import { runMatchForwardStatusCommand } from './commands/matchForwardStatus.js';
 import { runPlayCommand } from './commands/play.js';
 import {
   runTournamentCommand,
@@ -67,9 +69,15 @@ async function runMatchForwardSubcommand(argv: readonly string[]): Promise<numbe
   if (subcommand === 'preview') {
     return runMatchForwardPreviewCommand(rest, { rootDir });
   }
+  if (subcommand === 'refresh') {
+    return runMatchForwardRefreshCommand(rest, { rootDir });
+  }
+  if (subcommand === 'status') {
+    return runMatchForwardStatusCommand(rest, { rootDir });
+  }
   console.error(
     `Unknown match forward subcommand: "${String(subcommand)}". Only "run", "list", "inspect", ` +
-      `and "preview" exist today.`,
+      `"preview", "refresh", and "status" exist today.`,
   );
   return 1;
 }

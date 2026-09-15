@@ -1,7 +1,11 @@
 import { createRng } from '@thunderdome/rng';
 import { describe, expect, it } from 'vitest';
 import { stockMarket3 } from '../src/game.js';
-import { annualizedVolatility, correlationMatrix, logReturns } from '../src/validation/statisticalChecks.js';
+import {
+  annualizedVolatility,
+  correlationMatrix,
+  logReturns,
+} from '../src/validation/statisticalChecks.js';
 import type { StockMarket3Action, StockMarket3Config } from '../src/types.js';
 
 const PARTICIPANT_IDS = ['alice', 'bob'];
@@ -82,7 +86,10 @@ describe('statistical validation across seeds (spec §55/§56)', () => {
         }
         return sum;
       });
-      const matrix = correlationMatrix({ SYNTH_INDEX: indexReturns, WEIGHTED: weightedConstituentReturns });
+      const matrix = correlationMatrix({
+        SYNTH_INDEX: indexReturns,
+        WEIGHTED: weightedConstituentReturns,
+      });
       expect(must(matrix.SYNTH_INDEX, 'matrix row SYNTH_INDEX').WEIGHTED ?? 0).toBeGreaterThan(0.3);
     }
   });
@@ -91,7 +98,10 @@ describe('statistical validation across seeds (spec §55/§56)', () => {
     // TECH_A may occasionally have been acquired/delisted partway through a given seed's run
     // (spec §42's dynamic universe) — fall back to the index, which always survives, if so.
     const finalReturns = seedResults.map(({ returnsBySymbol }) =>
-      must(returnsBySymbol.TECH_A ?? returnsBySymbol.SYNTH_INDEX, 'TECH_A or SYNTH_INDEX returns').reduce((sum, v) => sum + v, 0),
+      must(
+        returnsBySymbol.TECH_A ?? returnsBySymbol.SYNTH_INDEX,
+        'TECH_A or SYNTH_INDEX returns',
+      ).reduce((sum, v) => sum + v, 0),
     );
     const distinctValues = new Set(finalReturns.map((v) => v.toFixed(6)));
     expect(distinctValues.size).toBeGreaterThan(1);
@@ -119,7 +129,11 @@ describe('long-run economic stability (regression coverage)', () => {
   it('no hidden economic factor drifts to (or gets stuck at) its clamp over a full-length match', () => {
     for (const seed of [1, 2, 3, 4, 5]) {
       const rng = createRng(Buffer.alloc(16, seed));
-      let state = stockMarket3.initialize({ config: fullConfig, participantIds: PARTICIPANT_IDS, rng });
+      let state = stockMarket3.initialize({
+        config: fullConfig,
+        participantIds: PARTICIPANT_IDS,
+        rng,
+      });
       const holdAll = new Map(PARTICIPANT_IDS.map((id) => [id, hold()]));
       for (let i = 0; i < 500; i++) {
         state = stockMarket3.resolve({ state, actions: holdAll, rng }).nextState;
@@ -133,7 +147,11 @@ describe('long-run economic stability (regression coverage)', () => {
   it("the index never collapses toward zero or explodes over a full-length match's own default horizon", () => {
     for (const seed of [1, 2, 3, 4, 5]) {
       const rng = createRng(Buffer.alloc(16, seed));
-      let state = stockMarket3.initialize({ config: fullConfig, participantIds: PARTICIPANT_IDS, rng });
+      let state = stockMarket3.initialize({
+        config: fullConfig,
+        participantIds: PARTICIPANT_IDS,
+        rng,
+      });
       const holdAll = new Map(PARTICIPANT_IDS.map((id) => [id, hold()]));
       for (let i = 0; i < 500; i++) {
         state = stockMarket3.resolve({ state, actions: holdAll, rng }).nextState;

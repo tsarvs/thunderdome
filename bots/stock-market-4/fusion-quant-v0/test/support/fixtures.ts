@@ -1,11 +1,12 @@
 import { createResearchSnapshot } from '@thunderdome/research-core';
 import { createFusionFixtureDataset, FUSION_FIXTURE_IDS } from '@thunderdome/research-fusion';
-import type { ResearchSnapshot, ResearchState } from '../../src/research/types.js';
 import type {
   DailyBar,
   PortfolioObservation,
+  ResearchSnapshot,
+  ResearchState,
   StockMarket4Observation,
-} from '../../src/marketTypes.js';
+} from '@thunderdome/quant-sdk-js';
 
 /**
  * Reuses the REAL `@thunderdome/research-fusion` fixture dataset (vendored as a devDependency
@@ -37,9 +38,9 @@ export const ACQUISITION_DAY = '2026-09-08T00:00:00Z';
 export const DAY_BEFORE_ACQUISITION = '2026-09-07T00:00:00Z';
 
 export function fusionSnapshotAt(timestamp: string): ResearchSnapshot {
-  // research-core's own snapshot is Zod-validated and field-for-field identical to this bot's
-  // hand-declared local mirror (see `../../src/research/types.ts`'s own doc comment) — a
-  // structural cast, not an unsafe one.
+  // research-core's own snapshot is Zod-validated and field-for-field identical to
+  // `@thunderdome/quant-sdk-js`'s hand-declared mirror (see that package's own
+  // `research/types.ts` doc comment) — a structural cast, not an unsafe one.
   return createResearchSnapshot(dataset, timestamp) as unknown as ResearchSnapshot;
 }
 
@@ -56,7 +57,8 @@ function bar(date: string, close: number): DailyBar {
  * game's own default), per `games/stock-market-4/README.md`'s "Risk & financing" section. Using
  * anything else here would let this whole test suite mask exactly the bug
  * `spendableCentsFor`/`buildOrders` fixed (a cash-account BUY reading `buyingPowerCents` directly
- * instead of falling back to `cashCents`) — see `src/portfolio.ts`'s own doc comment. */
+ * instead of falling back to `cashCents`) — see `@thunderdome/quant-sdk-js`'s `portfolio.ts`
+ * own doc comment. */
 export function emptyPortfolio(cashCents = 10_000_000): PortfolioObservation {
   return {
     cashCents,

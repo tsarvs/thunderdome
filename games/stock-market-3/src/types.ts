@@ -64,7 +64,12 @@ export type SecurityKind = (typeof SECURITY_KINDS)[number];
  * 6 hidden `EconomicFactor`s get a real published release; RISK_APPETITE and LIQUIDITY are never
  * directly published, only inferable from market behavior, same as in reality (there is no
  * scheduled "risk appetite index" release). */
-export const ECONOMIC_RELEASE_INDICATORS = ['GDP_GROWTH', 'INFLATION_RATE', 'POLICY_RATE', 'COMMODITY_INDEX'] as const;
+export const ECONOMIC_RELEASE_INDICATORS = [
+  'GDP_GROWTH',
+  'INFLATION_RATE',
+  'POLICY_RATE',
+  'COMMODITY_INDEX',
+] as const;
 export type EconomicReleaseIndicator = (typeof ECONOMIC_RELEASE_INDICATORS)[number];
 
 export const COMPANY_NEWS_TYPES = [
@@ -145,7 +150,8 @@ export interface CorporateActionEvent {
   details: CorporateActionDetails;
 }
 
-export type PublicEvent = EarningsReportEvent | EconomicReleaseEvent | CompanyNewsEvent | CorporateActionEvent;
+export type PublicEvent =
+  EarningsReportEvent | EconomicReleaseEvent | CompanyNewsEvent | CorporateActionEvent;
 
 /** A scheduled date is safe to expose in full, past and future — it carries no outcome, only
  * "something will be reported here" (spec §23). */
@@ -327,13 +333,18 @@ export const StockMarket3ConfigSchema = z
     risk: RiskConfigSchema.default({}),
   })
   .refine((config) => config.rounds > config.warmupRounds, {
-    message: 'rounds must be greater than warmupRounds (there must be at least 1 competition round)',
+    message:
+      'rounds must be greater than warmupRounds (there must be at least 1 competition round)',
     path: ['warmupRounds'],
   })
   .superRefine((config, ctx) => {
     const symbols = new Set(config.equities.map((e) => e.symbol));
     if (symbols.size !== config.equities.length) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['equities'], message: 'equity symbols must be unique' });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['equities'],
+        message: 'equity symbols must be unique',
+      });
     }
     if (symbols.has(config.indexSymbol)) {
       ctx.addIssue({

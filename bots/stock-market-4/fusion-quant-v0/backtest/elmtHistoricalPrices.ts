@@ -1,4 +1,4 @@
-import type { DailyBar } from '../src/marketTypes.js';
+import type { DailyBar } from '@thunderdome/quant-sdk-js';
 
 /**
  * ELMT's REAL daily price history, pulled from stockanalysis.com on 2026-09-09 (cross-checked

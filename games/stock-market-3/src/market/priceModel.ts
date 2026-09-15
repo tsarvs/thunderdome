@@ -67,10 +67,13 @@ export function stepEquityFundamentalValue(args: {
   crossSectorTerm: number;
   rng: Rng;
 }): number {
-  const { security, factorDeltas, marketShock, regime, eventImpactReturn, crossSectorTerm, rng } = args;
+  const { security, factorDeltas, marketShock, regime, eventImpactReturn, crossSectorTerm, rng } =
+    args;
   const fundamentals = security.fundamentals;
   if (fundamentals === null) {
-    throw new Error(`stepEquityFundamentalValue requires fundamentals (symbol "${security.symbol}")`);
+    throw new Error(
+      `stepEquityFundamentalValue requires fundamentals (symbol "${security.symbol}")`,
+    );
   }
   const regimeProfile = REGIME_PROFILES[regime];
 
@@ -81,18 +84,32 @@ export function stepEquityFundamentalValue(args: {
     factorTerm += exposure.loading * factorDeltas[exposure.factor];
   }
 
-  const fundamentalDriftTerm = (fundamentals.revenueGrowth / QUARTER_LENGTH_ROUNDS) * FUNDAMENTAL_DRIFT_SCALE;
+  const fundamentalDriftTerm =
+    (fundamentals.revenueGrowth / QUARTER_LENGTH_ROUNDS) * FUNDAMENTAL_DRIFT_SCALE;
 
   // SIZE and QUALITY dampen idiosyncratic noise (bigger/higher-quality => steadier); VOLATILITY
   // amplifies it. Floored well above zero so no combination of loadings can ever zero out a
   // security's noise entirely.
   const idiosyncraticVolScale = Math.max(
     0.25,
-    1 - 0.25 * security.styleLoadings.SIZE - 0.25 * security.styleLoadings.QUALITY + 0.4 * security.styleLoadings.VOLATILITY,
+    1 -
+      0.25 * security.styleLoadings.SIZE -
+      0.25 * security.styleLoadings.QUALITY +
+      0.4 * security.styleLoadings.VOLATILITY,
   );
-  const idiosyncraticTerm = gaussian(rng) * IDIOSYNCRATIC_VOLATILITY * idiosyncraticVolScale * regimeProfile.volatilityMultiplier;
+  const idiosyncraticTerm =
+    gaussian(rng) *
+    IDIOSYNCRATIC_VOLATILITY *
+    idiosyncraticVolScale *
+    regimeProfile.volatilityMultiplier;
 
-  const rawLogReturn = marketTerm + factorTerm + fundamentalDriftTerm + eventImpactReturn + crossSectorTerm + idiosyncraticTerm;
+  const rawLogReturn =
+    marketTerm +
+    factorTerm +
+    fundamentalDriftTerm +
+    eventImpactReturn +
+    crossSectorTerm +
+    idiosyncraticTerm;
   // A hard per-round circuit breaker: even with momentum/value moved off this trend-independent
   // path, a run of unlucky shared shocks (market/factor/event) could otherwise compound further
   // than any real security would in one day. Real exchanges cap single-day moves for the same
@@ -112,7 +129,12 @@ export function stepEquityFundamentalValue(args: {
  */
 export function computeStyleTechnicalReturn(security: SecurityState): number {
   const momentumTerm =
-    security.styleLoadings.MOMENTUM * MOMENTUM_DAMPING * trailingLogReturn(security.priceHistory, MOMENTUM_WINDOW);
-  const valueTerm = security.styleLoadings.VALUE * VALUE_DAMPING * trailingAverageLogGap(security.priceHistory, VALUE_WINDOW);
+    security.styleLoadings.MOMENTUM *
+    MOMENTUM_DAMPING *
+    trailingLogReturn(security.priceHistory, MOMENTUM_WINDOW);
+  const valueTerm =
+    security.styleLoadings.VALUE *
+    VALUE_DAMPING *
+    trailingAverageLogGap(security.priceHistory, VALUE_WINDOW);
   return Math.max(-0.08, Math.min(0.08, momentumTerm + valueTerm));
 }

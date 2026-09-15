@@ -97,7 +97,8 @@ describe('generateLiquiditySnapshot', () => {
       rng: createRng(Buffer.alloc(16, 1)),
     });
     const calmDepthAsk = calm.asks[calm.asks.length - 1]!.priceCents - calm.asks[0]!.priceCents;
-    const volatileDepthAsk = volatile.asks[volatile.asks.length - 1]!.priceCents - volatile.asks[0]!.priceCents;
+    const volatileDepthAsk =
+      volatile.asks[volatile.asks.length - 1]!.priceCents - volatile.asks[0]!.priceCents;
     expect(volatileDepthAsk).toBeGreaterThan(calmDepthAsk);
   });
 });

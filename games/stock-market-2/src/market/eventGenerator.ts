@@ -56,13 +56,19 @@ export function generateSyntheticEvent(regime: MarketRegime, rng: Rng): Generate
     const isMiss = rng.nextFloat() < negativeProbability;
     const magnitude = sampleMagnitude(rng, EARNINGS_IMPACT_RANGE);
     const type: StockMarket2EventType = isMiss ? 'EARNINGS_MISS' : 'EARNINGS_BEAT';
-    return { event: { type, description: EVENT_DESCRIPTIONS[type] }, impactReturn: isMiss ? -magnitude : magnitude };
+    return {
+      event: { type, description: EVENT_DESCRIPTIONS[type] },
+      impactReturn: isMiss ? -magnitude : magnitude,
+    };
   }
   if (bucketDraw < earningsProbability + newsProbability) {
     const isNegative = rng.nextFloat() < negativeProbability;
     const magnitude = sampleMagnitude(rng, NEWS_IMPACT_RANGE);
     const type: StockMarket2EventType = isNegative ? 'NEGATIVE_NEWS' : 'POSITIVE_NEWS';
-    return { event: { type, description: EVENT_DESCRIPTIONS[type] }, impactReturn: isNegative ? -magnitude : magnitude };
+    return {
+      event: { type, description: EVENT_DESCRIPTIONS[type] },
+      impactReturn: isNegative ? -magnitude : magnitude,
+    };
   }
   return { event: { type: 'NO_NEWS', description: EVENT_DESCRIPTIONS.NO_NEWS }, impactReturn: 0 };
 }

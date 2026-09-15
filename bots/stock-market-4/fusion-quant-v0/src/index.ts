@@ -1,24 +1,49 @@
 import { runBot } from '@thunderdome/bot-sdk-js';
-import { DEFAULT_FUSION_QUANT_CONFIG, type FusionQuantConfig } from './config.js';
 import {
+  asResearchSnapshot,
   computeTradingDecisions,
   formatStrategyTrace,
+  mapScenario,
+  type DomainAdapter,
+  type OrderRequest,
   type PreviousQuantState,
+  type RealizedAlphaSample,
+  type ResearchState,
+  type StockMarket4Action,
+  type StockMarket4Observation,
   type TradingDecision,
-} from './decision.js';
-import type { RealizedAlphaSample } from './alpha/ic.js';
-import type { OrderRequest, StockMarket4Action, StockMarket4Observation } from './marketTypes.js';
-import { asResearchSnapshot, type ResearchState } from './research/types.js';
+} from '@thunderdome/quant-sdk-js';
+import { DEFAULT_FUSION_QUANT_CONFIG, KNOWN_VALUATION_UNKNOWNS, type FusionQuantConfig } from './config.js';
+import { computeFusionValue } from './valuation/fusionValue.js';
+import type { FusionValuationAssumptions } from './valuation/fusionValue.js';
+import { computeMarketImpliedExpectationsFromScenarios } from './valuation/marketImplied.js';
+
+/** This bot's `@thunderdome/quant-sdk-js` `DomainAdapter` — the one seam that's genuinely
+ * fusion-specific (see `valuation/fusionValue.ts`'s own doc comment). A future domain bot supplies
+ * its own version of this object instead of copying `decision.ts`/`config.ts`/every other "bone"
+ * this bot no longer has its own copy of. */
+export const FUSION_DOMAIN_ADAPTER: DomainAdapter<FusionValuationAssumptions> = {
+  computeDomainValue: ({ assumptions, sharesOutstanding }) =>
+    mapScenario(computeFusionValue(assumptions).fusionValue, (companyTotal) => companyTotal / sharesOutstanding),
+  computeMarketImpliedGap: (params) =>
+    computeMarketImpliedExpectationsFromScenarios({
+      marketPricePerShare: params.marketPricePerShare,
+      baseBusinessValuePerShare: params.baseBusinessValuePerShare,
+      domainOptionValuePerShare: params.domainOptionValuePerShare,
+      fusion: params.domainAssumptions,
+      sharesOutstanding: params.sharesOutstanding,
+    }),
+  knownValuationUnknowns: KNOWN_VALUATION_UNKNOWNS,
+};
 
 /**
  * Builds the bot's `decideAction` closure — the state retained between rounds is: the previous
  * research snapshot's `state` (shared — one research delivery covers every tracked security),
  * PER-SECURITY the previous fair value and PENDING alpha signals (awaiting this round's price to
- * become a realized sample — see `decision.ts`'s `computeTradingDecisions`), and the pooled
- * `realizedAlphaSamples` list every alpha factor's information coefficient is measured from. All
- * of this is exactly what the bot could legitimately know from its own prior decisions — nothing
- * from the future. Exported so tests can call it directly against hand-built observations, same
- * pattern `fusion-fundamental-v7`'s own `index.ts` used.
+ * become a realized sample — see `@thunderdome/quant-sdk-js`'s `computeTradingDecisions`), and the
+ * pooled `realizedAlphaSamples` list every alpha factor's information coefficient is measured
+ * from. All of this is exactly what the bot could legitimately know from its own prior decisions —
+ * nothing from the future. Exported so tests can call it directly against hand-built observations.
  */
 export function createDecideAction(
   config: FusionQuantConfig = DEFAULT_FUSION_QUANT_CONFIG,
@@ -46,6 +71,7 @@ export function createDecideAction(
     const { decisions, updatedRealizedAlphaSamples, updatedPreviousByTicker } = computeTradingDecisions({
       date: observation.date,
       config,
+      domain: FUSION_DOMAIN_ADAPTER,
       previousResearchState,
       currentResearchState,
       currentPricesByTicker,
@@ -74,7 +100,7 @@ const isMainModule = process.argv[1] !== undefined && import.meta.url === `file:
 if (isMainModule) {
   runBot<StockMarket4Observation, StockMarket4Action>({
     decideAction: createDecideAction(DEFAULT_FUSION_QUANT_CONFIG, (decision) => {
-      process.stderr.write(`${formatStrategyTrace(decision)}\n`);
+      process.stderr.write(`${formatStrategyTrace(decision, 'fusion-quant-v0')}\n`);
     }),
   });
 }

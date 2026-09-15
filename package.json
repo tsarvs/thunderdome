@@ -11,6 +11,8 @@
     "packages/*",
     "packages/game-dev-toolkit/*",
     "packages/research/*",
+    "packages/stock-market-4/*",
+    "packages/stock-market-4/research/*",
     "games/*",
     "ci/tools/*"
   ],

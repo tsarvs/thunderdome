@@ -49,7 +49,7 @@ game's sake):
   — the actual trust boundary for its shape, since `@thunderdome/forward-match-store` (below)
   keeps it fully opaque on its own end.
 - `isForwardMatchFullyResolved(state)` — true only once `forwardShadowCutoffDate >=
-  config.endDate`; always true for `'HISTORICAL'`/`'SYNTHETIC'`. This is the fix for the
+config.endDate`; always true for `'HISTORICAL'`/`'SYNTHETIC'`. This is the fix for the
   `isTerminal` ambiguity above: a caller managing a persisted match's lifecycle uses THIS, never
   `isTerminal`, to decide whether to mark it `'completed'` or leave it `'active'` for a future
   resume.
@@ -81,22 +81,23 @@ the loop rather than silently continuing to play rounds whose results might neve
 (ADR-0009)'s file-layout/`Result`/Zod/list conventions, with two deliberate deviations, both
 because a forward match's correctness bar is explicitly higher than a tournament's own inspection
 trail:
-   - **Atomic writes** (temp file in the SAME directory, then `rename` — same-filesystem rename is
-     atomic on POSIX) instead of `tournament-store`'s plain `writeFile`. A crash mid-write must
-     never leave a half-written, unparseable record behind.
-   - **A three-way load outcome** (`found`/`not-found`/`corrupt`), not `tournament-store`'s
-     two-way `Result` (which conflates "missing" and "corrupt"). `match forward run`'s
-     create-or-resume branch genuinely needs to tell these apart: "not found" means create a
-     fresh match; "corrupt" must be a hard failure, never silently treated as "not found" (which
-     would quietly create a brand-new match under the same id, discarding whatever trading
-     history the corrupted file held).
 
-   `ForwardMatchRecord.config`/`.snapshot` are BOTH kept fully opaque (`unknown`) to this package
-   — it has no dependency on `@thunderdome/engine` and never inspects what it's persisting beyond
-   its own bookkeeping fields (`matchId`, `status`, `roundsPlayed`, timestamps). The game owns the
-   `snapshot` shape entirely. A `matchSeed` (hex-encoded, generated once at creation) is also
-   persisted and reused verbatim on every resume — a resumed bot's derived `rngSeed` must never
-   change across a resume.
+- **Atomic writes** (temp file in the SAME directory, then `rename` — same-filesystem rename is
+  atomic on POSIX) instead of `tournament-store`'s plain `writeFile`. A crash mid-write must
+  never leave a half-written, unparseable record behind.
+- **A three-way load outcome** (`found`/`not-found`/`corrupt`), not `tournament-store`'s
+  two-way `Result` (which conflates "missing" and "corrupt"). `match forward run`'s
+  create-or-resume branch genuinely needs to tell these apart: "not found" means create a
+  fresh match; "corrupt" must be a hard failure, never silently treated as "not found" (which
+  would quietly create a brand-new match under the same id, discarding whatever trading
+  history the corrupted file held).
+
+`ForwardMatchRecord.config`/`.snapshot` are BOTH kept fully opaque (`unknown`) to this package
+— it has no dependency on `@thunderdome/engine` and never inspects what it's persisting beyond
+its own bookkeeping fields (`matchId`, `status`, `roundsPlayed`, timestamps). The game owns the
+`snapshot` shape entirely. A `matchSeed` (hex-encoded, generated once at creation) is also
+persisted and reused verbatim on every resume — a resumed bot's derived `rngSeed` must never
+change across a resume.
 
 **4. New CLI: `match forward run|list|inspect <matchId>`**, mirroring the existing `tournament
 run/list/inspect` nested-dispatch pattern one level deeper. `run` is idempotent create-or-resume,
@@ -122,7 +123,7 @@ behavior change for any bot.
 ## Consequences
 
 - All pre-existing tests across every touched package pass unchanged (`packages/engine`:
-  25/25 including the new `runAvailableRounds` suite; `packages/market-data`: unaffected by this
+  25/25 including the new `runAvailableRounds` suite; `packages/stock-market-4/market-data`: unaffected by this
   ADR, see ADR-0012; `games/stock-market-4`: 229/229 including the new
   `forwardResumability.test.ts`; `apps/cli`: 73/73 including the new `matchForward.test.ts` and
   real-Docker integration coverage; `packages/protocol`: unaffected save for the additive

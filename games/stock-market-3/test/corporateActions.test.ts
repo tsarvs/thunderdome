@@ -15,7 +15,13 @@ function security(overrides: Partial<SecurityState> = {}): SecurityState {
     factorLoadings: [],
     styleLoadings: { SIZE: 0, VALUE: 0, MOMENTUM: 0, QUALITY: 0, VOLATILITY: 0 },
     marketBeta: 1,
-    fundamentals: { revenueCents: 100_000_000, revenueGrowth: 0.01, earningsCents: 10_000_000, marginBps: 1000, lifecycleStage: 'MATURE' },
+    fundamentals: {
+      revenueCents: 100_000_000,
+      revenueGrowth: 0.01,
+      earningsCents: 10_000_000,
+      marginBps: 1000,
+      lifecycleStage: 'MATURE',
+    },
     fundamentalValueCents: 40000,
     pendingActual: { epsCents: 100, revenueCents: 100_000_000, marginBps: 1000 },
     sharesOutstanding: 100_000_000,
@@ -38,16 +44,28 @@ describe('stock splits — spec §40 (a 2-for-1 split must not look like a 50% l
     const cheap = security({ referencePriceCents: 20000, initialReferencePriceCents: 10000 });
     expect(maybeTriggerSplit(cheap, cheap.initialReferencePriceCents)).toBeNull();
     const runUp = security({ referencePriceCents: 40000, initialReferencePriceCents: 10000 });
-    expect(maybeTriggerSplit(runUp, runUp.initialReferencePriceCents)).toEqual({ type: 'STOCK_SPLIT', fromShares: 1, toShares: 2 });
+    expect(maybeTriggerSplit(runUp, runUp.initialReferencePriceCents)).toEqual({
+      type: 'STOCK_SPLIT',
+      fromShares: 1,
+      toShares: 2,
+    });
   });
 
   it('triggers a reverse split once price falls to 15% of its starting price', () => {
     const beaten = security({ referencePriceCents: 1400, initialReferencePriceCents: 10000 });
-    expect(maybeTriggerSplit(beaten, beaten.initialReferencePriceCents)).toEqual({ type: 'REVERSE_SPLIT', fromShares: 5, toShares: 1 });
+    expect(maybeTriggerSplit(beaten, beaten.initialReferencePriceCents)).toEqual({
+      type: 'REVERSE_SPLIT',
+      fromShares: 5,
+      toShares: 1,
+    });
   });
 
   it('halves price and doubles shares outstanding, adjusting price history proportionally', () => {
-    const before = security({ referencePriceCents: 40000, fundamentalValueCents: 40000, sharesOutstanding: 100_000_000 });
+    const before = security({
+      referencePriceCents: 40000,
+      fundamentalValueCents: 40000,
+      sharesOutstanding: 100_000_000,
+    });
     const details: CorporateActionDetails = { type: 'STOCK_SPLIT', fromShares: 1, toShares: 2 };
     const after = applyCorporateActionToSecurity(before, details);
     expect(after.referencePriceCents).toBe(20000);
@@ -65,7 +83,9 @@ describe('stock splits — spec §40 (a 2-for-1 split must not look like a 50% l
     expect(after.averageEntryPriceCents).toBe(15000);
     expect(cashDeltaCents).toBe(0);
     // Cost basis (shares * averageEntryPrice) — the thing P&L is measured against — is preserved.
-    expect(after.shares * after.averageEntryPriceCents).toBe(position.shares * position.averageEntryPriceCents);
+    expect(after.shares * after.averageEntryPriceCents).toBe(
+      position.shares * position.averageEntryPriceCents,
+    );
   });
 
   it('reverse-splits a short position symmetrically (fewer shares owed, proportionally higher entry price)', () => {

@@ -11,8 +11,30 @@ pluggable portfolio construction → an independent risk stage that can only eve
 override**.
 
 It still tracks the same 11 real companies in the fusion-energy supply chain, using the same
-research-derived valuation math (`src/valuation/*.ts`, `src/research/*.ts`) as its predecessors —
-what's different is everything downstream of "here's what I think this company is worth."
+research-derived valuation logic as its predecessors — what's different is everything downstream
+of "here's what I think this company is worth."
+
+## Architecture: a thin domain bot on `@thunderdome/quant-sdk-js`
+
+The whole alpha/correlation/portfolio-construction/risk/execution/research-interpretation pipeline
+described below lives in
+[`@thunderdome/quant-sdk-js`](../../../packages/stock-market-4/quant-sdk-js/README.md) (vendored
+here the same way `@thunderdome/bot-sdk-js` is — see `vendor/`, `scripts/pack-quant-sdk-js.sh` at
+the repo root) — extracted specifically so a future domain bot (a different research package, a
+different tracked-security universe) can reuse all of it instead of copy-pasting ~25 files. This
+bot's own `src/` keeps only the three things that are genuinely fusion-specific:
+
+- `src/valuation/fusionValue.ts` — the fusion revenue-chain formula (`computeFusionValue`) and its
+  `FusionValuationAssumptions` shape; a different domain would replace this whole file.
+- `src/valuation/marketImplied.ts` — inverts that same formula for `supplierCapture` to answer
+  "what does the current price already assume"; produces the SDK's generic `MarketImpliedGap`.
+- `src/config.ts` — the 11 real companies' actual financial data, and `src/index.ts` — a thin
+  entrypoint that builds a `DomainAdapter` (see `@thunderdome/quant-sdk-js`'s `decision.ts`) out of
+  the two files above and hands it to the SDK's `computeTradingDecisions`.
+
+Every file path below under `src/alpha/`, `src/correlation/`, `src/portfolio/`, `src/risk/`,
+`src/execution/`, `src/research/`, `src/ablation.ts`, `src/signal.ts`, and `src/decision.ts` now
+means "that same relative path inside `@thunderdome/quant-sdk-js`," not a file in this bot.
 
 ## The companies it follows
 
@@ -128,7 +150,7 @@ buy-and-hold, cash) through the identical harness, so they're genuinely comparab
 **An honest, load-bearing caveat**: with only ~2-3 months of real price history to fold, any
 specific numbers this harness reports today are statistically thin — a working proof of the
 mechanism, not a settled verdict on any strategy. It gets more meaningful automatically as
-`packages/market-data`'s `fetch:append-bars` keeps growing the real dataset.
+`packages/stock-market-4/market-data`'s `fetch:append-bars` keeps growing the real dataset.
 
 **A second, related caveat, worth being just as direct about**: the IC-weighted ensemble (stage 2
 above) adapts *online, within a single continuous run* — for one long backtest over the same real

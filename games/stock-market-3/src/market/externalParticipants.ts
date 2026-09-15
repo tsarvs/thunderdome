@@ -36,7 +36,10 @@ export function computeExternalFlowBias(args: {
       : 0;
 
   const longWindow = priceHistory.slice(-30);
-  const longAverage = longWindow.length >= 10 ? longWindow.reduce((sum, c) => sum + c.close, 0) / longWindow.length : null;
+  const longAverage =
+    longWindow.length >= 10
+      ? longWindow.reduce((sum, c) => sum + c.close, 0) / longWindow.length
+      : null;
   const valueBias =
     longAverage !== null && recent !== undefined && recent.close > 0
       ? clamp(Math.log(longAverage / recent.close) * 4, -1, 1)

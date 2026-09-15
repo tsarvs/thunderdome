@@ -17,7 +17,7 @@ already exists — deliberately, since ADR-0010's whole reproducibility guarante
 version's rows are never mutated or deleted once published." That guarantee was designed around
 the historical/synthetic case (Phase 1's only actual use case): a complete dataset, authored once,
 occasionally corrected by publishing an entirely new version. It says nothing about a dataset that
-is *incomplete by design* at publish time and grows a row at a time as real trading days close —
+is _incomplete by design_ at publish time and grows a row at a time as real trading days close —
 a genuinely different access pattern this ADR is the first to need.
 
 The two options considered:
@@ -31,7 +31,7 @@ The two options considered:
 
 ## Decision
 
-**New function, `appendBars(store, identity, { bars })`** (`packages/market-data/src/store/
+**New function, `appendBars(store, identity, { bars })`** (`packages/stock-market-4/market-data/src/store/
 append.ts`, a new module — deliberately not added into `ingest.ts`, whose own doc comment is
 entirely about one-shot immutable publishing and shouldn't be muddied with a second, different
 contract). It grows an ALREADY-published `(id, version)` with rows for dates strictly AFTER each

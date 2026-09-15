@@ -42,7 +42,10 @@ function runOne(rollingBlendWeight: number, hysteresisBand: number): SweepRow {
   const config = {
     ...DEFAULT_FUSION_FUNDAMENTAL_CONFIG,
     signal: { ...DEFAULT_FUSION_FUNDAMENTAL_CONFIG.signal, hysteresisBand },
-    confidenceCalibration: { ...DEFAULT_FUSION_FUNDAMENTAL_CONFIG.confidenceCalibration, rollingBlendWeight },
+    confidenceCalibration: {
+      ...DEFAULT_FUSION_FUNDAMENTAL_CONFIG.confidenceCalibration,
+      rollingBlendWeight,
+    },
   };
   tradeCountForThisRun = 0;
   const decideAction = createDecideAction(config, (decision) => {
@@ -69,12 +72,15 @@ function main(): void {
 
   rows.sort((a, b) => (b.sharpeRatio ?? -Infinity) - (a.sharpeRatio ?? -Infinity));
 
-  console.log(`v1 benchmark (same window): return ${V1_BENCHMARK.totalReturnPct.toFixed(2)}%, ` +
-    `drawdown ${V1_BENCHMARK.maxDrawdownPct.toFixed(2)}%, Sharpe ${V1_BENCHMARK.sharpeRatio.toFixed(2)}\n`);
+  console.log(
+    `v1 benchmark (same window): return ${V1_BENCHMARK.totalReturnPct.toFixed(2)}%, ` +
+      `drawdown ${V1_BENCHMARK.maxDrawdownPct.toFixed(2)}%, Sharpe ${V1_BENCHMARK.sharpeRatio.toFixed(2)}\n`,
+  );
 
   console.log('blendWeight  hysteresis  trades  totalReturn  maxDrawdown  sharpe  beatsV1');
   for (const row of rows) {
-    const beatsV1 = row.sharpeRatio !== null && row.sharpeRatio > V1_BENCHMARK.sharpeRatio ? 'YES' : '';
+    const beatsV1 =
+      row.sharpeRatio !== null && row.sharpeRatio > V1_BENCHMARK.sharpeRatio ? 'YES' : '';
     console.log(
       `${row.rollingBlendWeight.toFixed(2).padStart(11)}  ` +
         `${row.hysteresisBand.toFixed(2).padStart(10)}  ` +

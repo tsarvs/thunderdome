@@ -32,10 +32,15 @@ export function applyFill(
   if (oldShares === 0 || Math.sign(oldShares) === Math.sign(signedDelta)) {
     const oldNotionalCents = Math.abs(oldShares) * position.averageEntryPriceCents;
     const addNotionalCents = quantity * priceCents;
-    averageEntryPriceCents = Math.round((oldNotionalCents + addNotionalCents) / Math.abs(newShares));
+    averageEntryPriceCents = Math.round(
+      (oldNotionalCents + addNotionalCents) / Math.abs(newShares),
+    );
   } else {
     const closingQuantity = Math.min(Math.abs(oldShares), quantity);
-    const pnlPerShareCents = oldShares > 0 ? priceCents - position.averageEntryPriceCents : position.averageEntryPriceCents - priceCents;
+    const pnlPerShareCents =
+      oldShares > 0
+        ? priceCents - position.averageEntryPriceCents
+        : position.averageEntryPriceCents - priceCents;
     realizedDeltaCents = pnlPerShareCents * closingQuantity;
 
     if (newShares === 0) {
@@ -53,7 +58,11 @@ export function applyFill(
     realizedPnlCents: position.realizedPnlCents + realizedDeltaCents,
   });
 
-  return { ...portfolio, cashCents: portfolio.cashCents + cashDeltaCents, positions: nextPositions };
+  return {
+    ...portfolio,
+    cashCents: portfolio.cashCents + cashDeltaCents,
+    positions: nextPositions,
+  };
 }
 
 function markPriceOf(markPricesCents: ReadonlyMap<string, number>, symbol: string): number {
@@ -61,7 +70,10 @@ function markPriceOf(markPricesCents: ReadonlyMap<string, number>, symbol: strin
 }
 
 /** Net liquidation value across every symbol the account holds. */
-export function equityCents(portfolio: PortfolioAccount, markPricesCents: ReadonlyMap<string, number>): number {
+export function equityCents(
+  portfolio: PortfolioAccount,
+  markPricesCents: ReadonlyMap<string, number>,
+): number {
   let total = portfolio.cashCents;
   for (const [symbol, position] of portfolio.positions) {
     total += position.shares * markPriceOf(markPricesCents, symbol);
@@ -71,7 +83,10 @@ export function equityCents(portfolio: PortfolioAccount, markPricesCents: Readon
 
 /** Total gross exposure (long + short, across all symbols) — what portfolio-level margin
  * requirements are sized against (spec §38). */
-export function grossPositionValueCents(portfolio: PortfolioAccount, markPricesCents: ReadonlyMap<string, number>): number {
+export function grossPositionValueCents(
+  portfolio: PortfolioAccount,
+  markPricesCents: ReadonlyMap<string, number>,
+): number {
   let total = 0;
   for (const [symbol, position] of portfolio.positions) {
     total += Math.abs(position.shares) * markPriceOf(markPricesCents, symbol);
@@ -79,7 +94,10 @@ export function grossPositionValueCents(portfolio: PortfolioAccount, markPricesC
   return total;
 }
 
-export function longExposureCents(portfolio: PortfolioAccount, markPricesCents: ReadonlyMap<string, number>): number {
+export function longExposureCents(
+  portfolio: PortfolioAccount,
+  markPricesCents: ReadonlyMap<string, number>,
+): number {
   let total = 0;
   for (const [symbol, position] of portfolio.positions) {
     if (position.shares > 0) {
@@ -89,7 +107,10 @@ export function longExposureCents(portfolio: PortfolioAccount, markPricesCents: 
   return total;
 }
 
-export function shortExposureCents(portfolio: PortfolioAccount, markPricesCents: ReadonlyMap<string, number>): number {
+export function shortExposureCents(
+  portfolio: PortfolioAccount,
+  markPricesCents: ReadonlyMap<string, number>,
+): number {
   let total = 0;
   for (const [symbol, position] of portfolio.positions) {
     if (position.shares < 0) {
@@ -111,7 +132,10 @@ export function remainingBuyingPowerCents(
   if (!risk.allowShortSelling) {
     return 0;
   }
-  const totalCapacity = Math.max(0, equityCents(portfolio, markPricesCents) / risk.initialMarginRatio);
+  const totalCapacity = Math.max(
+    0,
+    equityCents(portfolio, markPricesCents) / risk.initialMarginRatio,
+  );
   const used = grossPositionValueCents(portfolio, markPricesCents);
   return Math.max(0, totalCapacity - used);
 }
@@ -127,18 +151,29 @@ export function maintenanceRequirementCents(
   return risk.maintenanceMarginRatio * grossPositionValueCents(portfolio, markPricesCents);
 }
 
-export function isBelowMaintenance(portfolio: PortfolioAccount, markPricesCents: ReadonlyMap<string, number>, risk: RiskConfig): boolean {
+export function isBelowMaintenance(
+  portfolio: PortfolioAccount,
+  markPricesCents: ReadonlyMap<string, number>,
+  risk: RiskConfig,
+): boolean {
   if (!risk.allowShortSelling || portfolio.positions.size === 0) {
     return false;
   }
-  return equityCents(portfolio, markPricesCents) < maintenanceRequirementCents(portfolio, markPricesCents, risk);
+  return (
+    equityCents(portfolio, markPricesCents) <
+    maintenanceRequirementCents(portfolio, markPricesCents, risk)
+  );
 }
 
 /** Ported unchanged from games/stock-market-2 — these two only ever operate on plain numbers (one
  * symbol's current share count, and the account's already-computed *remaining* buying power), so
  * generalizing to multi-symbol required no change to the formulas themselves, only to what the
  * caller passes in for `buyingPower` (see `exchange/matchingEngine.ts`). */
-export function maxBuyQuantityByMargin(currentShares: number, buyingPower: number, priceCents: number): number {
+export function maxBuyQuantityByMargin(
+  currentShares: number,
+  buyingPower: number,
+  priceCents: number,
+): number {
   if (priceCents <= 0) {
     return Number.POSITIVE_INFINITY;
   }

@@ -4,10 +4,21 @@ import type { DailyCandle, Trade } from '../types.js';
 /** Derives one symbol's daily OHLCV candle from actual executed trades — never fabricated
  * independently. If nothing traded this round, open = high = low = close = the day's reference
  * price, volume = 0 (ported from games/stock-market-2). */
-export function buildDailyCandle(date: string, referencePriceCents: number, trades: readonly Trade[]): DailyCandle {
+export function buildDailyCandle(
+  date: string,
+  referencePriceCents: number,
+  trades: readonly Trade[],
+): DailyCandle {
   if (trades.length === 0) {
     const referencePrice = toDollars(referencePriceCents);
-    return { date, open: referencePrice, high: referencePrice, low: referencePrice, close: referencePrice, volume: 0 };
+    return {
+      date,
+      open: referencePrice,
+      high: referencePrice,
+      low: referencePrice,
+      close: referencePrice,
+      volume: 0,
+    };
   }
 
   let high = -Infinity;

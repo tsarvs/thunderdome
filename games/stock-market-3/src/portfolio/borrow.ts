@@ -4,7 +4,11 @@ const TRADING_DAYS_PER_YEAR = 252;
 
 /** The cost of holding a short position in one symbol for one more round, charged on its current
  * mark-to-market notional (ported from games/stock-market-2). */
-export function dailyBorrowFeeCents(shortShares: number, markPriceCents: number, borrowFeeAnnualized: number): number {
+export function dailyBorrowFeeCents(
+  shortShares: number,
+  markPriceCents: number,
+  borrowFeeAnnualized: number,
+): number {
   const dailyRate = borrowFeeAnnualized / TRADING_DAYS_PER_YEAR;
   return roundHalfUp(shortShares * markPriceCents * dailyRate);
 }
@@ -23,8 +27,10 @@ export function computeDynamicBorrowConditions(args: {
   totalShortInterestShares: number;
   sharesOutstanding: number;
 }): { feeAnnualized: number; availableShares: number } {
-  const { baseAnnualizedFee, baseBorrowableShares, totalShortInterestShares, sharesOutstanding } = args;
-  const shortInterestRatio = sharesOutstanding > 0 ? Math.min(1, totalShortInterestShares / sharesOutstanding) : 0;
+  const { baseAnnualizedFee, baseBorrowableShares, totalShortInterestShares, sharesOutstanding } =
+    args;
+  const shortInterestRatio =
+    sharesOutstanding > 0 ? Math.min(1, totalShortInterestShares / sharesOutstanding) : 0;
   return {
     feeAnnualized: baseAnnualizedFee * (1 + 3 * shortInterestRatio),
     availableShares: Math.max(1, Math.round(baseBorrowableShares * (1 - 0.5 * shortInterestRatio))),

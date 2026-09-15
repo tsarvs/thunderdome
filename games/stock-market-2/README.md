@@ -33,17 +33,17 @@ mode: "SYNTHETIC" | "HISTORICAL"   (default: SYNTHETIC)
   `POSITIVE_NEWS`/`NEGATIVE_NEWS`) is derived from Denny's actual, dated SEC Form 8-K filings — see
   [`src/data/README.md`](src/data/README.md) for sourcing and
   [`src/data/events.ts`](src/data/events.ts) for the classification logic. Its "hidden fundamental
-  value" simply *is* the real closing price (never a fabricated number), and its "regime" is a
+  value" simply _is_ the real closing price (never a fabricated number), and its "regime" is a
   deterministic classification of real trailing volatility/trend (never a stochastic process) —
-  affecting only liquidity/spread sizing, never price directly, since the real close already *is*
+  affecting only liquidity/spread sizing, never price directly, since the real close already _is_
   the price signal.
 
-  **No lookahead bias**: each round's reference/pre-open price is always pulled from the *previous*
+  **No lookahead bias**: each round's reference/pre-open price is always pulled from the _previous_
   real trading day's real close (round 0 is the one exception — it starts at its own pinned
   starting day's close, which is simply the match's configured starting point, not a leak). A bot
   is never handed today's real close before submitting orders, even indirectly. The simulated
-  exchange's own executions never rewrite this real path either — HISTORICAL mode is a *historical
-  market environment*, not a historically-accurate reconstruction of DENN's real order book (which
+  exchange's own executions never rewrite this real path either — HISTORICAL mode is a _historical
+  market environment_, not a historically-accurate reconstruction of DENN's real order book (which
   the data doesn't contain).
 
 Both modes feed the exact same exchange, matching, and portfolio-accounting code — neither of
@@ -60,7 +60,7 @@ Every round, before any orders are collected, the engine has already generated t
 synthetic external liquidity ladder (`src/exchange/liquidity.ts`) — several price levels of
 simulated depth on each side, centered on the day's reference price, sized off expected daily
 volume and widened by a volatility hint (both regime-adjusted). This same ladder is what every
-bot's observation is built from *and* what the exchange actually matches against, so every bot
+bot's observation is built from _and_ what the exchange actually matches against, so every bot
 decides against the identical public state the exchange is about to use.
 
 Each round, in order (`src/exchange/matchingEngine.ts`):
@@ -69,7 +69,7 @@ Each round, in order (`src/exchange/matchingEngine.ts`):
 2. New MARKET/LIMIT orders are admitted (LIMIT orders reserve buying power up front, since they
    might rest; MARKET orders never rest, so any real affordability limit is enforced per fill).
 3. **Player orders match against player orders first** — resting GTC orders plus this round's new
-   submissions, at price priority with a *seeded random* tie-break for equal prices (never
+   submissions, at price priority with a _seeded random_ tie-break for equal prices (never
    registration/submission order, so no participant is structurally favored). A participant can
    never trade against their own order (self-trade prevention).
 4. Whatever's left matches against the synthetic liquidity ladder, walking multiple price levels
@@ -116,7 +116,7 @@ A position's quantity can then be positive (long), zero (flat), or negative (sho
 margin used, and the maintenance requirement are all surfaced per-participant in their own
 observation (`portfolio.buyingPower`/`marginUsed`/`maintenanceRequirement`) — never for anyone
 else's account. Covering a short back toward flat, or reducing a long back toward flat, is always
-allowed regardless of margin; only the portion that pushes a position *past* flat into the
+allowed regardless of margin; only the portion that pushes a position _past_ flat into the
 opposite side consumes buying power (and, for a short, counts against `borrowableShares`).
 
 `src/portfolio/accounting.ts` is where position accounting lives — average cost basis and realized

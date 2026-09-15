@@ -27,14 +27,18 @@ export function applyFill(
     // average cost basis, nothing realized yet.
     const oldNotionalCents = Math.abs(oldShares) * portfolio.averageEntryPriceCents;
     const addNotionalCents = quantity * priceCents;
-    averageEntryPriceCents = Math.round((oldNotionalCents + addNotionalCents) / Math.abs(newShares));
+    averageEntryPriceCents = Math.round(
+      (oldNotionalCents + addNotionalCents) / Math.abs(newShares),
+    );
   } else {
     // Reducing (or reversing straight through flat) an existing position: the portion up to
     // whichever of the two is smaller closes against the existing average entry price, realizing
     // P&L; a long realizes (exit - entry), a short realizes (entry - exit).
     const closingQuantity = Math.min(Math.abs(oldShares), quantity);
     const pnlPerShareCents =
-      oldShares > 0 ? priceCents - portfolio.averageEntryPriceCents : portfolio.averageEntryPriceCents - priceCents;
+      oldShares > 0
+        ? priceCents - portfolio.averageEntryPriceCents
+        : portfolio.averageEntryPriceCents - priceCents;
     realizedDeltaCents = pnlPerShareCents * closingQuantity;
 
     if (newShares === 0) {
@@ -66,7 +70,10 @@ export function equityCents(portfolio: StockMarket2Portfolio, markPriceCents: nu
 }
 
 /** Absolute exposure, long or short — what margin requirements are sized against. */
-export function grossPositionValueCents(portfolio: StockMarket2Portfolio, markPriceCents: number): number {
+export function grossPositionValueCents(
+  portfolio: StockMarket2Portfolio,
+  markPriceCents: number,
+): number {
   return Math.abs(portfolio.shares) * markPriceCents;
 }
 
@@ -77,7 +84,11 @@ export function grossPositionValueCents(portfolio: StockMarket2Portfolio, markPr
  * and "margin trading" as one toggle, same as a real brokerage requiring a margin account to
  * short at all).
  */
-export function buyingPowerCents(portfolio: StockMarket2Portfolio, markPriceCents: number, risk: RiskConfig): number {
+export function buyingPowerCents(
+  portfolio: StockMarket2Portfolio,
+  markPriceCents: number,
+  risk: RiskConfig,
+): number {
   if (!risk.allowShortSelling) {
     return 0;
   }
@@ -103,7 +114,10 @@ export function isBelowMaintenance(
   if (!risk.allowShortSelling || portfolio.shares === 0) {
     return false;
   }
-  return equityCents(portfolio, markPriceCents) < maintenanceRequirementCents(portfolio, markPriceCents, risk);
+  return (
+    equityCents(portfolio, markPriceCents) <
+    maintenanceRequirementCents(portfolio, markPriceCents, risk)
+  );
 }
 
 /**
@@ -112,7 +126,11 @@ export function isBelowMaintenance(
  * always allowed regardless of margin (the position is shrinking); only the portion that would
  * push the position long *past* flat consumes buying power.
  */
-export function maxBuyQuantityByMargin(currentShares: number, buyingPower: number, priceCents: number): number {
+export function maxBuyQuantityByMargin(
+  currentShares: number,
+  buyingPower: number,
+  priceCents: number,
+): number {
   if (priceCents <= 0) {
     return Number.POSITIVE_INFINITY;
   }

@@ -1,4 +1,4 @@
-import type { DailyBar } from '../src/marketTypes.js';
+import type { DailyBar } from '@thunderdome/quant-sdk-js';
 
 /**
  * Kennametal Inc. (NYSE:KMT) REAL daily price history, pulled from stockanalysis.com on

@@ -195,11 +195,34 @@ function securitiesAsOf(
   });
 }
 
+/**
+ * Marks each security at its close for THIS internal accounting/equity/margin computation — a
+ * different contract from `SecurityMarketObservation.bar` itself (see that field's own doc
+ * comment: `null` there is a genuine, never-forward-filled gap the BOT must be able to see and
+ * react to). When `bar` is null because the ticker's own home exchange was closed (e.g. a Tokyo
+ * Stock Exchange or KOSDAQ holiday the shared US trading calendar doesn't know about — confirmed
+ * empirically: `daily_bars` has no row at all for FUJIKURA/FURUKAWA/SUMITOMO on 2026-07-20/08-11
+ * or VITZRONEXTECH on 2026-07-17/08-17, and Yahoo Finance itself has nothing for those dates,
+ * because there was zero trading, not a data-ingestion gap), an ALREADY-HELD position still needs
+ * a real value for equity/margin purposes that day. Falling back to `?? 0` (the old behavior)
+ * priced such a position at literal zero for one day and "recovered" it the next, a pure
+ * valuation artifact that once produced a ~31% single-day fake drawdown in a real forward match
+ * — not a real trading loss. Carrying forward `history`'s own last known close (never later than
+ * `bar`'s own date, by `securitiesAsOf`'s no-lookahead contract) fixes that without touching order
+ * execution at all: `execution/orders.ts`'s `resolveOrdersForPortfolio` already independently
+ * refuses to fill any order against a null `bar` (a zero-fill), so a holiday still correctly
+ * blocks NEW trades in that ticker — this only fixes how an untouched existing position is valued.
+ */
 function markPricesCentsFor(securities: readonly SecurityMarketObservation[]): Map<string, number> {
   const marks = new Map<string, number>();
   for (const security of securities) {
     if (security.bar !== null) {
       marks.set(security.ticker, toCents(security.bar.close));
+      continue;
+    }
+    const lastKnown = security.history.at(-1);
+    if (lastKnown !== undefined) {
+      marks.set(security.ticker, toCents(lastKnown.close));
     }
   }
   return marks;
@@ -611,7 +634,9 @@ export const stockMarket4: GameDefinition<
             shares: position.shares,
             averageEntryPrice: toDollars(position.averageEntryPriceCents),
             marketValue: toDollars(marketValueCents),
-            unrealizedPnl: toDollars(marketValueCents - position.shares * position.averageEntryPriceCents),
+            unrealizedPnl: toDollars(
+              marketValueCents - position.shares * position.averageEntryPriceCents,
+            ),
           };
         },
       );
@@ -736,7 +761,9 @@ export function resumeForwardState(args: {
 }): StockMarket4State {
   const { config, participantIds } = args;
   if (config.gameType !== 'FORWARD_SHADOW') {
-    throw new Error('stock-market-4: resumeForwardState is only meaningful for a FORWARD_SHADOW match');
+    throw new Error(
+      'stock-market-4: resumeForwardState is only meaningful for a FORWARD_SHADOW match',
+    );
   }
   const parsed = StockMarket4ForwardSnapshotSchema.safeParse(args.snapshot);
   if (!parsed.success) {

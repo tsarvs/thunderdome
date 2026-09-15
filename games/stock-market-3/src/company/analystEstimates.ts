@@ -22,14 +22,26 @@ export function initialConsensusEstimate(actual: ReportedFinancials, rng: Rng): 
  * called every round of an open quarter, appended to that security's `analystRevisions` history
  * (spec §21). Never called with, or allowed to leak, the actual itself beyond this pull — a bot
  * only ever sees the resulting consensus value, never `actual`. */
-export function reviseConsensus(current: ReportedFinancials, actual: ReportedFinancials, rng: Rng): ReportedFinancials {
+export function reviseConsensus(
+  current: ReportedFinancials,
+  actual: ReportedFinancials,
+  rng: Rng,
+): ReportedFinancials {
   function moveField(currentValue: number, actualValue: number, noiseScale: number): number {
     const pulled = currentValue + CONVERGENCE_RATE * (actualValue - currentValue);
     return Math.round(pulled + gaussian(rng) * noiseScale);
   }
   return {
-    epsCents: moveField(current.epsCents, actual.epsCents, Math.max(1, Math.abs(actual.epsCents) * 0.03)),
-    revenueCents: moveField(current.revenueCents, actual.revenueCents, Math.max(1, Math.abs(actual.revenueCents) * 0.01)),
+    epsCents: moveField(
+      current.epsCents,
+      actual.epsCents,
+      Math.max(1, Math.abs(actual.epsCents) * 0.03),
+    ),
+    revenueCents: moveField(
+      current.revenueCents,
+      actual.revenueCents,
+      Math.max(1, Math.abs(actual.revenueCents) * 0.01),
+    ),
     marginBps: moveField(current.marginBps, actual.marginBps, 20),
   };
 }

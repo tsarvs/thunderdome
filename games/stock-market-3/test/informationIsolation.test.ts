@@ -31,7 +31,11 @@ function config(overrides: Record<string, unknown> = {}) {
 }
 
 function initialState(overrides: Record<string, unknown> = {}, seed = 1): StockMarket3State {
-  return stockMarket3.initialize({ config: config(overrides), participantIds: PARTICIPANT_IDS, rng: createRng(Buffer.alloc(16, seed)) });
+  return stockMarket3.initialize({
+    config: config(overrides),
+    participantIds: PARTICIPANT_IDS,
+    rng: createRng(Buffer.alloc(16, seed)),
+  });
 }
 
 function hold(): StockMarket3Action {
@@ -44,7 +48,11 @@ function advance(state: StockMarket3State, rounds: number, seed = 1): StockMarke
   const rng = createRng(Buffer.alloc(16, seed));
   let next = state;
   for (let i = 0; i < rounds; i++) {
-    next = stockMarket3.resolve({ state: next, actions: new Map(PARTICIPANT_IDS.map((id) => [id, hold()])), rng }).nextState;
+    next = stockMarket3.resolve({
+      state: next,
+      actions: new Map(PARTICIPANT_IDS.map((id) => [id, hold()])),
+      rng,
+    }).nextState;
   }
   return next;
 }
@@ -70,7 +78,18 @@ describe('hidden information audit (spec §57)', () => {
     const state = advance(initialState({ rounds: 20, warmupRounds: 0 }), 15);
     const observation = stockMarket3.getObservation(state, 'alice');
     const json = JSON.stringify(observation);
-    for (const forbidden of ['correlation', 'momentumScore', 'fairValue', 'expectedReturn', 'alpha', 'beta', 'factorScore', 'marketRegime', 'riskOn', 'riskOff']) {
+    for (const forbidden of [
+      'correlation',
+      'momentumScore',
+      'fairValue',
+      'expectedReturn',
+      'alpha',
+      'beta',
+      'factorScore',
+      'marketRegime',
+      'riskOn',
+      'riskOff',
+    ]) {
       expect(json.toLowerCase()).not.toContain(forbidden.toLowerCase());
     }
   });
@@ -115,7 +134,9 @@ describe('no-future-information audit (spec §58)', () => {
     expect(future.length).toBeGreaterThan(0);
     for (const entry of future) {
       expect(Object.keys(entry).sort()).toEqual(
-        entry.type === 'EARNINGS_REPORT' ? ['round', 'symbol', 'type'].sort() : ['indicator', 'round', 'type'].sort(),
+        entry.type === 'EARNINGS_REPORT'
+          ? ['round', 'symbol', 'type'].sort()
+          : ['indicator', 'round', 'type'].sort(),
       );
     }
   });

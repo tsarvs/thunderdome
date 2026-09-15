@@ -2,13 +2,14 @@
 
 Dev tooling that isn't a workspace package in its own right.
 
-| Script                     | What it does                                                                                                                                                                             |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `build.sh`                 | The root `yarn build`'s implementation — builds every workspace package in dependency order (see its own comments; Yarn Classic's `workspaces run` doesn't guarantee topological order). |
-| `pack-bot-sdk-js.sh`       | Builds `@thunderdome/bot-sdk-js` and vendors it into every TypeScript/JavaScript bot that depends on it. See below.                                                                      |
-| `vendor-python-bot-sdk.sh` | Copies `packages/bot-sdk-python/thunderdome_bot_sdk.py` into every Python bot that depends on it — no build/pack step, just a file copy. See `packages/bot-sdk-python/README.md`.        |
-| `scaffold-game.mjs`        | Generates a new `games/<game-id>/` workspace package — a minimal but real, working `GameDefinition`. See below.                                                                          |
-| `scaffold-bot.mjs`         | Generates a new `bots/<game-id>/<bot-id>/` directory — a starter bot on `@thunderdome/bot-sdk-js`. See below.                                                                            |
+| Script                     | What it does                                                                                                                                                                                       |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build.sh`                 | The root `yarn build`'s implementation — builds every workspace package in dependency order (see its own comments; Yarn Classic's `workspaces run` doesn't guarantee topological order).           |
+| `pack-bot-sdk-js.sh`       | Builds `@thunderdome/bot-sdk-js` and vendors it into every TypeScript/JavaScript bot that depends on it. See below.                                                                                |
+| `pack-quant-sdk-js.sh`     | Builds `@thunderdome/quant-sdk-js` and vendors it into every bot that depends on it (today, just `fusion-quant-v0`). Same mechanism as `pack-bot-sdk-js.sh`, one level up in the stack. See below. |
+| `vendor-python-bot-sdk.sh` | Copies `packages/bot-sdk-python/thunderdome_bot_sdk.py` into every Python bot that depends on it — no build/pack step, just a file copy. See `packages/bot-sdk-python/README.md`.                  |
+| `scaffold-game.mjs`        | Generates a new `games/<game-id>/` workspace package — a minimal but real, working `GameDefinition`. See below.                                                                                    |
+| `scaffold-bot.mjs`         | Generates a new `bots/<game-id>/<bot-id>/` directory — a starter bot on `@thunderdome/bot-sdk-js`. See below.                                                                                      |
 
 Running a real match between bots from `/bots` is now `yarn thunderdome match run <botId>
 <botId>` (`apps/cli/src/commands/match.ts`) — the registry-backed successor to what used
@@ -34,6 +35,30 @@ forfeiting the match. Validated empirically: 60/60 real Docker trials succeeded 
 against a baseline that reliably failed several times per 15–30 trials before it. If you still see
 an `INIT_TIMEOUT` after this, that's a new signal worth investigating, not the old known issue.
 
+### A known yarn stdout-pollution issue (root-caused, worked around)
+
+`yarn workspace <pkg> run <script> -- <args> > output.json` silently corrupts `output.json`:
+Yarn Classic (1.x) unconditionally writes its own `yarn run vX.X.X` / `$ <the actual command>` /
+`Done in X.Xs.` lines to STDOUT for a `workspace ... run` invocation — **even with `--silent`**,
+which only suppresses yarn's warning/info logs, not this banner. Confirmed empirically: `yarn
+--silent workspace <pkg> run <script>` and `yarn workspace <pkg> run <script> --silent` both still
+emit the banner; only invoking `yarn run <script> --silent` directly from WITHIN that package's
+own directory (not via the `workspace <pkg>` wrapper) actually suppresses it. This bit real usage
+twice — generating a `researchTimeline` config for `match forward run` via
+[`emitForwardMatchConfig.ts`](../packages/stock-market-4/research/fusion/scripts/emitForwardMatchConfig.ts), and
+piping any other script's JSON/text output to a file.
+
+**The fix**: when a script's stdout must be piped or parsed (not just read by a human), `cd` into
+the package first and use plain `yarn run`, silenced:
+
+```bash
+(cd packages/stock-market-4/research/fusion && yarn run emit:forward-config --silent -- --your-args-here) > output.json
+```
+
+The `(...)` subshell keeps the `cd` from affecting your current shell. If you don't need the
+output piped/parsed (just watching it in a terminal), `yarn workspace <pkg> run <script>` is fine
+as-is — the banner is only a problem for anything that reads stdout programmatically.
+
 ## pack-bot-sdk-js.sh
 
 `bots/**` is deliberately not a Yarn workspace member (`docs/adr/0001-monorepo-and-boundary.md`):
@@ -57,6 +82,24 @@ from. This works the same whether the bot is TypeScript or plain JavaScript —
 Run this after changing `packages/bot-sdk-js`, then commit every dependent bot's updated
 `vendor/*.tgz` and `package-lock.json` alongside your source change — the script refreshes both
 for you (see its own comments for why a plain `npm install` in place isn't enough).
+
+## pack-quant-sdk-js.sh
+
+Same mechanism as `pack-bot-sdk-js.sh` above, one layer up: `@thunderdome/quant-sdk-js`
+(`packages/stock-market-4/quant-sdk-js`) is the domain-agnostic alpha/correlation/portfolio-
+construction/risk pipeline extracted out of `fusion-quant-v0` so a future domain bot can reuse it
+via a `DomainAdapter` instead of copy-pasting it — see that package's own README. It's vendored
+into `fusion-quant-v0` the exact same way, for the exact same reason (`bots/**` isn't a Yarn
+workspace member).
+
+```bash
+./scripts/pack-quant-sdk-js.sh
+```
+
+Run this after changing `packages/stock-market-4/quant-sdk-js`, then commit
+`fusion-quant-v0`'s updated `vendor/thunderdome-quant-sdk-js.tgz` and `package-lock.json`
+alongside your source change. Add a new bot directory to this script's own `BOT_DIRS` array when a
+second domain bot starts consuming the SDK.
 
 ## scaffold-game.mjs
 

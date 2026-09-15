@@ -48,7 +48,7 @@ concrete evidence the roadmap's "no duplicated trading logic" requirement holds.
 
 **Why `MIN`, never `MAX`.** A real ingestion pipeline can easily have one ticker's data land before
 another's on any given day. Using `MAX` across the universe would advance the calendar past a date
-where some *traded* ticker has no data yet, corrupting this game's existing "a missing bar is a
+where some _traded_ ticker has no data yet, corrupting this game's existing "a missing bar is a
 genuine data gap" contract (`bar: null`) into "the match ran out of data," systematically, every
 day, for whichever ticker happens to lag. `MIN` gives the honest reading: "every ticker this match
 can trade is known through at least this date." `config.benchmarkTicker` is deliberately excluded
@@ -89,8 +89,7 @@ the same category of already-public fact as `config.endDate` itself.
   `FORWARD_SHADOW` match today plays exactly what's currently published, once, in one process, then
   exits — a later invocation against a grown dataset starts a brand-new match from round 0. Making
   this resumable is separate, later roadmap work. This ADR doesn't foreclose it:
-  `buildMarketDataProvider(config)` staying a pure function of `config` (true since Phase 1, ADR-
-  0010) means a future resume mechanism can plausibly just re-run it from persisted config, never
+  `buildMarketDataProvider(config)` staying a pure function of `config` (true since Phase 1, ADR- 0010) means a future resume mechanism can plausibly just re-run it from persisted config, never
   needing to serialize the live SQLite handle itself.
 - Does not add any CLI stepping/pause mode, baseline bots (`Cash`/`BuyAndHold`/`EqualWeight`), or
   single-vs-multi-bot handling changes — all separate, later phases; nothing here blocks them.

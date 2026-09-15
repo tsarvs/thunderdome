@@ -33,6 +33,8 @@ export default tseslint.config(
           './packages/*/tsconfig.test.json',
           './packages/game-dev-toolkit/*/tsconfig.test.json',
           './packages/research/*/tsconfig.test.json',
+          './packages/stock-market-4/*/tsconfig.test.json',
+          './packages/stock-market-4/research/*/tsconfig.test.json',
           './games/*/tsconfig.test.json',
           './ci/tools/*/tsconfig.test.json',
         ],

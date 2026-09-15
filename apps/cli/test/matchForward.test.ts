@@ -60,7 +60,9 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     expect(await runMatchForwardRunCommand([], { rootDir: repoRoot })).toBe(1);
     expect(await runMatchForwardRunCommand(['only-a-match-id'], { rootDir: repoRoot })).toBe(1);
-    expect(error).toHaveBeenCalledWith(expect.stringContaining('Usage: thunderdome match forward run'));
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('Usage: thunderdome match forward run'),
+    );
   });
 
   it('exits 1 for an unknown bot id', async () => {
@@ -114,7 +116,9 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
           startDate: '2026-01-05',
           endDate: '2026-01-09',
           marketDataUniverse: ['ELMT'],
-          historicalPrices: { ELMT: [{ date: '2026-01-05', open: 1, high: 1, low: 1, close: 1, volume: 1 }] },
+          historicalPrices: {
+            ELMT: [{ date: '2026-01-05', open: 1, high: 1, low: 1, close: 1, volume: 1 }],
+          },
         }),
         '--store-dir',
         storeDir,
@@ -146,7 +150,16 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
 
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardRunCommand(
-      ['new-match', 'fusion-fundamental-v0', '--config', '{}', '--config-file', configPath, '--store-dir', storeDir],
+      [
+        'new-match',
+        'fusion-fundamental-v0',
+        '--config',
+        '{}',
+        '--config-file',
+        configPath,
+        '--store-dir',
+        storeDir,
+      ],
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
@@ -156,7 +169,14 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
   it('exits 1 when --config-file does not exist', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardRunCommand(
-      ['new-match', 'fusion-fundamental-v0', '--config-file', join(root, 'missing.json'), '--store-dir', storeDir],
+      [
+        'new-match',
+        'fusion-fundamental-v0',
+        '--config-file',
+        join(root, 'missing.json'),
+        '--store-dir',
+        storeDir,
+      ],
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
@@ -187,7 +207,9 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
-    expect(error).toHaveBeenCalledWith(expect.stringContaining('was created for game "connect-four"'));
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('was created for game "connect-four"'),
+    );
   });
 
   it('exits 0 without touching Docker when resuming an already-completed match', async () => {
@@ -254,7 +276,10 @@ describe('runMatchForwardInspectCommand', () => {
   });
 
   it('prints details for an existing record', async () => {
-    await saveForwardMatchRecord(storeDir, sampleRecord({ matchId: 'inspectable', roundsPlayed: 3 }));
+    await saveForwardMatchRecord(
+      storeDir,
+      sampleRecord({ matchId: 'inspectable', roundsPlayed: 3 }),
+    );
 
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const code = await runMatchForwardInspectCommand(['inspectable', '--store-dir', storeDir], {

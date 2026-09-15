@@ -30,21 +30,21 @@ today.
 
 ## Commands
 
-| Command              | Status                                                                                                      |
-| -------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `match run`          | Real — runs one match between two or more bots. See below.                                                  |
-| `match forward run`  | Real — runs (or resumes) one persistent, resumable forward match. See below.                                |
-| `match forward list` | Real — lists persisted forward match records. See below.                                                    |
-| `match forward inspect` | Real — prints one persisted forward match's details. See below.                                          |
-| `match forward preview` | Real — read-only "what would the bot do right now vs. its stored config," no persistence. See below.     |
-| `play`               | Real — a human, typing into this terminal, plays one interactive match against one or more bots. See below. |
-| `tournament run`     | Real — runs a round-robin or single-elimination tournament among two or more bots. See below.               |
-| `tournament list`    | Real — lists persisted tournament records. See below.                                                       |
-| `tournament inspect` | Real — prints one persisted tournament's details and final standings. See below.                            |
-| `tournament replay`  | Real — replays a persisted tournament's matches purely from its record, no Docker. See below.               |
-| `cleanup`            | Real — force-removes any leftover Thunderdome bot containers. See below.                                    |
-| `games`              | Stub — prints "not yet implemented"                                                                         |
-| `bots`               | Stub — prints "not yet implemented"                                                                         |
+| Command                 | Status                                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `match run`             | Real — runs one match between two or more bots. See below.                                                  |
+| `match forward run`     | Real — runs (or resumes) one persistent, resumable forward match. See below.                                |
+| `match forward list`    | Real — lists persisted forward match records. See below.                                                    |
+| `match forward inspect` | Real — prints one persisted forward match's details. See below.                                             |
+| `match forward preview` | Real — read-only "what would the bot do right now vs. its stored config," no persistence. See below.        |
+| `play`                  | Real — a human, typing into this terminal, plays one interactive match against one or more bots. See below. |
+| `tournament run`        | Real — runs a round-robin or single-elimination tournament among two or more bots. See below.               |
+| `tournament list`       | Real — lists persisted tournament records. See below.                                                       |
+| `tournament inspect`    | Real — prints one persisted tournament's details and final standings. See below.                            |
+| `tournament replay`     | Real — replays a persisted tournament's matches purely from its record, no Docker. See below.               |
+| `cleanup`               | Real — force-removes any leftover Thunderdome bot containers. See below.                                    |
+| `games`                 | Stub — prints "not yet implemented"                                                                         |
+| `bots`                  | Stub — prints "not yet implemented"                                                                         |
 
 ## `match run`
 
@@ -175,7 +175,7 @@ Still resumable — more data may arrive later; re-run the same command to conti
 - `--config-file <path>` reads the same JSON from a file instead of an inline argument — use it
   once `--config`'s JSON gets too large for your shell's argv limit (a `researchTimeline` built
   from a real research dataset routinely runs to megabytes; see
-  [`packages/research/fusion`](../../packages/research/fusion)'s
+  [`packages/stock-market-4/research/fusion`](../../packages/stock-market-4/research/fusion)'s
   `emit:forward-config` script for generating one). `--config` and `--config-file` are mutually
   exclusive.
 - Progress is persisted after every round resolved, not just once at the end of an invocation — a
@@ -186,7 +186,7 @@ Still resumable — more data may arrive later; re-run the same command to conti
   already reports on.
 - `match forward list`/`inspect` are pure reads against `.thunderdome/forward-matches/` (gitignored
   local run state, override with `--store-dir`) — no Docker, no registry, mirroring `tournament
-  list`/`inspect`'s own read-only design.
+list`/`inspect`'s own read-only design.
 
 ## `match forward preview`
 
@@ -199,7 +199,7 @@ own stored config" check — never persists anything (no round resolved, no `For
 write). Since this game has no intraday price data (daily bars only), the only thing that can
 differ within the same trading day is RESEARCH recorded after the match was created/last
 configured — pass a freshly regenerated config (e.g. re-run
-[`packages/research/fusion`](../../packages/research/fusion)'s `emit:forward-config` against the
+[`packages/stock-market-4/research/fusion`](../../packages/stock-market-4/research/fusion)'s `emit:forward-config` against the
 live research fixture) as `--config-file`; it must describe the same `marketDataUniverse`/
 `marketDataset`/`startDate` as the match's own stored config, differing only in
 `researchTimeline` (or similar). Prints, per bot, which securities' orders differ between "at

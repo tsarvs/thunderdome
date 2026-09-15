@@ -56,8 +56,15 @@ describe('stockMarket2.parseConfig', () => {
       expect(result.value.rounds).toBe(100);
       expect(result.value.transactionFee).toBe(0.001);
       expect(result.value.maxOrdersPerRound).toBe(5);
-      expect(result.value.synthetic).toEqual({ initialPrice: 100, fundamentalDrift: 0, fundamentalVolatility: 0.015 });
-      expect(result.value.referenceModel).toEqual({ meanReversionFactor: 0.15, referenceVolatility: 0.02 });
+      expect(result.value.synthetic).toEqual({
+        initialPrice: 100,
+        fundamentalDrift: 0,
+        fundamentalVolatility: 0.015,
+      });
+      expect(result.value.referenceModel).toEqual({
+        meanReversionFactor: 0.15,
+        referenceVolatility: 0.02,
+      });
       expect(result.value.risk).toEqual({
         allowShortSelling: false,
         borrowableShares: 1000,
@@ -77,18 +84,26 @@ describe('stockMarket2.parseConfig', () => {
   });
 
   it('rejects a HISTORICAL historyStartIndex too close to the end of the real dataset', () => {
-    expect(stockMarket2.parseConfig({ mode: 'HISTORICAL', historyStartIndex: 2500, rounds: 100 }).ok).toBe(false);
-    expect(stockMarket2.parseConfig({ mode: 'HISTORICAL', historyStartIndex: 2413, rounds: 100 }).ok).toBe(true);
+    expect(
+      stockMarket2.parseConfig({ mode: 'HISTORICAL', historyStartIndex: 2500, rounds: 100 }).ok,
+    ).toBe(false);
+    expect(
+      stockMarket2.parseConfig({ mode: 'HISTORICAL', historyStartIndex: 2413, rounds: 100 }).ok,
+    ).toBe(true);
   });
 
   it('does not apply the HISTORICAL dataset bound in SYNTHETIC mode', () => {
-    expect(stockMarket2.parseConfig({ mode: 'SYNTHETIC', historyStartIndex: 999999, rounds: 100 }).ok).toBe(true);
+    expect(
+      stockMarket2.parseConfig({ mode: 'SYNTHETIC', historyStartIndex: 999999, rounds: 100 }).ok,
+    ).toBe(true);
   });
 });
 
 describe('stockMarket2.initialize', () => {
   it('allows a single participant (solo play)', () => {
-    const state = initialState({ mode: 'HISTORICAL', historyStartIndex: FIRST_DAY_INDEX }, ['alice']);
+    const state = initialState({ mode: 'HISTORICAL', historyStartIndex: FIRST_DAY_INDEX }, [
+      'alice',
+    ]);
     expect(state.participantIds).toEqual(['alice']);
   });
 
@@ -121,7 +136,10 @@ describe('stockMarket2.initialize', () => {
     expect(state.referencePriceCents).toBe(911);
     expect(state.startingPriceCents).toBe(911);
     expect(state.startDate).toBe('2016-01-19');
-    expect(state.currentEvent).toEqual({ type: 'NO_NEWS', description: 'No regulatory disclosures today.' });
+    expect(state.currentEvent).toEqual({
+      type: 'NO_NEWS',
+      description: 'No regulatory disclosures today.',
+    });
   });
 
   it('reveals a real EARNINGS_BEAT event when pinned to that real date', () => {
@@ -131,8 +149,16 @@ describe('stockMarket2.initialize', () => {
   });
 
   it('draws a random HISTORICAL historyStartIndex deterministically from a given seed when omitted', () => {
-    const a = initialState({ mode: 'HISTORICAL' }, ['alice', 'bob'], createRng(Buffer.alloc(16, 7)));
-    const b = initialState({ mode: 'HISTORICAL' }, ['alice', 'bob'], createRng(Buffer.alloc(16, 7)));
+    const a = initialState(
+      { mode: 'HISTORICAL' },
+      ['alice', 'bob'],
+      createRng(Buffer.alloc(16, 7)),
+    );
+    const b = initialState(
+      { mode: 'HISTORICAL' },
+      ['alice', 'bob'],
+      createRng(Buffer.alloc(16, 7)),
+    );
     expect(a.historyStartIndex).toBe(b.historyStartIndex);
   });
 
@@ -179,7 +205,14 @@ describe('stockMarket2.getObservation', () => {
     state = stockMarket2.resolve({
       state,
       actions: actionsOf([
-        ['alice', { orders: [{ kind: 'LIMIT', side: 'BUY', quantity: 10, limitPrice: 1, timeInForce: 'GTC' }] }],
+        [
+          'alice',
+          {
+            orders: [
+              { kind: 'LIMIT', side: 'BUY', quantity: 10, limitPrice: 1, timeInForce: 'GTC' },
+            ],
+          },
+        ],
         ['bob', hold()],
       ]),
       rng,
@@ -207,10 +240,12 @@ describe('stockMarket2.getPendingActions / validateAction', () => {
 
   it('rejects more orders than config.maxOrdersPerRound', () => {
     const state = initialState({ maxOrdersPerRound: 1 });
-    const action = { orders: [
-      { kind: 'MARKET', side: 'BUY', quantity: 1 },
-      { kind: 'MARKET', side: 'BUY', quantity: 1 },
-    ] };
+    const action = {
+      orders: [
+        { kind: 'MARKET', side: 'BUY', quantity: 1 },
+        { kind: 'MARKET', side: 'BUY', quantity: 1 },
+      ],
+    };
     expect(stockMarket2.validateAction(state, 'alice', action).ok).toBe(false);
   });
 
@@ -225,7 +260,14 @@ describe('stockMarket2.getPendingActions / validateAction', () => {
     state = stockMarket2.resolve({
       state,
       actions: actionsOf([
-        ['alice', { orders: [{ kind: 'LIMIT', side: 'BUY', quantity: 1, limitPrice: 1, timeInForce: 'GTC' }] }],
+        [
+          'alice',
+          {
+            orders: [
+              { kind: 'LIMIT', side: 'BUY', quantity: 1, limitPrice: 1, timeInForce: 'GTC' },
+            ],
+          },
+        ],
         ['bob', hold()],
       ]),
       rng,
@@ -246,7 +288,11 @@ describe('stockMarket2.getPendingActions / validateAction', () => {
 
 describe('stockMarket2.resolve — accounting', () => {
   it('debits cash and credits shares on a filled BUY, net of the transaction fee', () => {
-    const state = initialState({ mode: 'HISTORICAL', historyStartIndex: FIRST_DAY_INDEX, transactionFee: 0.01 });
+    const state = initialState({
+      mode: 'HISTORICAL',
+      historyStartIndex: FIRST_DAY_INDEX,
+      transactionFee: 0.01,
+    });
     const { nextState } = stockMarket2.resolve({
       state,
       actions: actionsOf([
@@ -261,7 +307,11 @@ describe('stockMarket2.resolve — accounting', () => {
   });
 
   it('credits cash and debits shares on a filled SELL, net of the transaction fee', () => {
-    let state = initialState({ mode: 'HISTORICAL', historyStartIndex: FIRST_DAY_INDEX, transactionFee: 0.01 });
+    let state = initialState({
+      mode: 'HISTORICAL',
+      historyStartIndex: FIRST_DAY_INDEX,
+      transactionFee: 0.01,
+    });
     state = stockMarket2.resolve({
       state,
       actions: actionsOf([
@@ -289,7 +339,10 @@ describe('stockMarket2.resolve — accounting', () => {
     const before = state.portfolios.get('alice');
     const { nextState } = stockMarket2.resolve({
       state,
-      actions: actionsOf([['alice', hold()], ['bob', hold()]]),
+      actions: actionsOf([
+        ['alice', hold()],
+        ['bob', hold()],
+      ]),
       rng,
     });
     expect(nextState.portfolios.get('alice')).toEqual(before);
@@ -302,7 +355,14 @@ describe('stockMarket2.resolve — accounting', () => {
     state = stockMarket2.resolve({
       state,
       actions: actionsOf([
-        ['alice', { orders: [{ kind: 'LIMIT', side: 'BUY', quantity: 5, limitPrice: 0.01, timeInForce: 'GTC' }] }],
+        [
+          'alice',
+          {
+            orders: [
+              { kind: 'LIMIT', side: 'BUY', quantity: 5, limitPrice: 0.01, timeInForce: 'GTC' },
+            ],
+          },
+        ],
         ['bob', hold()],
       ]),
       rng,
@@ -318,7 +378,10 @@ describe('stockMarket2.resolve — accounting', () => {
     }
     state = stockMarket2.resolve({
       state,
-      actions: actionsOf([['alice', { orders: [{ kind: 'CANCEL', orderId }] }], ['bob', hold()]]),
+      actions: actionsOf([
+        ['alice', { orders: [{ kind: 'CANCEL', orderId }] }],
+        ['bob', hold()],
+      ]),
       rng,
     }).nextState;
     expect(state.openOrders).toHaveLength(0);
@@ -336,7 +399,10 @@ describe('stockMarket2.resolve — SYNTHETIC placeholder price process', () => {
     for (let i = 0; i < 500; i++) {
       state = stockMarket2.resolve({
         state,
-        actions: actionsOf([['alice', hold()], ['bob', hold()]]),
+        actions: actionsOf([
+          ['alice', hold()],
+          ['bob', hold()],
+        ]),
         rng: seedRng,
       }).nextState;
       expect(state.referencePriceCents).toBeGreaterThan(0);
@@ -350,7 +416,10 @@ describe('stockMarket2.resolve — SYNTHETIC placeholder price process', () => {
       references.add(state.referencePriceCents);
       state = stockMarket2.resolve({
         state,
-        actions: actionsOf([['alice', hold()], ['bob', hold()]]),
+        actions: actionsOf([
+          ['alice', hold()],
+          ['bob', hold()],
+        ]),
         rng,
       }).nextState;
     }
@@ -381,7 +450,10 @@ describe('stockMarket2.resolve — SYNTHETIC placeholder price process', () => {
     for (let i = 0; i < 3; i++) {
       state = stockMarket2.resolve({
         state,
-        actions: actionsOf([['alice', hold()], ['bob', hold()]]),
+        actions: actionsOf([
+          ['alice', hold()],
+          ['bob', hold()],
+        ]),
         rng,
       }).nextState;
     }
@@ -404,16 +476,37 @@ describe('stockMarket2.isTerminal / getResult / getStandingOutcomes', () => {
   it('is terminal only once exactly config.rounds rounds have been played', () => {
     let state = initialState({ rounds: 2 });
     expect(stockMarket2.isTerminal(state)).toBe(false);
-    state = stockMarket2.resolve({ state, actions: actionsOf([['alice', hold()], ['bob', hold()]]), rng }).nextState;
+    state = stockMarket2.resolve({
+      state,
+      actions: actionsOf([
+        ['alice', hold()],
+        ['bob', hold()],
+      ]),
+      rng,
+    }).nextState;
     expect(stockMarket2.isTerminal(state)).toBe(false);
-    state = stockMarket2.resolve({ state, actions: actionsOf([['alice', hold()], ['bob', hold()]]), rng }).nextState;
+    state = stockMarket2.resolve({
+      state,
+      actions: actionsOf([
+        ['alice', hold()],
+        ['bob', hold()],
+      ]),
+      rng,
+    }).nextState;
     expect(stockMarket2.isTerminal(state)).toBe(true);
   });
 
   it('reports the real symbol and real start/end dates in HISTORICAL mode', () => {
     let state = initialState({ mode: 'HISTORICAL', historyStartIndex: FIRST_DAY_INDEX, rounds: 2 });
     for (let i = 0; i < 2; i++) {
-      state = stockMarket2.resolve({ state, actions: actionsOf([['alice', hold()], ['bob', hold()]]), rng }).nextState;
+      state = stockMarket2.resolve({
+        state,
+        actions: actionsOf([
+          ['alice', hold()],
+          ['bob', hold()],
+        ]),
+        rng,
+      }).nextState;
     }
     const result = stockMarket2.getResult(state);
     expect(result.symbol).toBe('DENN');
@@ -485,7 +578,10 @@ describe('stockMarket2.isTerminal / getResult / getStandingOutcomes', () => {
   });
 
   it('can play a full HISTORICAL match through to the end of a long window without crashing', () => {
-    let state = initialState({ mode: 'HISTORICAL', historyStartIndex: FIRST_DAY_INDEX, rounds: 200 }, ['alice']);
+    let state = initialState(
+      { mode: 'HISTORICAL', historyStartIndex: FIRST_DAY_INDEX, rounds: 200 },
+      ['alice'],
+    );
     let seedRng = createRng(Buffer.alloc(16, 11));
     while (!stockMarket2.isTerminal(state)) {
       state = stockMarket2.resolve({
@@ -501,7 +597,9 @@ describe('stockMarket2.isTerminal / getResult / getStandingOutcomes', () => {
 
 describe('stockMarket2 — margin, shorting, and forced liquidation (config.risk.allowShortSelling)', () => {
   it('rejects maintenanceMarginRatio > initialMarginRatio', () => {
-    const result = stockMarket2.parseConfig({ risk: { initialMarginRatio: 0.3, maintenanceMarginRatio: 0.5 } });
+    const result = stockMarket2.parseConfig({
+      risk: { initialMarginRatio: 0.3, maintenanceMarginRatio: 0.5 },
+    });
     expect(result.ok).toBe(false);
   });
 
@@ -517,10 +615,23 @@ describe('stockMarket2 — margin, shorting, and forced liquidation (config.risk
       referencePriceCents: 15000,
       pendingLiquidity: { bids: [], asks: [{ priceCents: 15000, quantity: 1000 }] },
       portfolios: new Map([
-        ['alice', { cashCents: 9_000_000, shares: -500, averageEntryPriceCents: 10000, realizedPnlCents: 0, bankrupt: false }],
+        [
+          'alice',
+          {
+            cashCents: 9_000_000,
+            shares: -500,
+            averageEntryPriceCents: 10000,
+            realizedPnlCents: 0,
+            bankrupt: false,
+          },
+        ],
       ]),
     };
-    const { nextState } = stockMarket2.resolve({ state, actions: actionsOf([['alice', hold()]]), rng });
+    const { nextState } = stockMarket2.resolve({
+      state,
+      actions: actionsOf([['alice', hold()]]),
+      rng,
+    });
     const alice = nextState.portfolios.get('alice');
     expect(alice?.shares).toBe(0);
     expect(alice?.bankrupt).toBe(false);
@@ -541,10 +652,23 @@ describe('stockMarket2 — margin, shorting, and forced liquidation (config.risk
       referencePriceCents: 20000,
       pendingLiquidity: { bids: [], asks: [{ priceCents: 20000, quantity: 1000 }] },
       portfolios: new Map([
-        ['alice', { cashCents: 10_000_000, shares: -900, averageEntryPriceCents: 10000, realizedPnlCents: 0, bankrupt: false }],
+        [
+          'alice',
+          {
+            cashCents: 10_000_000,
+            shares: -900,
+            averageEntryPriceCents: 10000,
+            realizedPnlCents: 0,
+            bankrupt: false,
+          },
+        ],
       ]),
     };
-    const { nextState } = stockMarket2.resolve({ state, actions: actionsOf([['alice', hold()]]), rng });
+    const { nextState } = stockMarket2.resolve({
+      state,
+      actions: actionsOf([['alice', hold()]]),
+      rng,
+    });
     const alice = nextState.portfolios.get('alice');
     expect(alice?.bankrupt).toBe(true);
   });
@@ -555,7 +679,16 @@ describe('stockMarket2 — margin, shorting, and forced liquidation (config.risk
     state = {
       ...state,
       portfolios: new Map([
-        ['alice', { cashCents: 0, shares: 0, averageEntryPriceCents: 0, realizedPnlCents: 0, bankrupt: true }],
+        [
+          'alice',
+          {
+            cashCents: 0,
+            shares: 0,
+            averageEntryPriceCents: 0,
+            realizedPnlCents: 0,
+            bankrupt: true,
+          },
+        ],
       ]),
     };
     const rejected = stockMarket2.validateAction(state, 'alice', {
@@ -568,17 +701,35 @@ describe('stockMarket2 — margin, shorting, and forced liquidation (config.risk
   it('charges a daily borrow fee on a short position', () => {
     const marginConfig = config({
       mode: 'SYNTHETIC',
-      risk: { allowShortSelling: true, borrowFeeAnnualized: 0.365, initialMarginRatio: 0.5, maintenanceMarginRatio: 0.1 },
+      risk: {
+        allowShortSelling: true,
+        borrowFeeAnnualized: 0.365,
+        initialMarginRatio: 0.5,
+        maintenanceMarginRatio: 0.1,
+      },
     });
     let state = stockMarket2.initialize({ config: marginConfig, participantIds: ['alice'], rng });
     state = {
       ...state,
       portfolios: new Map([
-        ['alice', { cashCents: 10_000_000, shares: -100, averageEntryPriceCents: 10000, realizedPnlCents: 0, bankrupt: false }],
+        [
+          'alice',
+          {
+            cashCents: 10_000_000,
+            shares: -100,
+            averageEntryPriceCents: 10000,
+            realizedPnlCents: 0,
+            bankrupt: false,
+          },
+        ],
       ]),
     };
     const before = state.portfolios.get('alice')?.cashCents ?? 0;
-    const { nextState } = stockMarket2.resolve({ state, actions: actionsOf([['alice', hold()]]), rng });
+    const { nextState } = stockMarket2.resolve({
+      state,
+      actions: actionsOf([['alice', hold()]]),
+      rng,
+    });
     const after = nextState.portfolios.get('alice')?.cashCents ?? 0;
     expect(after).toBeLessThan(before);
     expect(nextState.riskStats.get('alice')?.borrowFeesPaidCents).toBeGreaterThan(0);
@@ -590,7 +741,9 @@ describe('stockMarket2 — margin, shorting, and forced liquidation (config.risk
     while (!stockMarket2.isTerminal(state)) {
       const observation = stockMarket2.getObservation(state, 'alice');
       const attempt: StockMarket2Action =
-        observation.market.bid !== null ? { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 5 }] } : hold();
+        observation.market.bid !== null
+          ? { orders: [{ kind: 'MARKET', side: 'SELL', quantity: 5 }] }
+          : hold();
       const validated = stockMarket2.validateAction(state, 'alice', attempt);
       const aliceAction = validated.ok ? validated.value : hold();
       state = stockMarket2.resolve({

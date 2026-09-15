@@ -29,7 +29,7 @@ import {
   DATASET_ID,
   DATASET_VERSION,
   DEFAULT_STORE_DIR,
-} from '../../../packages/market-data/scripts/seedFusionFundamentalV0.js';
+} from '../../../packages/stock-market-4/market-data/scripts/seedFusionFundamentalV0.js';
 import { buildResearchTimeline, TICKERS } from './runFusionFundamentalV0.js';
 
 const V0_ID = 'fusion-fundamental-v0';
@@ -77,14 +77,31 @@ function logDecision(
   );
 }
 
-const decideActionByParticipant: Record<string, (observation: StockMarket4Observation) => StockMarket4Action> = {
-  [V0_ID]: createDecideActionV0(undefined, (decision) => { logDecision(V0_ID, decision); }),
-  [V1_ID]: createDecideActionV1(undefined, (decision) => { logDecision(V1_ID, decision); }),
-  [V2_ID]: createDecideActionV2(undefined, (decision) => { logDecision(V2_ID, decision); }),
-  [V3_ID]: createDecideActionV3(undefined, (decision) => { logDecision(V3_ID, decision); }),
-  [V4_ID]: createDecideActionV4(undefined, (decision) => { logDecision(V4_ID, decision); }),
-  [V5_ID]: createDecideActionV5(undefined, (decision) => { logDecision(V5_ID, decision); }),
-  [V6_ID]: createDecideActionV6(undefined, (decision) => { logDecision(V6_ID, decision); }),
+const decideActionByParticipant: Record<
+  string,
+  (observation: StockMarket4Observation) => StockMarket4Action
+> = {
+  [V0_ID]: createDecideActionV0(undefined, (decision) => {
+    logDecision(V0_ID, decision);
+  }),
+  [V1_ID]: createDecideActionV1(undefined, (decision) => {
+    logDecision(V1_ID, decision);
+  }),
+  [V2_ID]: createDecideActionV2(undefined, (decision) => {
+    logDecision(V2_ID, decision);
+  }),
+  [V3_ID]: createDecideActionV3(undefined, (decision) => {
+    logDecision(V3_ID, decision);
+  }),
+  [V4_ID]: createDecideActionV4(undefined, (decision) => {
+    logDecision(V4_ID, decision);
+  }),
+  [V5_ID]: createDecideActionV5(undefined, (decision) => {
+    logDecision(V5_ID, decision);
+  }),
+  [V6_ID]: createDecideActionV6(undefined, (decision) => {
+    logDecision(V6_ID, decision);
+  }),
 };
 
 const rng = createRng(Buffer.alloc(16)); // unused — stock-market-4 is fully deterministic
@@ -94,7 +111,9 @@ let state = stockMarket4.initialize({
   rng,
 });
 
-console.log(`Running ${participantIds.join(' vs ')}, ${startDate} -> ${endDate}, real engine, shorting ENABLED.\n`);
+console.log(
+  `Running ${participantIds.join(' vs ')}, ${startDate} -> ${endDate}, real engine, shorting ENABLED.\n`,
+);
 
 // `getObservation` on the final, terminal state reports `date: null` — past the last trading day,
 // with no mark price left to value positions at (`marketValueCents`/`unrealizedPnlCents` both go
@@ -129,17 +148,23 @@ console.log(`Rounds played: ${String(result.totalRounds)}`);
 for (const participantId of participantIds) {
   const metrics = result.performanceMetrics[participantId];
   console.log(`\n${participantId}:`);
-  console.log(`  Final equity: $${((result.finalEquityCents[participantId] ?? 0) / 100).toFixed(2)}`);
+  console.log(
+    `  Final equity: $${((result.finalEquityCents[participantId] ?? 0) / 100).toFixed(2)}`,
+  );
   if (metrics) {
     console.log(`  Total return: ${(metrics.totalReturn * 100).toFixed(2)}%`);
     console.log(`  Max drawdown: ${(metrics.maxDrawdown * 100).toFixed(2)}%`);
     // console.log(`  Annualized volatility: ${(metrics.annualizedVolatility * 100).toFixed(2)}%`);
-    console.log(`  Sharpe ratio: ${metrics.sharpeRatio === null ? 'n/a (no variance)' : metrics.sharpeRatio.toFixed(2)}`);
+    console.log(
+      `  Sharpe ratio: ${metrics.sharpeRatio === null ? 'n/a (no variance)' : metrics.sharpeRatio.toFixed(2)}`,
+    );
   }
 }
 
 if (result.benchmarkReturn !== null) {
-  console.log(`\nELMT buy-and-hold return over the same window: ${(result.benchmarkReturn * 100).toFixed(2)}%`);
+  console.log(
+    `\nELMT buy-and-hold return over the same window: ${(result.benchmarkReturn * 100).toFixed(2)}%`,
+  );
 }
 
 console.log('\n--- Final Portfolios ---');

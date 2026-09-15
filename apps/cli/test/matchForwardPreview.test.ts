@@ -29,7 +29,11 @@ afterEach(async () => {
 const VALID_FORWARD_CONFIG = {
   gameType: 'FORWARD_SHADOW',
   marketDataUniverse: ['ELMT'],
-  marketDataset: { id: 'fusion-fundamental-v0', version: '3', storeDir: './.thunderdome/market-data' },
+  marketDataset: {
+    id: 'fusion-fundamental-v0',
+    version: '3',
+    storeDir: './.thunderdome/market-data',
+  },
   startDate: '2026-07-13',
   endDate: '2026-12-31',
 };
@@ -59,10 +63,10 @@ describe('runMatchForwardPreviewCommand: validation paths (no Docker touched)', 
   it('exits 1 with usage when matchId or --config-file is missing', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     expect(await runMatchForwardPreviewCommand([], { rootDir: repoRoot })).toBe(1);
-    expect(
-      await runMatchForwardPreviewCommand(['some-match'], { rootDir: repoRoot }),
-    ).toBe(1);
-    expect(error).toHaveBeenCalledWith(expect.stringContaining('Usage: thunderdome match forward preview'));
+    expect(await runMatchForwardPreviewCommand(['some-match'], { rootDir: repoRoot })).toBe(1);
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('Usage: thunderdome match forward preview'),
+    );
   });
 
   it('exits 1 when the match does not exist', async () => {
@@ -106,8 +110,11 @@ describe('runMatchForwardPreviewCommand: validation paths (no Docker touched)', 
     expect(error).toHaveBeenCalledWith(expect.stringContaining('not valid JSON'));
   });
 
-  it('exits 1 when --config-file fails the game\'s own schema', async () => {
-    const saved = await saveForwardMatchRecord(storeDir, sampleRecord({ config: VALID_FORWARD_CONFIG }));
+  it("exits 1 when --config-file fails the game's own schema", async () => {
+    const saved = await saveForwardMatchRecord(
+      storeDir,
+      sampleRecord({ config: VALID_FORWARD_CONFIG }),
+    );
     expect(saved.ok).toBe(true);
     const configPath = join(root, 'config.json');
     await writeFile(configPath, '{}', 'utf8');

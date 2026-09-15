@@ -702,7 +702,7 @@ describe('runAvailableRounds', () => {
     expect(collector.calls[0]?.roundId).toBe(7);
   });
 
-  it('awaits onRoundResolved before requesting the next round\'s actions', async () => {
+  it("awaits onRoundResolved before requesting the next round's actions", async () => {
     const game = makeRaceGame(4);
     const state = game.initialize({ config: undefined, participantIds: ['p1'], rng });
     const order: string[] = [];

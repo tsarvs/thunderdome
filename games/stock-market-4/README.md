@@ -1,7 +1,7 @@
 # Stock Market 4
 
 Where [`stock-market-2`](../stock-market-2/README.md) and [`stock-market-3`](../stock-market-3/README.md)
-*simulate* a market — a hidden price model, a hidden macro economy, an order book matching bots
+_simulate_ a market — a hidden price model, a hidden macro economy, an order book matching bots
 against each other — this version **replays one**. You supply the daily bars (real historical
 data, or a synthetic series you generated yourself); the game replays them day by day, gated so a
 bot never sees a bar, corporate action, or research payload before its own date. Nothing here
@@ -120,7 +120,9 @@ const observation = stockMarket4.getObservation(state0, 'alice');
 
 const { nextState } = stockMarket4.resolve({
   state: state0,
-  actions: new Map([['alice', { orders: [{ kind: 'MARKET', ticker: 'ACME', side: 'BUY', quantity: 10 }] }]]),
+  actions: new Map([
+    ['alice', { orders: [{ kind: 'MARKET', ticker: 'ACME', side: 'BUY', quantity: 10 }] }],
+  ]),
   rng,
 });
 
@@ -129,7 +131,7 @@ stockMarket4.isTerminal(nextState); // false — 3 more trading days left
 
 ### 4. Feed in research (optional)
 
-`config.researchTimeline` is a list of `{ date, payload }` entries — `payload` can be *anything*,
+`config.researchTimeline` is a list of `{ date, payload }` entries — `payload` can be _anything_,
 the game never looks inside it. The simplest possible version:
 
 ```ts
@@ -141,7 +143,7 @@ const researchTimeline = [
 A bot decides what a `research.payload` even means; this game just delivers the latest one whose
 `date` has arrived, via `observation.research`. The real, structured way to build one — what
 [`fusion-fundamental-v0`](../../bots/stock-market-4/fusion-fundamental-v0/README.md) actually
-uses — is [`@thunderdome/research-core`](../../packages/research/core/README.md)'s
+uses — is [`@thunderdome/research-core`](../../packages/stock-market-4/research/core/README.md)'s
 `createResearchSnapshot(dataset, timestamp)`, called once per date you want to reveal:
 
 ```ts
@@ -210,7 +212,7 @@ A `'HISTORICAL'` match plays a fixed window of prices you already have, start to
 sitting, then it's over. A `'FORWARD_SHADOW'` match instead plays against a dataset that's still
 growing in the real world: you run it today, it plays every real trading day currently known and
 then stops (not an error — `list`/`inspect` show it as `active`, "still resumable"); you run the
-*exact same command* again next week, once more real bars have actually happened, and it picks up
+_exact same command_ again next week, once more real bars have actually happened, and it picks up
 exactly where it left off, with the bot's portfolio and history intact. Nothing about a bot's own
 decision logic changes — only how much real data currently exists to show it.
 
@@ -224,10 +226,10 @@ yarn workspace @thunderdome/market-data run seed:fusion-fundamental-v0
 ```
 
 This publishes dataset id `fusion-fundamental-v0` (check its own script,
-[`packages/market-data/scripts/seedFusionFundamentalV0.ts`](../../packages/market-data/scripts/seedFusionFundamentalV0.ts),
+[`packages/stock-market-4/market-data/scripts/seedFusionFundamentalV0.ts`](../../packages/stock-market-4/market-data/scripts/seedFusionFundamentalV0.ts),
 for the current `DATASET_VERSION` — it bumps whenever the published data itself is corrected) into
 `.thunderdome/market-data/` (gitignored local state, not committed). See
-[`@thunderdome/market-data`'s own README](../../packages/market-data/README.md) for the full
+[`@thunderdome/market-data`'s own README](../../packages/stock-market-4/market-data/README.md) for the full
 picture, including tracking a brand-new ticker of your own.
 
 **Growing it later, with no LLM and no manual data-entry**, once you want more recent real prices
@@ -253,12 +255,12 @@ see its own script for the exact shape.)
 (the default), it correctly has nothing to react to and sits out every round, which looks like a
 bug the first time you see it but isn't one.
 
-If your bot uses [`@thunderdome/research-fusion`](../../packages/research/fusion/README.md)'s
+If your bot uses [`@thunderdome/research-fusion`](../../packages/stock-market-4/research/fusion/README.md)'s
 fixture (as every `fusion-fundamental-*` version does), generate a real `researchTimeline` from it:
 
 ```bash
 STORE_DIR="$(pwd)/.thunderdome/market-data"
-(cd packages/research/fusion && yarn run emit:forward-config --silent -- \
+(cd packages/stock-market-4/research/fusion && yarn run emit:forward-config --silent -- \
   --market-dataset-id fusion-fundamental-v0 --market-dataset-version <the version you seeded> \
   --start-date 2026-07-13 --end-date 2026-12-31 --as-of-date "$(date +%F)" \
   --universe ELMT,FURUKAWA,VITZRONEXTECH,ALM,FREEM,OPTX,GFUZ,FUJIKURA,SUMITOMO,KMT,AMSC \
@@ -272,7 +274,7 @@ shell allows as an inline argument, which is exactly why this writes to a file r
 printing something you'd paste inline. `--start-date` matters: pick one that's actually within
 every tracked ticker's real trading history (a company that IPO'd partway through your dataset's
 window has no earlier data to show, real or otherwise — check
-[`@thunderdome/market-data`'s README](../../packages/market-data/README.md) if a ticker isn't
+[`@thunderdome/market-data`'s README](../../packages/stock-market-4/market-data/README.md) if a ticker isn't
 covering the range you expected). `--end-date` should be far in the future (e.g. the end of the
 year) — **not** "today," or your match will immediately flip to `completed` the moment real data
 catches up to it, rather than staying `active`/resumable for the long haul.
@@ -437,7 +439,7 @@ one step. See [`portfolio/accounting.ts`](src/portfolio/accounting.ts),
 completely opaque to this game. No schema, no validation of its shape, no interpretation. A bot
 sees `observation.research`: the latest entry with `date` at or before the current round, or
 `undefined` if none is knowable yet. This game deliberately doesn't import
-[`@thunderdome/research-core`](../../packages/research/core/README.md) or know that it exists —
+[`@thunderdome/research-core`](../../packages/stock-market-4/research/core/README.md) or know that it exists —
 the intended real-world flow is to call that package's own `createResearchSnapshot(dataset,
 timestamp)` yourself, outside this game entirely, and hand the resulting JSON straight through
 here. See [`research/timeline.ts`](src/research/timeline.ts).
@@ -451,7 +453,7 @@ reading at match start, one more per round. At match end, `getResult` reports ea
 compute one from). Annualization uses 252 trading days/year throughout, the same convention the
 borrow-fee calculation uses. Optionally declare `config.benchmarkTicker` (any ticker with a
 `historicalPrices` entry — it doesn't need to be in `marketDataUniverse`, since a benchmark is
-something performance is measured *against*, not necessarily something a bot can trade) for a
+something performance is measured _against_, not necessarily something a bot can trade) for a
 buy-and-hold `benchmarkReturn` over the same first-to-last trading day the match actually played.
 See [`metrics/performance.ts`](src/metrics/performance.ts).
 

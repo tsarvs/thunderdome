@@ -14,12 +14,48 @@ export interface RegimeProfile {
 }
 
 export const REGIME_PROFILES: Record<MarketRegime, RegimeProfile> = {
-  BULL: { driftPerRound: 0.0008, volatilityMultiplier: 0.9, liquidityMultiplier: 1.1, eventFrequencyMultiplier: 1.0, negativeBias: -0.3 },
-  BEAR: { driftPerRound: -0.0008, volatilityMultiplier: 1.1, liquidityMultiplier: 0.9, eventFrequencyMultiplier: 1.1, negativeBias: 0.3 },
-  SIDEWAYS: { driftPerRound: 0, volatilityMultiplier: 0.8, liquidityMultiplier: 1.0, eventFrequencyMultiplier: 0.8, negativeBias: 0 },
-  HIGH_VOLATILITY: { driftPerRound: 0, volatilityMultiplier: 2.0, liquidityMultiplier: 0.8, eventFrequencyMultiplier: 1.4, negativeBias: 0.1 },
-  LOW_VOLATILITY: { driftPerRound: 0, volatilityMultiplier: 0.5, liquidityMultiplier: 1.2, eventFrequencyMultiplier: 0.6, negativeBias: 0 },
-  CRISIS: { driftPerRound: -0.003, volatilityMultiplier: 3.0, liquidityMultiplier: 0.4, eventFrequencyMultiplier: 2.0, negativeBias: 0.8 },
+  BULL: {
+    driftPerRound: 0.0008,
+    volatilityMultiplier: 0.9,
+    liquidityMultiplier: 1.1,
+    eventFrequencyMultiplier: 1.0,
+    negativeBias: -0.3,
+  },
+  BEAR: {
+    driftPerRound: -0.0008,
+    volatilityMultiplier: 1.1,
+    liquidityMultiplier: 0.9,
+    eventFrequencyMultiplier: 1.1,
+    negativeBias: 0.3,
+  },
+  SIDEWAYS: {
+    driftPerRound: 0,
+    volatilityMultiplier: 0.8,
+    liquidityMultiplier: 1.0,
+    eventFrequencyMultiplier: 0.8,
+    negativeBias: 0,
+  },
+  HIGH_VOLATILITY: {
+    driftPerRound: 0,
+    volatilityMultiplier: 2.0,
+    liquidityMultiplier: 0.8,
+    eventFrequencyMultiplier: 1.4,
+    negativeBias: 0.1,
+  },
+  LOW_VOLATILITY: {
+    driftPerRound: 0,
+    volatilityMultiplier: 0.5,
+    liquidityMultiplier: 1.2,
+    eventFrequencyMultiplier: 0.6,
+    negativeBias: 0,
+  },
+  CRISIS: {
+    driftPerRound: -0.003,
+    volatilityMultiplier: 3.0,
+    liquidityMultiplier: 0.4,
+    eventFrequencyMultiplier: 2.0,
+    negativeBias: 0.8,
+  },
 };
 
 export const INITIAL_REGIME: MarketRegime = 'SIDEWAYS';

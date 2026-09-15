@@ -3,20 +3,21 @@ import { createFusionFixtureDataset } from '@thunderdome/research-fusion';
 import {
   computePerformanceMetrics,
 } from '@thunderdome/game-stock-market-4/dist/metrics/performance.js';
+import {
+  buildOrders,
+  type DailyBar,
+  type EquityPoint,
+  type OrderPolicy,
+  type OrderRequest,
+  type PortfolioObservation,
+  type PortfolioStrategyName,
+  type ResearchAblationMode,
+  type SecurityMarketObservation,
+  type StockMarket4Observation,
+} from '@thunderdome/quant-sdk-js';
 import { applyOrdersMultiTicker } from './portfolioLedger.js';
-import { buildOrders, type OrderPolicy } from '../src/portfolio.js';
 import { DEFAULT_FUSION_QUANT_CONFIG, type FusionQuantConfig } from '../src/config.js';
 import { createDecideAction as createQuantDecideAction } from '../src/index.js';
-import type { PortfolioStrategyName } from '../src/portfolio/select.js';
-import type { ResearchAblationMode } from '../src/ablation.js';
-import type {
-  DailyBar,
-  EquityPoint,
-  OrderRequest,
-  PortfolioObservation,
-  SecurityMarketObservation,
-  StockMarket4Observation,
-} from '../src/marketTypes.js';
 import { ELMT_REAL_HISTORICAL_PRICES } from './elmtHistoricalPrices.js';
 import { FURUKAWA_REAL_HISTORICAL_PRICES } from './furukawaHistoricalPrices.js';
 import { VITZRO_NEXTECH_REAL_HISTORICAL_PRICES } from './vitzroNextechHistoricalPrices.js';
@@ -298,7 +299,7 @@ export interface WalkForwardReport {
  * price history, `numFolds: 3` gives ~24-day folds — real out-of-sample slices, correctly isolated
  * from each other and from the future, but a small enough sample that no single number here should
  * be read as a settled verdict on any strategy. This gets more meaningful as
- * `packages/market-data/scripts/fetchAndAppendBars.ts` accumulates more real history.
+ * `packages/stock-market-4/market-data/scripts/fetchAndAppendBars.ts` accumulates more real history.
  */
 export async function runWalkForward(params: {
   priceSeriesByTicker?: Record<string, DailyBar[]>;

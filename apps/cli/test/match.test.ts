@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { printPortfolioSummaries, printSecurityPriceTable, printStockPriceRange } from '../src/commands/match.js';
+import {
+  printPortfolioSummaries,
+  printSecurityPriceTable,
+  printStockPriceRange,
+} from '../src/commands/match.js';
 
 describe('printStockPriceRange', () => {
   afterEach(() => {
@@ -89,14 +93,24 @@ describe('printPortfolioSummaries', () => {
           cash: 5000,
           equity: 10500.5,
           bankrupt: false,
-          positions: [{ symbol: 'ACME', shares: 100, averageEntryPrice: 90, marketValue: 14021, unrealizedPnl: 5021 }],
+          positions: [
+            {
+              symbol: 'ACME',
+              shares: 100,
+              averageEntryPrice: 90,
+              marketValue: 14021,
+              unrealizedPnl: 5021,
+            },
+          ],
         },
         bob: { cash: 0, equity: 0, bankrupt: true, positions: [] },
       },
     });
     expect(log).toHaveBeenCalledWith('  Bot portfolios:');
     expect(log).toHaveBeenCalledWith('    alice: equity $10500.50, cash $5000.00');
-    expect(log).toHaveBeenCalledWith('      ACME: 100 sh @ avg $90.00, value $14021.00 (+$5021.00 unrealized)');
+    expect(log).toHaveBeenCalledWith(
+      '      ACME: 100 sh @ avg $90.00, value $14021.00 (+$5021.00 unrealized)',
+    );
     expect(log).toHaveBeenCalledWith('    bob: equity $0.00, cash $0.00 [BANKRUPT]');
     expect(log).toHaveBeenCalledWith('      (no open positions)');
   });

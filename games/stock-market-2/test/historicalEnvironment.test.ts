@@ -16,7 +16,12 @@ function conditionsFor(
   round: number,
   previousFundamentalValueCents = 0,
 ) {
-  return environment.conditionsFor({ round, rng, previousFundamentalValueCents, previousRegime: INITIAL_REGIME });
+  return environment.conditionsFor({
+    round,
+    rng,
+    previousFundamentalValueCents,
+    previousRegime: INITIAL_REGIME,
+  });
 }
 
 function config(overrides: Record<string, unknown> = {}) {
@@ -37,12 +42,22 @@ describe('resolveHistoryStartIndex', () => {
   const provider = loadDennProvider();
 
   it('uses the pinned index as-is when given', () => {
-    expect(resolveHistoryStartIndex(config({ historyStartIndex: 42, rounds: 10 }), provider, rng)).toBe(42);
+    expect(
+      resolveHistoryStartIndex(config({ historyStartIndex: 42, rounds: 10 }), provider, rng),
+    ).toBe(42);
   });
 
   it('draws deterministically from a seed when omitted', () => {
-    const a = resolveHistoryStartIndex(config({ rounds: 10 }), provider, createRng(Buffer.alloc(16, 7)));
-    const b = resolveHistoryStartIndex(config({ rounds: 10 }), provider, createRng(Buffer.alloc(16, 7)));
+    const a = resolveHistoryStartIndex(
+      config({ rounds: 10 }),
+      provider,
+      createRng(Buffer.alloc(16, 7)),
+    );
+    const b = resolveHistoryStartIndex(
+      config({ rounds: 10 }),
+      provider,
+      createRng(Buffer.alloc(16, 7)),
+    );
     expect(a).toBe(b);
   });
 

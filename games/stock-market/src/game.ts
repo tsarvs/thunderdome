@@ -380,7 +380,8 @@ export const stockMarket: GameDefinition<
     // linear model where impact per share never tapers off, letting a run of same-direction
     // trades in a growing portfolio spiral into runaway price feedback.
     const netDemand = sharesBought - sharesSold;
-    const marketPressure = Math.sign(netDemand) * state.config.marketImpactFactor * Math.sqrt(Math.abs(netDemand));
+    const marketPressure =
+      Math.sign(netDemand) * state.config.marketImpactFactor * Math.sqrt(Math.abs(netDemand));
 
     const priceDollars = toDollars(state.priceCents);
     const fundamentalPressure =

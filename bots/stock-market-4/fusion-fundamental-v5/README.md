@@ -108,7 +108,7 @@ for the design. Worked example, seeding a real dataset from this bot's own track
 
 ```ts
 // seed a market-data dataset from this bot's own real price history (see
-// packages/market-data/README.md for publishDatasetVersion/appendBars)
+// packages/stock-market-4/market-data/README.md for publishDatasetVersion/appendBars)
 import { createMarketDataStore, publishDatasetVersion } from '@thunderdome/market-data';
 import { ELMT_REAL_HISTORICAL_PRICES } from './backtest/elmtHistoricalPrices.js';
 import { ALMONTY_REAL_HISTORICAL_PRICES } from './backtest/almontyHistoricalPrices.js';

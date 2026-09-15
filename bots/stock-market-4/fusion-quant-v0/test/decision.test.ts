@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { computeTradingDecisions, type DailyBar, type PortfolioObservation } from '@thunderdome/quant-sdk-js';
 import { DEFAULT_FUSION_QUANT_CONFIG } from '../src/config.js';
-import { computeTradingDecisions } from '../src/decision.js';
-import type { DailyBar, PortfolioObservation } from '../src/marketTypes.js';
+import { FUSION_DOMAIN_ADAPTER } from '../src/index.js';
 import { emptyPortfolio, fusionStateAt } from './support/fixtures.js';
 
 const DATE = '2026-09-11';
@@ -28,6 +28,7 @@ function baseParams(portfolio: PortfolioObservation) {
   return {
     date: DATE,
     config: DEFAULT_FUSION_QUANT_CONFIG,
+    domain: FUSION_DOMAIN_ADAPTER,
     previousResearchState: undefined,
     currentResearchState: RESEARCH_STATE,
     currentPricesByTicker,

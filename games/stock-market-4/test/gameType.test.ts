@@ -47,9 +47,13 @@ let dir: string;
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'sm4-gametype-'));
   const store = createMarketDataStore(join(dir, `${DATASET_ID}.sqlite`));
-  const published = publishDatasetVersion(store, { id: DATASET_ID, version: DATASET_VERSION }, {
-    bars: { FAST: FAST_BARS, SLOW: SLOW_BARS, STALE: STALE_BAR, BENCH: BENCH_BARS },
-  });
+  const published = publishDatasetVersion(
+    store,
+    { id: DATASET_ID, version: DATASET_VERSION },
+    {
+      bars: { FAST: FAST_BARS, SLOW: SLOW_BARS, STALE: STALE_BAR, BENCH: BENCH_BARS },
+    },
+  );
   if (!published.ok) throw new Error(published.reason);
 });
 
@@ -146,7 +150,10 @@ describe('FORWARD_SHADOW calendar trimming', () => {
 
   it('throws at initialize() when there are zero playable trading days', () => {
     const configResult = stockMarket4.parseConfig(
-      marketDatasetConfigInput({ gameType: 'FORWARD_SHADOW', marketDataUniverse: ['FAST', 'STALE'] }),
+      marketDatasetConfigInput({
+        gameType: 'FORWARD_SHADOW',
+        marketDataUniverse: ['FAST', 'STALE'],
+      }),
     );
     if (!configResult.ok) throw new Error(configResult.reason);
     expect(() =>

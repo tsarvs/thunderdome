@@ -32,13 +32,16 @@ function runOne(vetoThreshold: number) {
   };
 }
 
-console.log(`v2 benchmark (same window): return ${V2_BENCHMARK.totalReturnPct.toFixed(2)}%, ` +
-  `drawdown ${V2_BENCHMARK.maxDrawdownPct.toFixed(2)}%, Sharpe ${V2_BENCHMARK.sharpeRatio.toFixed(2)}\n`);
+console.log(
+  `v2 benchmark (same window): return ${V2_BENCHMARK.totalReturnPct.toFixed(2)}%, ` +
+    `drawdown ${V2_BENCHMARK.maxDrawdownPct.toFixed(2)}%, Sharpe ${V2_BENCHMARK.sharpeRatio.toFixed(2)}\n`,
+);
 
 console.log('vetoThreshold  totalReturn  maxDrawdown  sharpe  beatsV2');
 for (const vetoThreshold of VETO_THRESHOLD_CANDIDATES) {
   const row = runOne(vetoThreshold);
-  const beatsV2 = row.sharpeRatio !== null && row.sharpeRatio > V2_BENCHMARK.sharpeRatio ? 'YES' : '';
+  const beatsV2 =
+    row.sharpeRatio !== null && row.sharpeRatio > V2_BENCHMARK.sharpeRatio ? 'YES' : '';
   console.log(
     `${row.vetoThreshold.toFixed(2).padStart(13)}  ` +
       `${row.totalReturnPct.toFixed(2).padStart(10)}%  ` +

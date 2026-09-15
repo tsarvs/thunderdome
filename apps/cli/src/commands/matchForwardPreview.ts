@@ -45,7 +45,11 @@ function ordersByTicker(action: unknown): Map<string, unknown> {
   const orders = (action as Record<string, unknown>).orders;
   if (!Array.isArray(orders)) return byTicker;
   for (const order of orders) {
-    if (typeof order === 'object' && order !== null && typeof (order as Record<string, unknown>).ticker === 'string') {
+    if (
+      typeof order === 'object' &&
+      order !== null &&
+      typeof (order as Record<string, unknown>).ticker === 'string'
+    ) {
       byTicker.set((order as Record<string, unknown>).ticker as string, order);
     }
   }
@@ -91,7 +95,9 @@ export async function runMatchForwardPreviewCommand(
   const loadOutcome = await loadForwardMatchRecord(storeDir, matchId);
   if (loadOutcome.status !== 'found') {
     console.error(
-      loadOutcome.status === 'corrupt' ? loadOutcome.reason : `No forward match record found for "${matchId}".`,
+      loadOutcome.status === 'corrupt'
+        ? loadOutcome.reason
+        : `No forward match record found for "${matchId}".`,
     );
     return 1;
   }
@@ -101,14 +107,18 @@ export async function runMatchForwardPreviewCommand(
   try {
     freshConfigString = await readFile(values['config-file'], 'utf8');
   } catch (error) {
-    console.error(`Could not read --config-file "${values['config-file']}": ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `Could not read --config-file "${values['config-file']}": ${error instanceof Error ? error.message : String(error)}`,
+    );
     return 1;
   }
   let freshConfigRaw: unknown;
   try {
     freshConfigRaw = JSON.parse(freshConfigString);
   } catch (error) {
-    console.error(`--config-file is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `--config-file is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    );
     return 1;
   }
 
@@ -127,7 +137,9 @@ export async function runMatchForwardPreviewCommand(
 
   const storedConfigResult = game.parseConfig(record.config);
   if (!storedConfigResult.ok) {
-    console.error(`Match "${matchId}"'s own stored config is no longer valid: ${storedConfigResult.reason}`);
+    console.error(
+      `Match "${matchId}"'s own stored config is no longer valid: ${storedConfigResult.reason}`,
+    );
     return 1;
   }
   const freshConfigResult = game.parseConfig(freshConfigRaw);
@@ -192,7 +204,11 @@ export async function runMatchForwardPreviewCommand(
       });
       openAction = outcome.ok ? outcome.action : undefined;
     } finally {
-      await Promise.all([...openLifecycles.values()].map((lifecycle) => lifecycle.finish({ result: null, reason: 'aborted' })));
+      await Promise.all(
+        [...openLifecycles.values()].map((lifecycle) =>
+          lifecycle.finish({ result: null, reason: 'aborted' }),
+        ),
+      );
       untrackLifecycles(openLifecycles);
     }
 
@@ -216,7 +232,11 @@ export async function runMatchForwardPreviewCommand(
       });
       nowAction = outcome.ok ? outcome.action : undefined;
     } finally {
-      await Promise.all([...nowLifecycles.values()].map((lifecycle) => lifecycle.finish({ result: null, reason: 'aborted' })));
+      await Promise.all(
+        [...nowLifecycles.values()].map((lifecycle) =>
+          lifecycle.finish({ result: null, reason: 'aborted' }),
+        ),
+      );
       untrackLifecycles(nowLifecycles);
     }
 

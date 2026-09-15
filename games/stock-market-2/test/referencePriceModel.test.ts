@@ -34,18 +34,26 @@ describe('computeReferencePriceCents', () => {
   });
 
   it('a higher meanReversionFactor closes more of the gap in one round', () => {
-    const slow = computeReferencePriceCents(baseArgs({ fundamentalValueCents: 12000, meanReversionFactor: 0.1 }));
-    const fast = computeReferencePriceCents(baseArgs({ fundamentalValueCents: 12000, meanReversionFactor: 0.9 }));
+    const slow = computeReferencePriceCents(
+      baseArgs({ fundamentalValueCents: 12000, meanReversionFactor: 0.1 }),
+    );
+    const fast = computeReferencePriceCents(
+      baseArgs({ fundamentalValueCents: 12000, meanReversionFactor: 0.9 }),
+    );
     expect(fast).toBeGreaterThan(slow);
   });
 
   it('meanReversionFactor 1 snaps exactly to the fundamental value when there is no other noise', () => {
-    const price = computeReferencePriceCents(baseArgs({ fundamentalValueCents: 12345, meanReversionFactor: 1 }));
+    const price = computeReferencePriceCents(
+      baseArgs({ fundamentalValueCents: 12345, meanReversionFactor: 1 }),
+    );
     expect(price).toBe(12345);
   });
 
   it('meanReversionFactor 0 ignores the fundamental value entirely', () => {
-    const price = computeReferencePriceCents(baseArgs({ fundamentalValueCents: 999999, meanReversionFactor: 0 }));
+    const price = computeReferencePriceCents(
+      baseArgs({ fundamentalValueCents: 999999, meanReversionFactor: 0 }),
+    );
     expect(price).toBe(10000);
   });
 
@@ -61,7 +69,11 @@ describe('computeReferencePriceCents', () => {
 
   it('CRISIS scales the random shock wider than SIDEWAYS, given the same rng draws', () => {
     const sideways = computeReferencePriceCents(
-      baseArgs({ referenceVolatility: 0.1, regime: 'SIDEWAYS', rng: createRng(Buffer.alloc(16, 9)) }),
+      baseArgs({
+        referenceVolatility: 0.1,
+        regime: 'SIDEWAYS',
+        rng: createRng(Buffer.alloc(16, 9)),
+      }),
     );
     const crisis = computeReferencePriceCents(
       baseArgs({ referenceVolatility: 0.1, regime: 'CRISIS', rng: createRng(Buffer.alloc(16, 9)) }),
@@ -77,7 +89,10 @@ describe('computeReferencePriceCents', () => {
   });
 
   it('is deterministic given the same seed', () => {
-    const build = () => computeReferencePriceCents(baseArgs({ referenceVolatility: 0.05, rng: createRng(Buffer.alloc(16, 7)) }));
+    const build = () =>
+      computeReferencePriceCents(
+        baseArgs({ referenceVolatility: 0.05, rng: createRng(Buffer.alloc(16, 7)) }),
+      );
     expect(build()).toBe(build());
   });
 });

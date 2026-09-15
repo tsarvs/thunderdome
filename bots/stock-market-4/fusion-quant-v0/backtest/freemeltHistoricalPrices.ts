@@ -1,4 +1,4 @@
-import type { DailyBar } from '../src/marketTypes.js';
+import type { DailyBar } from '@thunderdome/quant-sdk-js';
 
 /**
  * Freemelt Holding AB (STO:FREEM) REAL daily price history, pulled from stockanalysis.com on
@@ -8,7 +8,7 @@ import type { DailyBar } from '../src/marketTypes.js';
  * `RAW_SEK` is kept alongside the converted export so the conversion is auditable.
  *
  * The 2026-09-09 bar (+~30% on the day) is the real market reaction to the Freemelt/F4E JT-60SA
- * tungsten-component order announced that same day (see `../../../packages/research/fusion`'s
+ * tungsten-component order announced that same day (see `../../../packages/stock-market-4/research/fusion`'s
  * Sept 9, 2026 research update) — this is genuinely the acceptance-case pairing for this security,
  * the same role ELMT/Sept-8 plays for ELMT.
  */

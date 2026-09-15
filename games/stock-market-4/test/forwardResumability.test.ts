@@ -47,7 +47,9 @@ function noopActions(): Map<string, StockMarket4Action> {
 function actionsFor(round: number): Map<string, StockMarket4Action> {
   const actions = noopActions();
   if (round === 0) {
-    actions.set('alice', { orders: [{ kind: 'MARKET', ticker: 'FAST', side: 'BUY', quantity: 5 }] });
+    actions.set('alice', {
+      orders: [{ kind: 'MARKET', ticker: 'FAST', side: 'BUY', quantity: 5 }],
+    });
   }
   return actions;
 }
@@ -72,7 +74,12 @@ function seedDataset(storeDir: string, barsThroughIndex: number): void {
   const published = publishDatasetVersion(
     store,
     { id: DATASET_ID, version: DATASET_VERSION },
-    { bars: { FAST: FAST_BARS.slice(0, barsThroughIndex + 1), SLOW: SLOW_BARS.slice(0, barsThroughIndex + 1) } },
+    {
+      bars: {
+        FAST: FAST_BARS.slice(0, barsThroughIndex + 1),
+        SLOW: SLOW_BARS.slice(0, barsThroughIndex + 1),
+      },
+    },
   );
   if (!published.ok) throw new Error(published.reason);
 }
@@ -159,7 +166,11 @@ function playGrowingMatch(
     if (restartEveryRound) {
       const json = JSON.stringify(serializeForwardState(state));
       const snapshot = JSON.parse(json) as ReturnType<typeof serializeForwardState>;
-      state = resumeForwardState({ config: configResult.value, participantIds: PARTICIPANT_IDS, snapshot });
+      state = resumeForwardState({
+        config: configResult.value,
+        participantIds: PARTICIPANT_IDS,
+        snapshot,
+      });
     }
 
     if (stockMarket4.isTerminal(state)) {
@@ -245,7 +256,7 @@ describe('forward-match resumability', () => {
     expect(resumed.forwardShadowCutoffDate).toBe('2026-01-06');
   });
 
-  it('isForwardMatchFullyResolved is false while data hasn\'t caught up to endDate, true once it has', () => {
+  it("isForwardMatchFullyResolved is false while data hasn't caught up to endDate, true once it has", () => {
     seedDataset(dir, 0);
     const configResult = stockMarket4.parseConfig(configInput(dir));
     if (!configResult.ok) throw new Error(configResult.reason);

@@ -6,7 +6,7 @@ import { INITIAL_REGIME, REGIME_PROFILES, nextRegime } from './regime.js';
 
 const NO_EVENT_YET: DailyMarketConditions['event'] = {
   type: 'NO_NEWS',
-  description: 'No news yet — round 0 is the match\'s pinned starting point.',
+  description: "No news yet — round 0 is the match's pinned starting point.",
 };
 
 /**
@@ -27,7 +27,12 @@ export function createSyntheticMarketEnvironment(
   const initialPriceCents = toCents(profile.initialPrice);
 
   return {
-    conditionsFor({ round, rng, previousFundamentalValueCents, previousRegime }): DailyMarketConditions {
+    conditionsFor({
+      round,
+      rng,
+      previousFundamentalValueCents,
+      previousRegime,
+    }): DailyMarketConditions {
       if (round === 0) {
         // Round 0 is the match's pinned starting point — no regime transition, no event, no
         // shock yet (nothing has happened before the match's first day).
@@ -46,8 +51,11 @@ export function createSyntheticMarketEnvironment(
       const { event, impactReturn } = generateSyntheticEvent(regime, rng);
       const regimeProfile = REGIME_PROFILES[regime];
       const shock =
-        profile.fundamentalVolatility === 0 ? 0 : (rng.nextFloat() * 2 - 1) * profile.fundamentalVolatility;
-      const fundamentalReturn = regimeProfile.driftPerRound + profile.fundamentalDrift + shock + impactReturn;
+        profile.fundamentalVolatility === 0
+          ? 0
+          : (rng.nextFloat() * 2 - 1) * profile.fundamentalVolatility;
+      const fundamentalReturn =
+        regimeProfile.driftPerRound + profile.fundamentalDrift + shock + impactReturn;
       const fundamentalValueCents = Math.max(
         1,
         Math.round(previousFundamentalValueCents * Math.exp(fundamentalReturn)),

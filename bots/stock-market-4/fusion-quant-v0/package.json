@@ -10,7 +10,8 @@
     "backtest": "tsx backtest/runBacktest.ts"
   },
   "dependencies": {
-    "@thunderdome/bot-sdk-js": "file:./vendor/thunderdome-bot-sdk-js.tgz"
+    "@thunderdome/bot-sdk-js": "file:./vendor/thunderdome-bot-sdk-js.tgz",
+    "@thunderdome/quant-sdk-js": "file:./vendor/thunderdome-quant-sdk-js.tgz"
   },
   "devDependencies": {
     "@thunderdome/game-stock-market-4": "file:./vendor/thunderdome-game-stock-market-4.tgz",

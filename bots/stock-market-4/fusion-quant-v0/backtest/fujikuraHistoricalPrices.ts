@@ -1,4 +1,4 @@
-import type { DailyBar } from '../src/marketTypes.js';
+import type { DailyBar } from '@thunderdome/quant-sdk-js';
 
 /**
  * Fujikura Ltd. (TYO:5803) REAL daily price history, pulled from stockanalysis.com on

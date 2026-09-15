@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeExposureMap, exposureFootprint } from '../../src/research/exposure.js';
-import type { ResearchState } from '../../src/research/types.js';
+import { computeExposureMap, exposureFootprint, type ResearchState } from '@thunderdome/quant-sdk-js';
 import { ELMT_ENTITY_ID, fusionStateAt } from '../support/fixtures.js';
 
 const TARGET = 'entity-target';

@@ -22,22 +22,43 @@ export function generateLiquiditySnapshot(args: {
   askQuantityMultiplier: number;
   rng: Rng;
 }): LiquiditySnapshot {
-  const { referencePriceCents, expectedDailyVolume, volatilityHint, profile, bidQuantityMultiplier, askQuantityMultiplier, rng } =
-    args;
+  const {
+    referencePriceCents,
+    expectedDailyVolume,
+    volatilityHint,
+    profile,
+    bidQuantityMultiplier,
+    askQuantityMultiplier,
+    rng,
+  } = args;
 
-  const halfSpreadCents = Math.max(1, Math.round((referencePriceCents * profile.baseSpreadBps) / 10000 / 2));
+  const halfSpreadCents = Math.max(
+    1,
+    Math.round((referencePriceCents * profile.baseSpreadBps) / 10000 / 2),
+  );
   const volatilityScale = 1 + volatilityHint * 10;
-  const stepCents = Math.max(1, Math.round((referencePriceCents * profile.levelPriceStepBps) / 10000 * volatilityScale));
-  const baseLevelQuantity = Math.max(1, Math.round(expectedDailyVolume * BEST_LEVEL_VOLUME_FRACTION));
+  const stepCents = Math.max(
+    1,
+    Math.round(((referencePriceCents * profile.levelPriceStepBps) / 10000) * volatilityScale),
+  );
+  const baseLevelQuantity = Math.max(
+    1,
+    Math.round(expectedDailyVolume * BEST_LEVEL_VOLUME_FRACTION),
+  );
 
-  function buildSide(direction: 1 | -1, quantityMultiplier: number): { priceCents: number; quantity: number }[] {
+  function buildSide(
+    direction: 1 | -1,
+    quantityMultiplier: number,
+  ): { priceCents: number; quantity: number }[] {
     const levels: { priceCents: number; quantity: number }[] = [];
     for (let level = 0; level < profile.bookLevels; level++) {
       const priceCents = referencePriceCents + direction * (halfSpreadCents + level * stepCents);
       const jitter = SIZE_JITTER_MIN + rng.nextFloat() * (SIZE_JITTER_MAX - SIZE_JITTER_MIN);
       const quantity = Math.max(
         1,
-        Math.round(baseLevelQuantity * profile.levelSizeDecay ** level * jitter * quantityMultiplier),
+        Math.round(
+          baseLevelQuantity * profile.levelSizeDecay ** level * jitter * quantityMultiplier,
+        ),
       );
       levels.push({ priceCents: Math.max(1, priceCents), quantity });
     }

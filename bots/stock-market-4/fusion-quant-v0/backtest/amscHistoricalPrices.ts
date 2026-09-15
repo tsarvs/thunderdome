@@ -1,4 +1,4 @@
-import type { DailyBar } from '../src/marketTypes.js';
+import type { DailyBar } from '@thunderdome/quant-sdk-js';
 
 /**
  * American Superconductor Corporation (NASDAQ:AMSC) REAL daily price history, pulled from stockanalysis.com on

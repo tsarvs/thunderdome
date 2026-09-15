@@ -26,7 +26,10 @@ const INITIAL_STAGE_WEIGHTS: readonly { to: LifecycleStage; weight: number }[] =
 
 /** Checked once per quarter, at that company's own earnings date (spec §41) — a company's stage
  * is deliberately sticky across a whole quarter, not re-rolled every round. */
-const LIFECYCLE_TRANSITIONS: Record<LifecycleStage, readonly { to: LifecycleStage; weight: number }[]> = {
+const LIFECYCLE_TRANSITIONS: Record<
+  LifecycleStage,
+  readonly { to: LifecycleStage; weight: number }[]
+> = {
   HIGH_GROWTH: [
     { to: 'HIGH_GROWTH', weight: 0.9 },
     { to: 'MATURE', weight: 0.1 },
@@ -73,12 +76,21 @@ export function stepFundamentalsForNextQuarter(
   rng: Rng,
 ): CompanyFundamentals {
   const target = LIFECYCLE_GROWTH_TARGET[current.lifecycleStage] + growthFactorValue * 0.01;
-  const revenueGrowth = ouStep({ current: current.revenueGrowth, mean: target, speed: 0.2, volatility: 0.008, rng });
+  const revenueGrowth = ouStep({
+    current: current.revenueGrowth,
+    mean: target,
+    speed: 0.2,
+    volatility: 0.008,
+    rng,
+  });
   const revenueCents = Math.max(1, Math.round(current.revenueCents * (1 + revenueGrowth)));
   const marginTarget = LIFECYCLE_MARGIN_TARGET_BPS[current.lifecycleStage];
   const marginBps = Math.min(
     5000,
-    Math.max(-2000, ouStep({ current: current.marginBps, mean: marginTarget, speed: 0.05, volatility: 60, rng })),
+    Math.max(
+      -2000,
+      ouStep({ current: current.marginBps, mean: marginTarget, speed: 0.05, volatility: 60, rng }),
+    ),
   );
   const lifecycleStage = weightedTransition(LIFECYCLE_TRANSITIONS[current.lifecycleStage], rng);
 
@@ -91,9 +103,13 @@ export function stepFundamentalsForNextQuarter(
   };
 }
 
-export function reportedFinancialsFor(fundamentals: CompanyFundamentals, sharesOutstanding: number): ReportedFinancials {
+export function reportedFinancialsFor(
+  fundamentals: CompanyFundamentals,
+  sharesOutstanding: number,
+): ReportedFinancials {
   return {
-    epsCents: sharesOutstanding > 0 ? Math.round(fundamentals.earningsCents / sharesOutstanding) : 0,
+    epsCents:
+      sharesOutstanding > 0 ? Math.round(fundamentals.earningsCents / sharesOutstanding) : 0,
     revenueCents: fundamentals.revenueCents,
     marginBps: fundamentals.marginBps,
   };

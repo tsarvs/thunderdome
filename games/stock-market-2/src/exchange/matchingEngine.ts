@@ -87,9 +87,16 @@ function capTradeQuantity(args: {
       maxBuyQty = 0;
     } else if (!risk.allowShortSelling) {
       const costPerShareCents = priceCents * (1 + feeRate);
-      maxBuyQty = costPerShareCents > 0 ? Math.floor(buyer.cashCents / costPerShareCents) : Number.POSITIVE_INFINITY;
+      maxBuyQty =
+        costPerShareCents > 0
+          ? Math.floor(buyer.cashCents / costPerShareCents)
+          : Number.POSITIVE_INFINITY;
     } else {
-      maxBuyQty = maxBuyQuantityByMargin(buyer.shares, buyingPowerCents(buyer, priceCents, risk), priceCents);
+      maxBuyQty = maxBuyQuantityByMargin(
+        buyer.shares,
+        buyingPowerCents(buyer, priceCents, risk),
+        priceCents,
+      );
     }
   }
 
@@ -117,19 +124,29 @@ function capTradeQuantity(args: {
   };
 }
 
-function settleTrade(portfolios: Map<string, StockMarket2Portfolio>, trade: Trade, feeRate: number): void {
+function settleTrade(
+  portfolios: Map<string, StockMarket2Portfolio>,
+  trade: Trade,
+  feeRate: number,
+): void {
   const tradeValueCents = trade.priceCents * trade.quantity;
   const feeCents = Math.round(tradeValueCents * feeRate);
   if (trade.buyerParticipantId !== null) {
     const buyer = portfolios.get(trade.buyerParticipantId);
     if (buyer !== undefined) {
-      portfolios.set(trade.buyerParticipantId, applyFill(buyer, 'BUY', trade.quantity, trade.priceCents, feeCents));
+      portfolios.set(
+        trade.buyerParticipantId,
+        applyFill(buyer, 'BUY', trade.quantity, trade.priceCents, feeCents),
+      );
     }
   }
   if (trade.sellerParticipantId !== null) {
     const seller = portfolios.get(trade.sellerParticipantId);
     if (seller !== undefined) {
-      portfolios.set(trade.sellerParticipantId, applyFill(seller, 'SELL', trade.quantity, trade.priceCents, feeCents));
+      portfolios.set(
+        trade.sellerParticipantId,
+        applyFill(seller, 'SELL', trade.quantity, trade.priceCents, feeCents),
+      );
     }
   }
 }
@@ -209,7 +226,16 @@ export interface ResolveRoundResult {
  * capacity; admission just decides whether an order is worth resting in the book at all.
  */
 export function resolveRound(args: ResolveRoundArgs): ResolveRoundResult {
-  const { round, referencePriceCents, pendingLiquidity, actions, participantIds, feeRate, risk, rng } = args;
+  const {
+    round,
+    referencePriceCents,
+    pendingLiquidity,
+    actions,
+    participantIds,
+    feeRate,
+    risk,
+    rng,
+  } = args;
 
   const portfolios = new Map(args.portfolios);
   const openOrdersWorking: RestingOrder[] = [...args.openOrders];
@@ -263,7 +289,12 @@ export function resolveRound(args: ResolveRoundArgs): ResolveRoundResult {
         const maxQty =
           order.side === 'BUY'
             ? maxBuyQuantityByMargin(portfolio.shares, power, limitPriceCents)
-            : maxSellQuantityByMargin(portfolio.shares, power, limitPriceCents, risk.borrowableShares);
+            : maxSellQuantityByMargin(
+                portfolio.shares,
+                power,
+                limitPriceCents,
+                risk.borrowableShares,
+              );
         if (order.quantity > maxQty) {
           return;
         }
@@ -367,7 +398,10 @@ export function resolveRound(args: ResolveRoundArgs): ResolveRoundResult {
       ai++;
       continue;
     }
-    const crosses = bid.limitPriceCents === null || ask.limitPriceCents === null || bid.limitPriceCents >= ask.limitPriceCents;
+    const crosses =
+      bid.limitPriceCents === null ||
+      ask.limitPriceCents === null ||
+      bid.limitPriceCents >= ask.limitPriceCents;
     if (!crosses) {
       break; // sorted by price — no later pair can cross either
     }
@@ -498,7 +532,11 @@ export function resolveRound(args: ResolveRoundArgs): ResolveRoundResult {
   // GTC LIMIT remainders (new or still-resting) persist into the next round's book. ---
   const nextOpenOrders: RestingOrder[] = [];
   for (const working of [...bidPool, ...askPool]) {
-    if (working.remaining <= 0 || working.limitPriceCents === null || working.timeInForce !== 'GTC') {
+    if (
+      working.remaining <= 0 ||
+      working.limitPriceCents === null ||
+      working.timeInForce !== 'GTC'
+    ) {
       continue;
     }
     if (working.resting !== null) {

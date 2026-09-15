@@ -20,7 +20,10 @@ export function computeSectorImpactNudges(args: {
 
   const flowImbalanceBySymbol = new Map<string, number>();
   for (const [symbol, netDemand] of netDemandBySymbol) {
-    flowImbalanceBySymbol.set(symbol, Math.max(-1, Math.min(1, netDemand / Math.max(1, averageDailyVolume))));
+    flowImbalanceBySymbol.set(
+      symbol,
+      Math.max(-1, Math.min(1, netDemand / Math.max(1, averageDailyVolume))),
+    );
   }
 
   const symbolsBySector = new Map<Sector, string[]>();
@@ -44,7 +47,8 @@ export function computeSectorImpactNudges(args: {
       nudges[symbol] = 0;
       continue;
     }
-    const peerAverage = peers.reduce((sum, peer) => sum + (flowImbalanceBySymbol.get(peer) ?? 0), 0) / peers.length;
+    const peerAverage =
+      peers.reduce((sum, peer) => sum + (flowImbalanceBySymbol.get(peer) ?? 0), 0) / peers.length;
     nudges[symbol] = IMPACT_WEIGHT * peerAverage;
   }
   return nudges;

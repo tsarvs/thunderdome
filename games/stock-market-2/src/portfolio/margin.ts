@@ -37,8 +37,20 @@ export function forceLiquidate(args: {
     portfolio = applyFill(portfolio, side, quantity, level.priceCents, feeCents);
     trades.push(
       side === 'SELL'
-        ? { buyerParticipantId: null, sellerParticipantId: participantId, priceCents: level.priceCents, quantity, forced: true }
-        : { buyerParticipantId: participantId, sellerParticipantId: null, priceCents: level.priceCents, quantity, forced: true },
+        ? {
+            buyerParticipantId: null,
+            sellerParticipantId: participantId,
+            priceCents: level.priceCents,
+            quantity,
+            forced: true,
+          }
+        : {
+            buyerParticipantId: participantId,
+            sellerParticipantId: null,
+            priceCents: level.priceCents,
+            quantity,
+            forced: true,
+          },
     );
     level.quantity -= quantity;
     remaining -= quantity;

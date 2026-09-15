@@ -1,0 +1,78 @@
+/**
+ * Emits a complete `stock-market-4` FORWARD_SHADOW match `--config` JSON to stdout, wiring
+ * `@thunderdome/research-fusion`'s fixture into `researchTimeline` via `buildResearchTimeline` —
+ * the piece `match forward run` has no other way to get (unlike `runBacktest.ts`, which calls
+ * `createResearchSnapshot` fresh per simulated day, a real match's config carries the whole
+ * timeline up front once, at creation).
+ *
+ * Usage (`--universe` and `--store-dir` are both optional — see their defaults below; NOTE:
+ * `yarn workspace <pkg> run <script>` always writes its own "yarn run vX"/"$ <command>"/"Done in
+ * Xs" banner to STDOUT — even with `--silent` — corrupting piped JSON; `cd` into the package and
+ * use plain `yarn run --silent` instead, see scripts/README.md's own "known yarn
+ * stdout-pollution issue" note in the repo root for the full explanation):
+ *   (cd packages/stock-market-4/research/fusion && yarn run emit:forward-config --silent -- \
+ *     --market-dataset-id fusion-fundamental-v0 --market-dataset-version 3 \
+ *     --start-date 2026-07-13 --end-date 2026-12-31) > config.json
+ */
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { TRACKED_SECURITIES } from '@thunderdome/fusion-universe';
+import { createFusionFixtureDataset } from '../src/fixture.js';
+import { buildResearchTimeline } from '../src/timeline.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+// Absolute, not "./.thunderdome/market-data" — a relative default silently broke when this
+// config's storeDir was later read from a different cwd (see apps/cli's `matchForwardRefresh.ts`,
+// which had to work around exactly this by re-resolving it at call time). Anchoring it here, once,
+// at the actual source of the config, removes that whole class of bug for every future consumer.
+const REPO_ROOT = resolve(__dirname, '../../../../..');
+const DEFAULT_STORE_DIR = resolve(REPO_ROOT, '.thunderdome/market-data');
+
+function requireArg(args: Record<string, string>, name: string): string {
+  const value = args[name];
+  if (value === undefined) throw new Error(`missing required --${name}`);
+  return value;
+}
+
+function parseArgs(argv: string[]): Record<string, string> {
+  const args: Record<string, string> = {};
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i];
+    if (token?.startsWith('--') !== true) continue;
+    const name = token.slice(2);
+    const value = argv[i + 1];
+    if (value === undefined) throw new Error(`--${name} needs a value`);
+    args[name] = value;
+    i++;
+  }
+  return args;
+}
+
+function main(): void {
+  const args = parseArgs(process.argv.slice(2));
+  const asOfDate = args['as-of-date'] ?? requireArg(args, 'end-date');
+  const storeDir = args['store-dir'] ?? DEFAULT_STORE_DIR;
+  // Defaults to the full 11-ticker universe (@thunderdome/fusion-universe's own canonical order)
+  // rather than requiring it be hand-typed on every invocation — pass --universe to trade a subset.
+  const universe = args.universe ?? TRACKED_SECURITIES.map((s) => s.ticker).join(',');
+
+  const dataset = createFusionFixtureDataset();
+  const researchTimeline = buildResearchTimeline(dataset, asOfDate);
+
+  const config = {
+    gameType: 'FORWARD_SHADOW',
+    marketDataUniverse: universe.split(','),
+    marketDataset: {
+      id: requireArg(args, 'market-dataset-id'),
+      version: requireArg(args, 'market-dataset-version'),
+      storeDir,
+    },
+    startDate: requireArg(args, 'start-date'),
+    endDate: requireArg(args, 'end-date'),
+    researchTimeline,
+  };
+
+  process.stdout.write(JSON.stringify(config));
+}
+
+main();

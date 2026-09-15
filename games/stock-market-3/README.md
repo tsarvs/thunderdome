@@ -161,7 +161,7 @@ weighting or bound behind an earnings surprise's price impact; any other partici
 open orders, cash, or margin status.
 
 This is deliberate, not an oversight — several of those numbers exist as ordinary constants in this
-game's own source, same as any simulator has to encode *something* concrete to actually run. This
+game's own source, same as any simulator has to encode _something_ concrete to actually run. This
 README stops short of restating them for the same reason a bot shouldn't read them out of that
 source: they're meant to be estimated from observed behavior over the course of a real match, the
 same way a real quant would, not known in advance. A bot that infers "this sector is clearly rate-

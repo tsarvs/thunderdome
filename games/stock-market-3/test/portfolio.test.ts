@@ -13,7 +13,13 @@ import { forceLiquidatePortfolio } from '../src/portfolio/liquidation.js';
 import type { PortfolioAccount, RiskConfig } from '../src/types.js';
 
 function emptyPortfolio(cashCents = 1_000_000): PortfolioAccount {
-  return { cashCents, positions: new Map(), bankrupt: false, peakEquityCents: cashCents, maxDrawdown: 0 };
+  return {
+    cashCents,
+    positions: new Map(),
+    bankrupt: false,
+    peakEquityCents: cashCents,
+    maxDrawdown: 0,
+  };
 }
 
 const RISK_MARGIN: RiskConfig = {
@@ -28,8 +34,16 @@ describe('applyFill — weighted-average cost basis across multiple symbols', ()
   it('opens a long in one symbol without disturbing another symbol already held', () => {
     let portfolio = applyFill(emptyPortfolio(), 'TECH_A', 'BUY', 10, 1000, 0);
     portfolio = applyFill(portfolio, 'CONSUMER_A', 'BUY', 5, 2000, 0);
-    expect(getPosition(portfolio, 'TECH_A')).toEqual({ shares: 10, averageEntryPriceCents: 1000, realizedPnlCents: 0 });
-    expect(getPosition(portfolio, 'CONSUMER_A')).toEqual({ shares: 5, averageEntryPriceCents: 2000, realizedPnlCents: 0 });
+    expect(getPosition(portfolio, 'TECH_A')).toEqual({
+      shares: 10,
+      averageEntryPriceCents: 1000,
+      realizedPnlCents: 0,
+    });
+    expect(getPosition(portfolio, 'CONSUMER_A')).toEqual({
+      shares: 5,
+      averageEntryPriceCents: 2000,
+      realizedPnlCents: 0,
+    });
     expect(portfolio.cashCents).toBe(1_000_000 - 10 * 1000 - 5 * 2000);
   });
 
@@ -60,7 +74,13 @@ describe('portfolio-level margin (spec §38 — sized against gross exposure acr
   it('flags below-maintenance once equity falls under maintenanceMarginRatio * gross exposure', () => {
     let portfolio = applyFill(emptyPortfolio(10_000), 'TECH_A', 'SELL', 100, 1000, 0); // short 100 @ $10, cash +$1,000
     // cash = 10,000 + 100,000(cents) ... use plain numbers for clarity below instead.
-    portfolio = { cashCents: 20_000, positions: portfolio.positions, bankrupt: false, peakEquityCents: 20_000, maxDrawdown: 0 };
+    portfolio = {
+      cashCents: 20_000,
+      positions: portfolio.positions,
+      bankrupt: false,
+      peakEquityCents: 20_000,
+      maxDrawdown: 0,
+    };
     const marksHealthy = new Map([['TECH_A', 1000]]); // equity = 20000 - 100*1000 = -80000 (deliberately unhealthy to prove the check fires)
     expect(isBelowMaintenance(portfolio, marksHealthy, RISK_MARGIN)).toBe(true);
   });

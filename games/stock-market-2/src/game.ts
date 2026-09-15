@@ -87,10 +87,16 @@ function aggregateBookLevels(
     map.set(order.limitPriceCents, (map.get(order.limitPriceCents) ?? 0) + order.quantity);
   }
   for (const level of liquidity.bids) {
-    bidCentsByPrice.set(level.priceCents, (bidCentsByPrice.get(level.priceCents) ?? 0) + level.quantity);
+    bidCentsByPrice.set(
+      level.priceCents,
+      (bidCentsByPrice.get(level.priceCents) ?? 0) + level.quantity,
+    );
   }
   for (const level of liquidity.asks) {
-    askCentsByPrice.set(level.priceCents, (askCentsByPrice.get(level.priceCents) ?? 0) + level.quantity);
+    askCentsByPrice.set(
+      level.priceCents,
+      (askCentsByPrice.get(level.priceCents) ?? 0) + level.quantity,
+    );
   }
 
   const bids = [...bidCentsByPrice.entries()]
@@ -120,7 +126,10 @@ function describeObservation(observation: StockMarket2Observation): string {
     openOrders.length === 0
       ? ''
       : `Open orders: ${openOrders
-          .map((o) => `${o.id} ${o.side} ${String(o.quantity)}@$${o.limitPrice.toFixed(2)} (${o.timeInForce})`)
+          .map(
+            (o) =>
+              `${o.id} ${o.side} ${String(o.quantity)}@$${o.limitPrice.toFixed(2)} (${o.timeInForce})`,
+          )
           .join(', ')}\n`;
   const marginLine =
     portfolio.buyingPower > 0 || portfolio.marginUsed > 0
@@ -243,7 +252,13 @@ export const stockMarket2: GameDefinition<
     const portfolios = new Map(
       participantIds.map((id) => [
         id,
-        { cashCents: startingCashCents, shares: 0, averageEntryPriceCents: 0, realizedPnlCents: 0, bankrupt: false },
+        {
+          cashCents: startingCashCents,
+          shares: 0,
+          averageEntryPriceCents: 0,
+          realizedPnlCents: 0,
+          bankrupt: false,
+        },
       ]),
     );
     const riskStats = new Map(participantIds.map((id) => [id, emptyRiskStats()]));
@@ -311,7 +326,11 @@ export const stockMarket2: GameDefinition<
         quantity: order.quantity,
       }));
 
-    const book = aggregateBookLevels(state.openOrders, state.pendingLiquidity, state.config.orderBookDepth);
+    const book = aggregateBookLevels(
+      state.openOrders,
+      state.pendingLiquidity,
+      state.config.orderBookDepth,
+    );
     const priceCents = markPriceCents(state);
     const lastClose = toDollars(priceCents);
     const risk = state.config.risk;
@@ -427,14 +446,21 @@ export const stockMarket2: GameDefinition<
         if (portfolio === undefined || portfolio.bankrupt || portfolio.shares >= 0) {
           continue;
         }
-        const feeCents = dailyBorrowFeeCents(-portfolio.shares, interimMarkPriceCents, risk.borrowFeeAnnualized);
+        const feeCents = dailyBorrowFeeCents(
+          -portfolio.shares,
+          interimMarkPriceCents,
+          risk.borrowFeeAnnualized,
+        );
         if (feeCents <= 0) {
           continue;
         }
         portfolios = new Map(portfolios);
         portfolios.set(participantId, { ...portfolio, cashCents: portfolio.cashCents - feeCents });
         const stats = riskStats.get(participantId) ?? emptyRiskStats();
-        riskStats.set(participantId, { ...stats, borrowFeesPaidCents: stats.borrowFeesPaidCents + feeCents });
+        riskStats.set(participantId, {
+          ...stats,
+          borrowFeesPaidCents: stats.borrowFeesPaidCents + feeCents,
+        });
       }
 
       for (const participantId of state.participantIds) {
@@ -463,7 +489,10 @@ export const stockMarket2: GameDefinition<
 
         const equityAfter = equityCents(liquidation.portfolio, interimMarkPriceCents);
         portfolios = new Map(portfolios);
-        portfolios.set(participantId, equityAfter < 0 ? { ...liquidation.portfolio, bankrupt: true } : liquidation.portfolio);
+        portfolios.set(
+          participantId,
+          equityAfter < 0 ? { ...liquidation.portfolio, bankrupt: true } : liquidation.portfolio,
+        );
 
         const stats = riskStats.get(participantId) ?? emptyRiskStats();
         riskStats.set(participantId, {

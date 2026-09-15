@@ -12,18 +12,31 @@ const BUYBACK_PROBABILITY_PER_ROUND = 1 / 200;
 const SPLIT_PRICE_MULTIPLE = 4;
 const REVERSE_SPLIT_PRICE_FRACTION = 0.15;
 
-export function maybeTriggerDividend(security: SecurityState, rng: Rng): CorporateActionDetails | null {
-  if (security.kind !== 'EQUITY' || security.fundamentals === null || security.fundamentals.lifecycleStage === 'HIGH_GROWTH') {
+export function maybeTriggerDividend(
+  security: SecurityState,
+  rng: Rng,
+): CorporateActionDetails | null {
+  if (
+    security.kind !== 'EQUITY' ||
+    security.fundamentals === null ||
+    security.fundamentals.lifecycleStage === 'HIGH_GROWTH'
+  ) {
     return null; // high-growth companies plow cash back into growth rather than paying dividends
   }
   if (rng.nextFloat() >= DIVIDEND_PROBABILITY_PER_ROUND) {
     return null;
   }
   const yieldFraction = 0.001 + rng.nextFloat() * 0.004;
-  return { type: 'CASH_DIVIDEND', perShareCents: Math.max(1, Math.round(security.referencePriceCents * yieldFraction)) };
+  return {
+    type: 'CASH_DIVIDEND',
+    perShareCents: Math.max(1, Math.round(security.referencePriceCents * yieldFraction)),
+  };
 }
 
-export function maybeTriggerBuyback(security: SecurityState, rng: Rng): CorporateActionDetails | null {
+export function maybeTriggerBuyback(
+  security: SecurityState,
+  rng: Rng,
+): CorporateActionDetails | null {
   if (security.kind !== 'EQUITY' || security.fundamentals?.lifecycleStage !== 'MATURE') {
     return null;
   }
@@ -36,7 +49,10 @@ export function maybeTriggerBuyback(security: SecurityState, rng: Rng): Corporat
 
 /** Rule-based, not random: a security whose price ran up 4x (or fell to 15% of) its starting price
  * splits (or reverse-splits) — a bot that only watches raw price can reason about why (spec §40). */
-export function maybeTriggerSplit(security: SecurityState, startingPriceCents: number): CorporateActionDetails | null {
+export function maybeTriggerSplit(
+  security: SecurityState,
+  startingPriceCents: number,
+): CorporateActionDetails | null {
   if (security.referencePriceCents >= startingPriceCents * SPLIT_PRICE_MULTIPLE) {
     return { type: 'STOCK_SPLIT', fromShares: 1, toShares: 2 };
   }
@@ -63,7 +79,13 @@ function splitRatio(details: CorporateActionDetails): { from: number; to: number
 
 function adjustCandle(candle: DailyCandle, from: number, to: number): DailyCandle {
   const factor = from / to;
-  return { ...candle, open: candle.open * factor, high: candle.high * factor, low: candle.low * factor, close: candle.close * factor };
+  return {
+    ...candle,
+    open: candle.open * factor,
+    high: candle.high * factor,
+    low: candle.low * factor,
+    close: candle.close * factor,
+  };
 }
 
 /** Applies a dividend/split/reverse-split/buyback to the security itself — price, share count, and
@@ -71,7 +93,10 @@ function adjustCandle(candle: DailyCandle, from: number, to: number): DailyCandl
  * cliff on the split day (real "adjusted close" data does the same). Open orders for this symbol
  * are cancelled on a split (a stale pre-split limit price/quantity would otherwise misprice the
  * book) — a documented simplification, not a general order-adjustment engine. */
-export function applyCorporateActionToSecurity(security: SecurityState, details: CorporateActionDetails): SecurityState {
+export function applyCorporateActionToSecurity(
+  security: SecurityState,
+  details: CorporateActionDetails,
+): SecurityState {
   const ratio = splitRatio(details);
   if (ratio !== null) {
     const factor = ratio.to / ratio.from;
@@ -87,12 +112,16 @@ export function applyCorporateActionToSecurity(security: SecurityState, details:
       // that just 4x'd and split 2-for-1 is now back around 2x its start, not still 4x). Rescaling
       // both sides by the same factor would leave the ratio (and therefore the trigger condition)
       // completely unchanged by the split, causing it to fire again on the very next check.
-      priceHistory: security.priceHistory.map((candle) => adjustCandle(candle, ratio.from, ratio.to)),
+      priceHistory: security.priceHistory.map((candle) =>
+        adjustCandle(candle, ratio.from, ratio.to),
+      ),
       openOrders: [],
     };
   }
   if (details.type === 'BUYBACK') {
-    const remainingFraction = security.sharesOutstanding / Math.max(1, security.sharesOutstanding - details.sharesRepurchased);
+    const remainingFraction =
+      security.sharesOutstanding /
+      Math.max(1, security.sharesOutstanding - details.sharesRepurchased);
     return {
       ...security,
       sharesOutstanding: Math.max(1, security.sharesOutstanding - details.sharesRepurchased),
@@ -115,7 +144,8 @@ export function adjustPositionForCorporateAction(
       position: {
         ...position,
         shares: Math.round(position.shares * factor),
-        averageEntryPriceCents: position.shares === 0 ? 0 : Math.round(position.averageEntryPriceCents / factor),
+        averageEntryPriceCents:
+          position.shares === 0 ? 0 : Math.round(position.averageEntryPriceCents / factor),
       },
       cashDeltaCents: 0,
     };

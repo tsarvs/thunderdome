@@ -19,16 +19,17 @@ import { FUJIKURA_REAL_HISTORICAL_PRICES } from './fujikuraHistoricalPrices.js';
 import { SUMITOMO_REAL_HISTORICAL_PRICES } from './sumitomoHistoricalPrices.js';
 import { KMT_REAL_HISTORICAL_PRICES } from './kmtHistoricalPrices.js';
 import { AMSC_REAL_HISTORICAL_PRICES } from './amscHistoricalPrices.js';
+import {
+  formatStrategyTrace,
+  type DailyBar,
+  type EquityPoint,
+  type PortfolioObservation,
+  type SecurityMarketObservation,
+  type StockMarket4Observation,
+  type TradingDecision,
+} from '@thunderdome/quant-sdk-js';
 import { DEFAULT_FUSION_QUANT_CONFIG, type FusionQuantConfig } from '../src/config.js';
-import { formatStrategyTrace, type TradingDecision } from '../src/decision.js';
 import { createDecideAction } from '../src/index.js';
-import type {
-  DailyBar,
-  EquityPoint,
-  PortfolioObservation,
-  SecurityMarketObservation,
-  StockMarket4Observation,
-} from '../src/marketTypes.js';
 
 const dataset = createFusionFixtureDataset();
 
@@ -142,7 +143,7 @@ if (isMainModule) {
   const result = runBacktest();
 
   for (const decision of result.decisions) {
-    process.stderr.write(`${formatStrategyTrace(decision)}\n\n`);
+    process.stderr.write(`${formatStrategyTrace(decision, 'fusion-quant-v0')}\n\n`);
   }
 
   const finalEquityCents = result.equityHistory.at(-1)?.equityCents ?? null;

@@ -2,7 +2,7 @@
  * Runs a `stock-market-4` bot's REAL `decideAction` against the REAL game engine (real fees, real
  * margin/portfolio accounting, real fills — via `stockMarket4.initialize`/`getObservation`/
  * `resolve`, not a simplified ledger) over a fixed, bounded historical window, reading real prices
- * from the dataset `packages/market-data/scripts/seedFusionFundamentalV0.ts` seeds. In-process (no
+ * from the dataset `packages/stock-market-4/market-data/scripts/seedFusionFundamentalV0.ts` seeds. In-process (no
  * Docker, no CLI) — this is what `apps/cli`'s `match run` does under the hood, minus its own
  * two-participant minimum, which doesn't apply to a single bot evaluating its own strategy solo
  * (`stock-market-4` itself allows this; see that game's own README).
@@ -29,7 +29,7 @@ import {
   DATASET_ID,
   DATASET_VERSION,
   DEFAULT_STORE_DIR,
-} from '../../../packages/market-data/scripts/seedFusionFundamentalV0.js';
+} from '../../../packages/stock-market-4/market-data/scripts/seedFusionFundamentalV0.js';
 
 export const PARTICIPANT_ID = 'fusion-fundamental-v0';
 export const TICKERS = [
@@ -49,7 +49,10 @@ export const TICKERS = [
 /** One research snapshot per calendar day in the window — matches `backtest/runBacktest.ts`'s own
  * "reconstructed fresh for each date, so no day ever sees research that wasn't yet knowable"
  * discipline, just driven by calendar dates here instead of by the price series' own dates. */
-export function buildResearchTimeline(fromDate: string, toDate: string): { date: string; payload: unknown }[] {
+export function buildResearchTimeline(
+  fromDate: string,
+  toDate: string,
+): { date: string; payload: unknown }[] {
   const dataset = createFusionFixtureDataset();
   const timeline: { date: string; payload: unknown }[] = [];
   let cursor = new Date(`${fromDate}T00:00:00Z`);
@@ -155,7 +158,9 @@ if (isMainModule()) {
     }
   });
 
-  console.log(`Running fusion-fundamental-v0 solo, ${startDate} -> ${endDate}, real engine, real fees/margin.\n`);
+  console.log(
+    `Running fusion-fundamental-v0 solo, ${startDate} -> ${endDate}, real engine, real fees/margin.\n`,
+  );
   const summary = runFusionMatch({ decideAction, startDate, endDate });
 
   console.log('\n--- Result ---');
@@ -164,12 +169,16 @@ if (isMainModule()) {
   if (summary.totalReturn !== undefined) {
     console.log(`Total return: ${(summary.totalReturn * 100).toFixed(2)}%`);
     console.log(`Max drawdown: ${((summary.maxDrawdown ?? 0) * 100).toFixed(2)}%`);
-    console.log(`Annualized volatility: ${((summary.annualizedVolatility ?? 0) * 100).toFixed(2)}%`);
+    console.log(
+      `Annualized volatility: ${((summary.annualizedVolatility ?? 0) * 100).toFixed(2)}%`,
+    );
     console.log(
       `Sharpe ratio: ${summary.sharpeRatio === null || summary.sharpeRatio === undefined ? 'n/a (no variance)' : summary.sharpeRatio.toFixed(2)}`,
     );
   }
   if (summary.benchmarkReturn !== null) {
-    console.log(`ELMT buy-and-hold return over the same window: ${(summary.benchmarkReturn * 100).toFixed(2)}%`);
+    console.log(
+      `ELMT buy-and-hold return over the same window: ${(summary.benchmarkReturn * 100).toFixed(2)}%`,
+    );
   }
 }

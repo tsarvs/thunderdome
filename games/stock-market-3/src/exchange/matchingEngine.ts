@@ -65,7 +65,17 @@ function capTradeQuantity(args: {
   markPricesCents: ReadonlyMap<string, number>;
   risk: RiskConfig;
 }): { quantity: number; buyerExhausted: boolean; sellerExhausted: boolean } {
-  const { desiredQuantity, symbol, buyerId, sellerId, priceCents, feeRate, portfolios, markPricesCents, risk } = args;
+  const {
+    desiredQuantity,
+    symbol,
+    buyerId,
+    sellerId,
+    priceCents,
+    feeRate,
+    portfolios,
+    markPricesCents,
+    risk,
+  } = args;
 
   let maxBuyQty = Number.POSITIVE_INFINITY;
   if (buyerId !== null) {
@@ -74,7 +84,10 @@ function capTradeQuantity(args: {
       maxBuyQty = 0;
     } else if (!risk.allowShortSelling) {
       const costPerShareCents = priceCents * (1 + feeRate);
-      maxBuyQty = costPerShareCents > 0 ? Math.floor(buyer.cashCents / costPerShareCents) : Number.POSITIVE_INFINITY;
+      maxBuyQty =
+        costPerShareCents > 0
+          ? Math.floor(buyer.cashCents / costPerShareCents)
+          : Number.POSITIVE_INFINITY;
     } else {
       maxBuyQty = maxBuyQuantityByMargin(
         getPosition(buyer, symbol).shares,
@@ -228,12 +241,22 @@ export function resolveRound(args: ResolveRoundArgs): ResolveRoundResult {
           const maxQty =
             order.side === 'BUY'
               ? maxBuyQuantityByMargin(currentShares, power, limitPriceCents)
-              : maxSellQuantityByMargin(currentShares, power, limitPriceCents, risk.borrowableShares);
+              : maxSellQuantityByMargin(
+                  currentShares,
+                  power,
+                  limitPriceCents,
+                  risk.borrowableShares,
+                );
           if (order.quantity > maxQty) {
             return;
           }
         } else {
-          const { availableCashCents, availableShares } = computeAvailability(portfolio, openOrdersWorking, participantId, symbol);
+          const { availableCashCents, availableShares } = computeAvailability(
+            portfolio,
+            openOrdersWorking,
+            participantId,
+            symbol,
+          );
           if (order.side === 'BUY') {
             const alreadyCommitted = committedCashCents.get(participantId) ?? 0;
             const worstCaseCostCents = order.quantity * limitPriceCents;
@@ -297,8 +320,14 @@ export function resolveRound(args: ResolveRoundArgs): ResolveRoundResult {
     }
 
     const restingForSymbol = openOrdersWorking.filter((o) => o.symbol === symbol);
-    const bidPool: WorkingOrder[] = [...restingForSymbol.filter((o) => o.side === 'BUY').map(toWorking), ...newBuys];
-    const askPool: WorkingOrder[] = [...restingForSymbol.filter((o) => o.side === 'SELL').map(toWorking), ...newSells];
+    const bidPool: WorkingOrder[] = [
+      ...restingForSymbol.filter((o) => o.side === 'BUY').map(toWorking),
+      ...newBuys,
+    ];
+    const askPool: WorkingOrder[] = [
+      ...restingForSymbol.filter((o) => o.side === 'SELL').map(toWorking),
+      ...newSells,
+    ];
 
     sortBids(bidPool);
     sortAsks(askPool);
@@ -322,7 +351,10 @@ export function resolveRound(args: ResolveRoundArgs): ResolveRoundResult {
         ai++;
         continue;
       }
-      const crosses = bid.limitPriceCents === null || ask.limitPriceCents === null || bid.limitPriceCents >= ask.limitPriceCents;
+      const crosses =
+        bid.limitPriceCents === null ||
+        ask.limitPriceCents === null ||
+        bid.limitPriceCents >= ask.limitPriceCents;
       if (!crosses) {
         break;
       }
@@ -394,7 +426,13 @@ export function resolveRound(args: ResolveRoundArgs): ResolveRoundResult {
           risk,
         });
         if (cap.quantity > 0) {
-          const trade: Trade = { symbol, buyerParticipantId: bid.participantId, sellerParticipantId: null, priceCents: level.priceCents, quantity: cap.quantity };
+          const trade: Trade = {
+            symbol,
+            buyerParticipantId: bid.participantId,
+            sellerParticipantId: null,
+            priceCents: level.priceCents,
+            quantity: cap.quantity,
+          };
           settleTrade(portfolios, trade, feeRate);
           trades.push(trade);
           bid.remaining -= cap.quantity;
@@ -431,7 +469,13 @@ export function resolveRound(args: ResolveRoundArgs): ResolveRoundResult {
           risk,
         });
         if (cap.quantity > 0) {
-          const trade: Trade = { symbol, buyerParticipantId: null, sellerParticipantId: ask.participantId, priceCents: level.priceCents, quantity: cap.quantity };
+          const trade: Trade = {
+            symbol,
+            buyerParticipantId: null,
+            sellerParticipantId: ask.participantId,
+            priceCents: level.priceCents,
+            quantity: cap.quantity,
+          };
           settleTrade(portfolios, trade, feeRate);
           trades.push(trade);
           ask.remaining -= cap.quantity;
@@ -447,7 +491,11 @@ export function resolveRound(args: ResolveRoundArgs): ResolveRoundResult {
     remainingLiquidity.set(symbol, { bids: bidLiquidity, asks: askLiquidity });
 
     for (const working of [...bidPool, ...askPool]) {
-      if (working.remaining <= 0 || working.limitPriceCents === null || working.timeInForce !== 'GTC') {
+      if (
+        working.remaining <= 0 ||
+        working.limitPriceCents === null ||
+        working.timeInForce !== 'GTC'
+      ) {
         continue;
       }
       if (working.resting !== null) {
@@ -480,19 +528,29 @@ export function resolveRound(args: ResolveRoundArgs): ResolveRoundResult {
   return { portfolios, openOrders: nextOpenOrders, trades, nextOrderSequence, remainingLiquidity };
 }
 
-function settleTrade(portfolios: Map<string, PortfolioAccount>, trade: Trade, feeRate: number): void {
+function settleTrade(
+  portfolios: Map<string, PortfolioAccount>,
+  trade: Trade,
+  feeRate: number,
+): void {
   const tradeValueCents = trade.priceCents * trade.quantity;
   const feeCents = Math.round(tradeValueCents * feeRate);
   if (trade.buyerParticipantId !== null) {
     const buyer = portfolios.get(trade.buyerParticipantId);
     if (buyer !== undefined) {
-      portfolios.set(trade.buyerParticipantId, applyFill(buyer, trade.symbol, 'BUY', trade.quantity, trade.priceCents, feeCents));
+      portfolios.set(
+        trade.buyerParticipantId,
+        applyFill(buyer, trade.symbol, 'BUY', trade.quantity, trade.priceCents, feeCents),
+      );
     }
   }
   if (trade.sellerParticipantId !== null) {
     const seller = portfolios.get(trade.sellerParticipantId);
     if (seller !== undefined) {
-      portfolios.set(trade.sellerParticipantId, applyFill(seller, trade.symbol, 'SELL', trade.quantity, trade.priceCents, feeCents));
+      portfolios.set(
+        trade.sellerParticipantId,
+        applyFill(seller, trade.symbol, 'SELL', trade.quantity, trade.priceCents, feeCents),
+      );
     }
   }
 }

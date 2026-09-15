@@ -12,7 +12,11 @@ import type { DailyCandle, SecurityObservation, StockMarket3State } from '../typ
  * by tests to prove the seam behaves correctly, since nothing else in this game needs it yet.
  */
 export interface MarketDataProvider {
-  getUniverse(): { symbol: string; kind: SecurityObservation['kind']; sector: SecurityObservation['sector'] }[];
+  getUniverse(): {
+    symbol: string;
+    kind: SecurityObservation['kind'];
+    sector: SecurityObservation['sector'];
+  }[];
   getMarketSnapshot(participantId: string): SecurityObservation[];
   getHistoricalBars(symbol: string, roundsBack: number): DailyCandle[];
 }
@@ -22,7 +26,11 @@ export function createSyntheticMarketDataProvider(state: StockMarket3State): Mar
     getUniverse() {
       return [...state.securities.values()]
         .filter((security) => security.active)
-        .map((security) => ({ symbol: security.symbol, kind: security.kind, sector: security.sector }));
+        .map((security) => ({
+          symbol: security.symbol,
+          kind: security.kind,
+          sector: security.sector,
+        }));
     },
     getMarketSnapshot(participantId: string) {
       return buildObservation(state, participantId).securities;

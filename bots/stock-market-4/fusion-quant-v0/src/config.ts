@@ -1,95 +1,33 @@
-import type { ThesisGroupCapPolicy } from './portfolio/optimizer.js';
-import type { PortfolioStrategyName } from './portfolio/select.js';
-import type { ValuationSensitivities } from './valuation/companyValue.js';
-import type { FusionValuationAssumptions, ScenarioValue } from './valuation/types.js';
-import type { ResearchAblationMode } from './ablation.js';
-import type { CorrelationBlendPolicy } from './correlation/blended.js';
-import type { PortfolioConstructionPolicy } from './portfolio/types.js';
-import type { RiskPolicy } from './risk/riskEngine.js';
-import type { ExecutionCostPolicy } from './execution/costs.js';
-
-export type { ThesisGroupCapPolicy } from './portfolio/optimizer.js';
+import {
+  constantScenario,
+  type AlphaEnsemblePolicy,
+  type QuantStrategyConfig,
+  type SecurityConfig,
+  type ValuationSensitivities,
+} from '@thunderdome/quant-sdk-js';
+import type { FusionValuationAssumptions } from './valuation/fusionValue.js';
 
 /**
- * Every assumption for ONE tracked company — everything the alpha layer (`./alpha/*.ts`) needs to
- * run the delta -> effects -> valuation -> alpha pipeline independently of any other security in
- * the portfolio. Field-for-field identical to `fusion-fundamental-v7`'s own `SecurityConfig`
- * (same shape, same 11 real-price-anchored securities below) — this bot changes HOW alphas get
- * combined and sized into a portfolio, not the underlying per-security valuation inputs themselves.
+ * This bot's own instantiation of `@thunderdome/quant-sdk-js`'s generic `QuantStrategyConfig`/
+ * `SecurityConfig`, applied to `FusionValuationAssumptions` — see `valuation/fusionValue.ts` for
+ * why that's the one genuinely domain-specific piece. A future domain bot supplies its own
+ * assumptions type here instead.
  */
-export interface SecurityConfig {
-  ticker: string;
-  /** research-core entity id for this company — e.g. `entity-elmt` in
-   * `@thunderdome/research-fusion`'s fixture dataset. */
-  targetEntityId: string;
-  /** Public share count — NOT a research fact and NOT point-in-time sensitive information; used
-   * only to convert the absolute-dollar valuation chain into a per-share figure comparable to
-   * `DailyBar.close`. */
-  sharesOutstanding: number;
-  valuation: {
-    /** Non-fusion, base-business value per share, before any research-driven adjustment — a
-     * FALLBACK used only when a security has no trailing price history yet; `decision.ts` replaces
-     * this with `valuation/rollingBaseValue.ts`'s trailing-window low/mean/high once at least one
-     * bar of history exists. */
-    baseBusinessValuePerShare: ScenarioValue;
-    /** Fusion OPTION value per share, before any research-driven adjustment — deliberately small
-     * and separate from `fusionDerivedValue`. */
-    fusionOptionValueBaselinePerShare: ScenarioValue;
-    fusion: FusionValuationAssumptions;
-    sensitivities: ValuationSensitivities;
-  };
-}
+export type FusionQuantConfig = QuantStrategyConfig<FusionValuationAssumptions>;
+export type FusionSecurityConfig = SecurityConfig<FusionValuationAssumptions>;
 
-/** How many trailing real trading days feed BOTH the rolling base-value calculation
- * (`valuation/rollingBaseValue.ts`) and every volatility-dependent alpha/portfolio calculation
- * (`momentum.ts`'s own window is separate — see `AlphaEnsemblePolicy.momentumWindowDays`). Same
- * "one 'how much recent history do we trust' knob" discipline `fusion-fundamental-v7`'s
- * `ConfidenceCalibration` used. */
-export interface AlphaEnsemblePolicy {
-  rollingWindowDays: number;
-  /** Deliberately shorter than `rollingWindowDays` — a momentum/trend read should react to more
-   * recent price action than the value/volatility anchor itself does (same reasoning
-   * `fusion-fundamental-v7`'s `TrendFilterPolicy.windowDays` doc comment gives). */
-  momentumWindowDays: number;
-  /** The rolling base-value calculation's own share of the blended base value — see
-   * `valuation/rollingBaseValue.ts`'s `computeBlendedBaseValuePerShare` doc comment. */
-  rollingBlendWeight: number;
-  /** Below this many realized (predicted, actual) samples, a factor's measured information
-   * coefficient is treated as too noisy to trust as an ensemble weight — see `alpha/ic.ts`'s
-   * `computeEnsembleWeights`. */
-  minSamplesForMeasuredIC: number;
-  /** Caps how many realized alpha samples `decision.ts` keeps in memory (oldest dropped first) —
-   * bounds memory/CPU for a long-running forward-shadow match; large enough to comfortably exceed
-   * `minSamplesForMeasuredIC` many times over. */
-  maxAlphaHistorySamples: number;
-}
-
-/**
- * Every number in this file is an EXPERIMENTAL STRATEGY ASSUMPTION, not a researched fact — nothing
- * here is derived from `@thunderdome/research-fusion`'s dataset directly. This is the successor
- * config to `fusion-fundamental-v6`/`fusion-fundamental-v7`'s single `FusionFundamentalConfig`,
- * restructured around the plan's alpha/portfolio-construction/risk separation instead of one
- * combined signal-threshold-and-position-sizing block.
- */
-export interface FusionQuantConfig {
-  /** Every company this bot actively tracks and can trade — see `SecurityConfig`. */
-  securities: SecurityConfig[];
-  alphaEnsemble: AlphaEnsemblePolicy;
-  correlationBlend: CorrelationBlendPolicy;
-  portfolioConstruction: PortfolioConstructionPolicy & { strategy: PortfolioStrategyName };
-  risk: RiskPolicy;
-  execution: ExecutionCostPolicy;
-  /** The null-research ablation switch (plan Phase 1, item 8) — see `./ablation.ts`. */
-  ablationMode: ResearchAblationMode;
-  /** How a final target weight becomes actual orders — see `./portfolio.ts`'s `buildOrders`
-   * (unchanged from `fusion-fundamental-v7`, just with a smaller, dedicated policy type here
-   * instead of the old combined `PortfolioPolicy`). */
-  orderExecution: { minOrderNotionalCents: number; rebalanceToleranceWeight: number };
-}
-
-function constantScenario(value: number): ScenarioValue {
-  return { bear: value, base: value, bull: value };
-}
+/** What research does NOT establish for this bot's real security — carried over unchanged from
+ * `fusion-fundamental-v7`'s own list — reported on every decision (`CompanyValuation.unknowns`)
+ * so a reader never mistakes fair value for a fully-known figure. Supplied to the SDK's
+ * `DomainAdapter.knownValuationUnknowns` in `index.ts`. */
+export const KNOWN_VALUATION_UNKNOWNS: readonly string[] = [
+  'acquired historical revenue of the Schwabmünchen operation',
+  'acquired historical EBITDA/profitability of the Schwabmünchen operation',
+  'final purchase consideration for the acquisition',
+  'exact tungsten/molybdenum production capacity and current utilization',
+  'exact incremental EBIT margin ELMT will realize on the acquired operation',
+  'exact fusion-program customer revenue, if any, ELMT will ever realize',
+];
 
 /**
  * ELMT's assumptions, anchored to its own real trading history (stockanalysis.com daily closes,
@@ -100,14 +38,14 @@ function constantScenario(value: number): ScenarioValue {
  * observed distribution, not a guess. `sharesOutstanding`: 30.46M, stockanalysis.com, as of
  * 2026-09-09.
  */
-const ELMT_SECURITY: SecurityConfig = {
+const ELMT_SECURITY: FusionSecurityConfig = {
   ticker: 'ELMT',
   targetEntityId: 'entity-elmt',
   sharesOutstanding: 30_460_000,
   valuation: {
     baseBusinessValuePerShare: { bear: 12.74, base: 16.78, bull: 19.89 },
-    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.5, bull: 1.5 },
-    fusion: {
+    domainOptionValueBaselinePerShare: { bear: 0, base: 0.5, bull: 1.5 },
+    domain: {
       reactorDeployments: { bear: 3, base: 8, bull: 20 },
       tungstenContentTonnes: { bear: 20, base: 40, bull: 60 },
       // Approximate tungsten-alloy market price; not a researched fact for this dataset.
@@ -122,11 +60,11 @@ const ELMT_SECURITY: SecurityConfig = {
     },
     sensitivities: {
       manufacturingCapabilityToBaseValuePerShare: 1.5,
-      manufacturingCapabilityToFusionOptionPerShare: 0.4,
-      hypothesisConfidenceToFusionOptionPerShare: 0.25,
+      manufacturingCapabilityToDomainOptionPerShare: 0.4,
+      hypothesisConfidenceToDomainOptionPerShare: 0.25,
       // Illustrative starting ratio (2x the hypothesis sensitivity) — a qualification/contract-tier
       // change is treated as twice as consequential as a generic hypothesis shift; not swept/tuned.
-      supplierCaptureToFusionOptionPerShare: 0.5,
+      supplierCaptureToDomainOptionPerShare: 0.5,
     },
   },
 };
@@ -140,7 +78,7 @@ const ELMT_SECURITY: SecurityConfig = {
  * slice of, not a discrete component order). Force-fitting the same formula to a different business
  * model would be manufactured precision. Until each of those gets its own properly-shaped formula,
  * their fusion channel stays honestly at zero — their fair value comes from
- * `baseBusinessValuePerShare` (real, anchored) plus a small `fusionOptionValueBaselinePerShare` for
+ * `baseBusinessValuePerShare` (real, anchored) plus a small `domainOptionValueBaselinePerShare` for
  * their evidenced-but-unquantified fusion involvement, nothing invented on top.
  */
 const NO_FUSION_ASSUMPTIONS: FusionValuationAssumptions = {
@@ -160,22 +98,22 @@ const NO_FUSION_ASSUMPTIONS: FusionValuationAssumptions = {
  * `bull` = lowest/highest USD close over the same real window. `sharesOutstanding`: 703.5M
  * (stockanalysis.com, 2026-09-09). Fusion channel is zero (see `NO_FUSION_ASSUMPTIONS`) — Furukawa
  * has a REAL, evidenced HTS-wire supply relationship with CFS/SPARC, but that's a wire business,
- * not a tungsten-component one; `fusionOptionValueBaselinePerShare` (~3%/9% of base, the same ratio
+ * not a tungsten-component one; `domainOptionValueBaselinePerShare` (~3%/9% of base, the same ratio
  * ELMT's own placeholder used) is the only channel that can move for it right now.
  */
-const FURUKAWA_SECURITY: SecurityConfig = {
+const FURUKAWA_SECURITY: FusionSecurityConfig = {
   ticker: 'FURUKAWA', // no US-listed ticker; see backtest note on cross-exchange securities
   targetEntityId: 'entity-furukawa',
   sharesOutstanding: 703_500_000,
   valuation: {
     baseBusinessValuePerShare: { bear: 18.05, base: 26.88, bull: 30.79 },
-    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.81, bull: 2.42 },
-    fusion: NO_FUSION_ASSUMPTIONS,
+    domainOptionValueBaselinePerShare: { bear: 0, base: 0.81, bull: 2.42 },
+    domain: NO_FUSION_ASSUMPTIONS,
     sensitivities: {
       manufacturingCapabilityToBaseValuePerShare: 2.39,
-      manufacturingCapabilityToFusionOptionPerShare: 0.65,
-      hypothesisConfidenceToFusionOptionPerShare: 0.4,
-      supplierCaptureToFusionOptionPerShare: 0.8,
+      manufacturingCapabilityToDomainOptionPerShare: 0.65,
+      hypothesisConfidenceToDomainOptionPerShare: 0.4,
+      supplierCaptureToDomainOptionPerShare: 0.8,
     },
   },
 };
@@ -188,19 +126,19 @@ const FURUKAWA_SECURITY: SecurityConfig = {
  * `NO_FUSION_ASSUMPTIONS`) — Vitzro Nextech's fusion involvement (KSTAR/ITER components) is
  * aerospace/plasma-component manufacturing, not the tungsten-component chain ELMT's formula models.
  */
-const VITZRO_NEXTECH_SECURITY: SecurityConfig = {
+const VITZRO_NEXTECH_SECURITY: FusionSecurityConfig = {
   ticker: 'VITZRONEXTECH', // no US-listed ticker; see backtest note on cross-exchange securities
   targetEntityId: 'entity-vitzro-nextech',
   sharesOutstanding: 28_980_000,
   valuation: {
     baseBusinessValuePerShare: { bear: 4.95, base: 7.26, bull: 8.42 },
-    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.22, bull: 0.65 },
-    fusion: NO_FUSION_ASSUMPTIONS,
+    domainOptionValueBaselinePerShare: { bear: 0, base: 0.22, bull: 0.65 },
+    domain: NO_FUSION_ASSUMPTIONS,
     sensitivities: {
       manufacturingCapabilityToBaseValuePerShare: 0.65,
-      manufacturingCapabilityToFusionOptionPerShare: 0.17,
-      hypothesisConfidenceToFusionOptionPerShare: 0.11,
-      supplierCaptureToFusionOptionPerShare: 0.22,
+      manufacturingCapabilityToDomainOptionPerShare: 0.17,
+      hypothesisConfidenceToDomainOptionPerShare: 0.11,
+      supplierCaptureToDomainOptionPerShare: 0.22,
     },
   },
 };
@@ -212,19 +150,19 @@ const VITZRO_NEXTECH_SECURITY: SecurityConfig = {
  * existing industrial market; fusion demand is a small, currently-unquantified slice of that
  * market, not a discrete component order like ELMT's or Freemelt's.
  */
-const ALMONTY_SECURITY: SecurityConfig = {
+const ALMONTY_SECURITY: FusionSecurityConfig = {
   ticker: 'ALM',
   targetEntityId: 'entity-almonty',
   sharesOutstanding: 288_109_013,
   valuation: {
     baseBusinessValuePerShare: { bear: 10.95, base: 18.56, bull: 19.12 },
-    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.56, bull: 1.67 },
-    fusion: NO_FUSION_ASSUMPTIONS,
+    domainOptionValueBaselinePerShare: { bear: 0, base: 0.56, bull: 1.67 },
+    domain: NO_FUSION_ASSUMPTIONS,
     sensitivities: {
       manufacturingCapabilityToBaseValuePerShare: 1.65,
-      manufacturingCapabilityToFusionOptionPerShare: 0.45,
-      hypothesisConfidenceToFusionOptionPerShare: 0.28,
-      supplierCaptureToFusionOptionPerShare: 0.56,
+      manufacturingCapabilityToDomainOptionPerShare: 0.45,
+      hypothesisConfidenceToDomainOptionPerShare: 0.28,
+      supplierCaptureToDomainOptionPerShare: 0.56,
     },
   },
 };
@@ -237,25 +175,25 @@ const ALMONTY_SECURITY: SecurityConfig = {
  * 227.7M (stockanalysis.com, 2026-09-09).
  *
  * Fusion channel is zero (`NO_FUSION_ASSUMPTIONS`) for the same reason as the others — but unlike
- * them, Freemelt's `fusionOptionValueBaselinePerShare` is grounded directly in the REAL order
+ * them, Freemelt's `domainOptionValueBaselinePerShare` is grounded directly in the REAL order
  * Fusion for Energy awarded Freemelt for JT-60SA: base value SEK 55M / potential SEK 84M, converted
  * to USD at the same spot rate, times an assumed 15% margin and ELMT's own 7x multiple (both still
  * STRATEGY ASSUMPTIONS), divided by shares outstanding. `bear: 0` — the order could still fail to
  * convert into realized margin.
  */
-const FREEMELT_SECURITY: SecurityConfig = {
+const FREEMELT_SECURITY: FusionSecurityConfig = {
   ticker: 'FREEM',
   targetEntityId: 'entity-freemelt',
   sharesOutstanding: 227_700_000,
   valuation: {
     baseBusinessValuePerShare: { bear: 0.1262, base: 0.1356, bull: 0.2222 },
-    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.0265, bull: 0.0404 },
-    fusion: NO_FUSION_ASSUMPTIONS,
+    domainOptionValueBaselinePerShare: { bear: 0, base: 0.0265, bull: 0.0404 },
+    domain: NO_FUSION_ASSUMPTIONS,
     sensitivities: {
       manufacturingCapabilityToBaseValuePerShare: 0.0121,
-      manufacturingCapabilityToFusionOptionPerShare: 0.0033,
-      hypothesisConfidenceToFusionOptionPerShare: 0.002,
-      supplierCaptureToFusionOptionPerShare: 0.004,
+      manufacturingCapabilityToDomainOptionPerShare: 0.0033,
+      hypothesisConfidenceToDomainOptionPerShare: 0.002,
+      supplierCaptureToDomainOptionPerShare: 0.004,
     },
   },
 };
@@ -267,19 +205,19 @@ const FREEMELT_SECURITY: SecurityConfig = {
  * approximate, as of 2026-09-10). Fusion channel is zero (see `NO_FUSION_ASSUMPTIONS`) — Syntec
  * supplies specialized OPTICS, not the tungsten-component chain ELMT's formula models.
  */
-const OPTX_SECURITY: SecurityConfig = {
+const OPTX_SECURITY: FusionSecurityConfig = {
   ticker: 'OPTX',
   targetEntityId: 'entity-syntec-optics',
   sharesOutstanding: 40_280_000,
   valuation: {
     baseBusinessValuePerShare: { bear: 5.88, base: 8.19, bull: 12.17 },
-    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.25, bull: 0.74 },
-    fusion: NO_FUSION_ASSUMPTIONS,
+    domainOptionValueBaselinePerShare: { bear: 0, base: 0.25, bull: 0.74 },
+    domain: NO_FUSION_ASSUMPTIONS,
     sensitivities: {
       manufacturingCapabilityToBaseValuePerShare: 0.73,
-      manufacturingCapabilityToFusionOptionPerShare: 0.2,
-      hypothesisConfidenceToFusionOptionPerShare: 0.12,
-      supplierCaptureToFusionOptionPerShare: 0.24,
+      manufacturingCapabilityToDomainOptionPerShare: 0.2,
+      hypothesisConfidenceToDomainOptionPerShare: 0.12,
+      supplierCaptureToDomainOptionPerShare: 0.24,
     },
   },
 };
@@ -292,19 +230,19 @@ const OPTX_SECURITY: SecurityConfig = {
  * `NO_FUSION_ASSUMPTIONS`) — General Fusion is a pure-play pre-revenue REACTOR DEVELOPER, not a
  * component supplier, so ELMT's tungsten-component-order formula has no analog here at all.
  */
-const GFUZ_SECURITY: SecurityConfig = {
+const GFUZ_SECURITY: FusionSecurityConfig = {
   ticker: 'GFUZ',
   targetEntityId: 'entity-general-fusion',
   sharesOutstanding: 73_840_000,
   valuation: {
     baseBusinessValuePerShare: { bear: 6.73, base: 8.1, bull: 13.76 },
-    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.24, bull: 0.73 },
-    fusion: NO_FUSION_ASSUMPTIONS,
+    domainOptionValueBaselinePerShare: { bear: 0, base: 0.24, bull: 0.73 },
+    domain: NO_FUSION_ASSUMPTIONS,
     sensitivities: {
       manufacturingCapabilityToBaseValuePerShare: 0.72,
-      manufacturingCapabilityToFusionOptionPerShare: 0.19,
-      hypothesisConfidenceToFusionOptionPerShare: 0.12,
-      supplierCaptureToFusionOptionPerShare: 0.24,
+      manufacturingCapabilityToDomainOptionPerShare: 0.19,
+      hypothesisConfidenceToDomainOptionPerShare: 0.12,
+      supplierCaptureToDomainOptionPerShare: 0.24,
     },
   },
 };
@@ -318,19 +256,19 @@ const GFUZ_SECURITY: SecurityConfig = {
  * zero (see `NO_FUSION_ASSUMPTIONS`) — Fujikura has a REAL, evidenced HTS-wire supply relationship
  * with CFS, but that's a wire business, not the tungsten-component chain ELMT's formula models.
  */
-const FUJIKURA_SECURITY: SecurityConfig = {
+const FUJIKURA_SECURITY: FusionSecurityConfig = {
   ticker: 'FUJIKURA', // no US-listed ticker; see backtest note on cross-exchange securities
   targetEntityId: 'entity-fujikura',
   sharesOutstanding: 1_655_659_296,
   valuation: {
     baseBusinessValuePerShare: { bear: 24.22, base: 35.84, bull: 39.58 },
-    fusionOptionValueBaselinePerShare: { bear: 0, base: 1.08, bull: 3.23 },
-    fusion: NO_FUSION_ASSUMPTIONS,
+    domainOptionValueBaselinePerShare: { bear: 0, base: 1.08, bull: 3.23 },
+    domain: NO_FUSION_ASSUMPTIONS,
     sensitivities: {
       manufacturingCapabilityToBaseValuePerShare: 3.19,
-      manufacturingCapabilityToFusionOptionPerShare: 0.86,
-      hypothesisConfidenceToFusionOptionPerShare: 0.53,
-      supplierCaptureToFusionOptionPerShare: 1.06,
+      manufacturingCapabilityToDomainOptionPerShare: 0.86,
+      hypothesisConfidenceToDomainOptionPerShare: 0.53,
+      supplierCaptureToDomainOptionPerShare: 1.06,
     },
   },
 };
@@ -345,19 +283,19 @@ const FUJIKURA_SECURITY: SecurityConfig = {
  * ITER tungsten-monoblock production contract (~¥3.5B, dated 2021), but that revenue is already
  * fully absorbed into its real trading range.
  */
-const SUMITOMO_SECURITY: SecurityConfig = {
+const SUMITOMO_SECURITY: FusionSecurityConfig = {
   ticker: 'SUMITOMO', // no US-listed ticker; see backtest note on cross-exchange securities
   targetEntityId: 'entity-sumitomo',
   sharesOutstanding: 3_120_000_000,
   valuation: {
     baseBusinessValuePerShare: { bear: 13.43, base: 14.46, bull: 18.45 },
-    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.43, bull: 1.3 },
-    fusion: NO_FUSION_ASSUMPTIONS,
+    domainOptionValueBaselinePerShare: { bear: 0, base: 0.43, bull: 1.3 },
+    domain: NO_FUSION_ASSUMPTIONS,
     sensitivities: {
       manufacturingCapabilityToBaseValuePerShare: 1.29,
-      manufacturingCapabilityToFusionOptionPerShare: 0.34,
-      hypothesisConfidenceToFusionOptionPerShare: 0.21,
-      supplierCaptureToFusionOptionPerShare: 0.42,
+      manufacturingCapabilityToDomainOptionPerShare: 0.34,
+      hypothesisConfidenceToDomainOptionPerShare: 0.21,
+      supplierCaptureToDomainOptionPerShare: 0.42,
     },
   },
 };
@@ -370,19 +308,19 @@ const SUMITOMO_SECURITY: SecurityConfig = {
  * `commodityTrap` assertion names Kennametal explicitly as a caution case: general tungsten
  * exposure through tooling and materials is not the same as capturing fusion economics.
  */
-const KMT_SECURITY: SecurityConfig = {
+const KMT_SECURITY: FusionSecurityConfig = {
   ticker: 'KMT',
   targetEntityId: 'entity-kennametal',
   sharesOutstanding: 76_219_022,
   valuation: {
     baseBusinessValuePerShare: { bear: 29.27, base: 29.34, bull: 36.06 },
-    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.88, bull: 2.64 },
-    fusion: NO_FUSION_ASSUMPTIONS,
+    domainOptionValueBaselinePerShare: { bear: 0, base: 0.88, bull: 2.64 },
+    domain: NO_FUSION_ASSUMPTIONS,
     sensitivities: {
       manufacturingCapabilityToBaseValuePerShare: 2.61,
-      manufacturingCapabilityToFusionOptionPerShare: 0.7,
-      hypothesisConfidenceToFusionOptionPerShare: 0.43,
-      supplierCaptureToFusionOptionPerShare: 0.86,
+      manufacturingCapabilityToDomainOptionPerShare: 0.7,
+      hypothesisConfidenceToDomainOptionPerShare: 0.43,
+      supplierCaptureToDomainOptionPerShare: 0.86,
     },
   },
 };
@@ -395,19 +333,19 @@ const KMT_SECURITY: SecurityConfig = {
  * `NO_FUSION_ASSUMPTIONS`) — the research dataset has no evidenced fusion-specific relationship for
  * AMSC yet (grid/power-electronics superconductor business, not a named fusion supplier).
  */
-const AMSC_SECURITY: SecurityConfig = {
+const AMSC_SECURITY: FusionSecurityConfig = {
   ticker: 'AMSC',
   targetEntityId: 'entity-amsc',
   sharesOutstanding: 48_442_143,
   valuation: {
     baseBusinessValuePerShare: { bear: 26.64, base: 28.71, bull: 39.92 },
-    fusionOptionValueBaselinePerShare: { bear: 0, base: 0.86, bull: 2.58 },
-    fusion: NO_FUSION_ASSUMPTIONS,
+    domainOptionValueBaselinePerShare: { bear: 0, base: 0.86, bull: 2.58 },
+    domain: NO_FUSION_ASSUMPTIONS,
     sensitivities: {
       manufacturingCapabilityToBaseValuePerShare: 2.56,
-      manufacturingCapabilityToFusionOptionPerShare: 0.69,
-      hypothesisConfidenceToFusionOptionPerShare: 0.42,
-      supplierCaptureToFusionOptionPerShare: 0.84,
+      manufacturingCapabilityToDomainOptionPerShare: 0.69,
+      hypothesisConfidenceToDomainOptionPerShare: 0.42,
+      supplierCaptureToDomainOptionPerShare: 0.84,
     },
   },
 };
@@ -415,7 +353,7 @@ const AMSC_SECURITY: SecurityConfig = {
 /** Same 11 real-price-anchored securities `fusion-fundamental-v7` tracks — this bot's whole
  * point is a different alpha-combination/portfolio-construction/risk architecture ON TOP of the
  * same per-security valuation inputs, not a different universe. */
-const ALL_SECURITIES: SecurityConfig[] = [
+const ALL_SECURITIES: FusionSecurityConfig[] = [
   ELMT_SECURITY,
   FURUKAWA_SECURITY,
   VITZRO_NEXTECH_SECURITY,
@@ -429,17 +367,30 @@ const ALL_SECURITIES: SecurityConfig[] = [
   AMSC_SECURITY,
 ];
 
+const alphaEnsemble: AlphaEnsemblePolicy = {
+  rollingWindowDays: 20,
+  // Shorter than rollingWindowDays on purpose — see AlphaEnsemblePolicy's own doc comment.
+  momentumWindowDays: 10,
+  // Same illustrative starting point fusion-fundamental-v7's ConfidenceCalibration used.
+  rollingBlendWeight: 0.08,
+  // Raised from 10 (2026-09 review): `decision.ts` pools one realized sample per PRICED SECURITY
+  // per round into each factor's history — with 11 tracked securities, a factor could already
+  // clear a threshold of 10 after just ONE round transition, from a single day's cross-section.
+  // That's cross-sectional breadth, not the temporal diversity IC is actually supposed to measure
+  // (a market-wide move on one day makes every factor look correlated with returns that day,
+  // contaminating all ~11 "samples" with the same single-day noise). 40 requires roughly 4 full
+  // rounds of cross-section before measured IC overrides the equal-weight fallback — still fast
+  // in absolute days given this dataset's real size (~70 trading days total), but meaningfully
+  // harder to satisfy from one lucky/unlucky day. Not a rigorously derived number — this whole
+  // dataset is too small yet for one (see this bot's own README caveats) — just a more
+  // conservative floor than 10 was.
+  minSamplesForMeasuredIC: 40,
+  maxAlphaHistorySamples: 2_000,
+};
+
 export const DEFAULT_FUSION_QUANT_CONFIG: FusionQuantConfig = {
   securities: ALL_SECURITIES,
-  alphaEnsemble: {
-    rollingWindowDays: 20,
-    // Shorter than rollingWindowDays on purpose — see AlphaEnsemblePolicy's own doc comment.
-    momentumWindowDays: 10,
-    // Same illustrative starting point fusion-fundamental-v7's ConfidenceCalibration used.
-    rollingBlendWeight: 0.08,
-    minSamplesForMeasuredIC: 10,
-    maxAlphaHistorySamples: 2_000,
-  },
+  alphaEnsemble,
   correlationBlend: {
     // Illustrative starting point (not fitted/swept) — see CorrelationBlendPolicy's own doc
     // comment for why causal overlap gets a meaningful, non-trivial share given how little real
@@ -477,9 +428,10 @@ export const DEFAULT_FUSION_QUANT_CONFIG: FusionQuantConfig = {
     averageDailyVolumeUsdByTicker: new Map(),
     defaultAverageDailyVolumeUsd: 2_000_000,
   },
-  // 'full' — every alpha active. See ./ablation.ts for the other three modes and
-  // backtest/walkForward.ts for where each gets exercised as part of the Full/Null/Research-only/
-  // Price-only comparison the plan calls out as the key scientific test of this whole approach.
+  // 'full' — every alpha active. See @thunderdome/quant-sdk-js's `ablation.ts` for the other three
+  // modes and `backtest/walkForward.ts` for where each gets exercised as part of the Full/Null/
+  // Research-only/Price-only comparison the plan calls out as the key scientific test of this
+  // whole approach.
   ablationMode: 'full',
   orderExecution: {
     minOrderNotionalCents: 5_000,
@@ -487,5 +439,3 @@ export const DEFAULT_FUSION_QUANT_CONFIG: FusionQuantConfig = {
     rebalanceToleranceWeight: 0.03,
   },
 };
-
-export { constantScenario };

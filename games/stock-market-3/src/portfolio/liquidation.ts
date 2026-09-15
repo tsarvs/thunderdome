@@ -23,7 +23,11 @@ export function forceLiquidatePortfolio(args: {
   liquidityBySymbol: ReadonlyMap<string, LiquiditySnapshot>;
   risk: RiskConfig;
   feeRate: number;
-}): { trades: Trade[]; portfolio: PortfolioAccount; liquidityBySymbol: Map<string, LiquiditySnapshot> } {
+}): {
+  trades: Trade[];
+  portfolio: PortfolioAccount;
+  liquidityBySymbol: Map<string, LiquiditySnapshot>;
+} {
   const { participantId, markPricesCents, risk, feeRate } = args;
   let portfolio = args.portfolio;
   const liquidityBySymbol = new Map(args.liquidityBySymbol);
@@ -60,13 +64,32 @@ export function forceLiquidatePortfolio(args: {
       portfolio = applyFill(portfolio, symbol, side, quantity, level.priceCents, feeCents);
       trades.push(
         side === 'SELL'
-          ? { symbol, buyerParticipantId: null, sellerParticipantId: participantId, priceCents: level.priceCents, quantity, forced: true }
-          : { symbol, buyerParticipantId: participantId, sellerParticipantId: null, priceCents: level.priceCents, quantity, forced: true },
+          ? {
+              symbol,
+              buyerParticipantId: null,
+              sellerParticipantId: participantId,
+              priceCents: level.priceCents,
+              quantity,
+              forced: true,
+            }
+          : {
+              symbol,
+              buyerParticipantId: participantId,
+              sellerParticipantId: null,
+              priceCents: level.priceCents,
+              quantity,
+              forced: true,
+            },
       );
       level.quantity -= quantity;
       remaining -= quantity;
     }
-    liquidityBySymbol.set(symbol, side === 'SELL' ? { bids: levels, asks: snapshot.asks } : { bids: snapshot.bids, asks: levels });
+    liquidityBySymbol.set(
+      symbol,
+      side === 'SELL'
+        ? { bids: levels, asks: snapshot.asks }
+        : { bids: snapshot.bids, asks: levels },
+    );
   }
 
   return { trades, portfolio, liquidityBySymbol };

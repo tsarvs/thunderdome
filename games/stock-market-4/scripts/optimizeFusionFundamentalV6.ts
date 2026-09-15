@@ -24,12 +24,17 @@ function compositeScore(summary: RunMatchSummary): number {
 }
 
 function runWith(hysteresisBand: number) {
-  const config = { ...DEFAULT_FUSION_FUNDAMENTAL_CONFIG, signal: { ...DEFAULT_FUSION_FUNDAMENTAL_CONFIG.signal, hysteresisBand } };
+  const config = {
+    ...DEFAULT_FUSION_FUNDAMENTAL_CONFIG,
+    signal: { ...DEFAULT_FUSION_FUNDAMENTAL_CONFIG.signal, hysteresisBand },
+  };
   const summary = runFusionMatch({ decideAction: createDecideAction(config) });
   return { hysteresisBand, summary, score: compositeScore(summary) };
 }
 
-console.log(`v3 benchmark (solo-harness scale, for relative comparison only): return ${V3_BENCHMARK.totalReturnPct}%, sharpe ${V3_BENCHMARK.sharpeRatio}`);
+console.log(
+  `v3 benchmark (solo-harness scale, for relative comparison only): return ${V3_BENCHMARK.totalReturnPct}%, sharpe ${V3_BENCHMARK.sharpeRatio}`,
+);
 console.log('\nhysteresisBand   return    maxDD    annVol  sharpe   score');
 for (const hysteresisBand of [0, 0.01, 0.02, 0.03, 0.05, 0.08]) {
   const { summary: s, score } = runWith(hysteresisBand);

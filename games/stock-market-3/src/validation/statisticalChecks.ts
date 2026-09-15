@@ -54,7 +54,9 @@ export function correlation(a: readonly number[], b: readonly number[]): number 
 /** A full symmetric correlation matrix across every symbol's return series — the statistic
  * spec §55/§56 asks a validation pass to inspect for pathological cases (everything at 1.0,
  * everything at 0.0, one factor visibly dominating every pair). */
-export function correlationMatrix(returnsBySymbol: Readonly<Record<string, number[]>>): Record<string, Record<string, number>> {
+export function correlationMatrix(
+  returnsBySymbol: Readonly<Record<string, number[]>>,
+): Record<string, Record<string, number>> {
   const symbols = Object.keys(returnsBySymbol);
   const matrix: Record<string, Record<string, number>> = {};
   for (const a of symbols) {

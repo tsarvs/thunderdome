@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FUSION_FIXTURE_IDS } from '@thunderdome/research-fusion';
-import { computeExposureMap } from '../../src/research/exposure.js';
+import { computeExposureMap } from '@thunderdome/quant-sdk-js';
 import { fusionStateAt } from '../support/fixtures.js';
 
 /**

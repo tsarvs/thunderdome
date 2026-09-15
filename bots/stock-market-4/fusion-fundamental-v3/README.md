@@ -1,4 +1,4 @@
-# fusion-fundamental-v2
+# fusion-fundamental-v3
 
 A [Stock Market 4](../../../games/stock-market-4/README.md) bot that reads point-in-time research
 about fusion-energy supply-chain companies, turns it into a fair-value estimate for each one,
@@ -8,11 +8,32 @@ holding when there's nothing new to act on. It never invents a relationship or a
 hasn't established; every assumption it makes is an explicit, documented Bear/Base/Bull range, not
 a guess dressed up as precision.
 
-It tracks seven real, currently-traded companies: **ELMT** (tungsten components), Furukawa Electric
+It tracks 11 real, currently-traded companies: **ELMT** (tungsten components), Furukawa Electric
 (`FURUKAWA`), Vitzro Nextech (`VITZRONEXTECH`), Almonty Industries (`ALM`), Freemelt (`FREEM`),
-Syntec Optics (`OPTX`), and General Fusion (`GFUZ`).
+Syntec Optics (`OPTX`), General Fusion (`GFUZ`), Fujikura Ltd. (`FUJIKURA`), Sumitomo Electric
+(`SUMITOMO`), Kennametal (`KMT`), and American Superconductor (`AMSC`).
 
-**v2, vs. [`fusion-fundamental-v1`](../fusion-fundamental-v1):**
+**v3, vs. [`fusion-fundamental-v2`](../fusion-fundamental-v2):**
+- **A trend/momentum confirmation filter.** A value signal alone will happily keep buying a
+  security that looks statistically cheap while it's in the middle of a genuine, sustained decline
+  (confirmed empirically this session: v2's original valuation-only design lost badly doing exactly
+  this). v3 doesn't change the valuation signal itself — it VETOES acting on it when recent price
+  action strongly contradicts the trade: don't open or add to a long while the security is in a
+  steep recent decline, don't open a short while it's in a steep recent rally. Existing
+  REDUCE/SELL/cover actions (anything that only shrinks risk) are never vetoed — this only gates
+  NEW or larger exposure, and uses only real, already-public trailing price history, never
+  anything derived from information not yet knowable on the day of the trade. See
+  [`src/config.ts`](src/config.ts)'s `TrendFilterPolicy` (`windowDays`/`vetoThreshold`) and
+  [`src/signal.ts`](src/signal.ts)'s `computeTrailingReturn`, applied in
+  [`src/decision.ts`](src/decision.ts).
+
+Everything else — signal classification, hysteresis, shorting with its confidence gate, execution
+ordering, cash reserves, valuation methodology — is unchanged from v2. See that bot's own README
+for the full writeup.
+
+<details>
+<summary>v2, vs. <a href="../fusion-fundamental-v1">fusion-fundamental-v1</a> (unchanged in v3)</summary>
+
 - **Conviction-ordered execution, not array-position execution.** v0/v1 processed securities in
   whatever order they happened to sit in `config.securities`, sharing one round's cash budget in
   that fixed order — so a mild `BUY` sitting earlier in the list could claim the round's cash before
@@ -38,11 +59,10 @@ Syntec Optics (`OPTX`), and General Fusion (`GFUZ`).
   conviction opportunity first, while making the "how much stays uninvested on purpose" decision
   explicit instead of incidental.
 
-Everything else — signal classification, hysteresis, shorting with its confidence gate, valuation
-methodology — is unchanged from v1. See that bot's own README for the full pipeline writeup.
+</details>
 
 <details>
-<summary>v1, vs. <a href="../fusion-fundamental-v0">fusion-fundamental-v0</a> (unchanged in v2)</summary>
+<summary>v1, vs. <a href="../fusion-fundamental-v0">fusion-fundamental-v0</a> (unchanged in v2/v3)</summary>
 
 - **Shorting.** v0's most bearish signal (`SELL`) only ever flattened to cash — it could express
   "not worth owning" but never "worth betting against." v1 adds a `STRONG_SELL` level, symmetric to
@@ -74,7 +94,7 @@ methodology — is unchanged from v1. See that bot's own README for the full pip
 ### Run the backtest (fastest — no Docker, no game engine)
 
 ```bash
-cd bots/stock-market-4/fusion-fundamental-v2
+cd bots/stock-market-4/fusion-fundamental-v3
 npm install   # first time only
 npm run backtest
 ```
@@ -91,13 +111,11 @@ real engine's fee/margin/execution accounting — see the real match below for t
 ### Run it for real, through the actual game engine
 
 `yarn thunderdome match run` (the plain, non-forward command) always requires **at least two**
-bot ids — it has no notion of a solo run, even though `stock-market-4` itself does. Since this is
-currently the only `stock-market-4` bot in the repo, running it for real, alone, against a
-`marketDataUniverse` matching its own tracked securities means using `match forward run` instead
-(below) — the same engine, the same real fees/fills/portfolio accounting, just the command that
-actually supports one participant. `match run` becomes relevant again once a second
-`stock-market-4` bot exists to pair it against — see
-[`apps/cli/README.md`](../../../apps/cli/README.md#match-run) for that command's own reference.
+bot ids — it has no notion of a solo run, even though `stock-market-4` itself does. Running it
+alone, against a `marketDataUniverse` matching its own tracked securities, means using
+`match forward run` instead (below) — the same engine, the same real fees/fills/portfolio
+accounting, just the command that actually supports one participant. See
+[`apps/cli/README.md`](../../../apps/cli/README.md#match-run) for `match run`'s own reference.
 
 ### Run it as a persistent, resumable forward-shadow match
 
@@ -108,7 +126,7 @@ for the design. Worked example, seeding a real dataset from this bot's own track
 
 ```ts
 // seed a market-data dataset from this bot's own real price history (see
-// packages/market-data/README.md for publishDatasetVersion/appendBars)
+// packages/stock-market-4/market-data/README.md for publishDatasetVersion/appendBars)
 import { createMarketDataStore, publishDatasetVersion } from '@thunderdome/market-data';
 import { ELMT_REAL_HISTORICAL_PRICES } from './backtest/elmtHistoricalPrices.js';
 import { ALMONTY_REAL_HISTORICAL_PRICES } from './backtest/almontyHistoricalPrices.js';
@@ -129,7 +147,7 @@ publishDatasetVersion(store, { id: 'fusion-live', version: '1' }, {
 ```
 
 ```bash
-yarn thunderdome match forward run fusion-live fusion-fundamental-v2 --config '{
+yarn thunderdome match forward run fusion-live fusion-fundamental-v3 --config '{
   "gameType": "FORWARD_SHADOW",
   "startDate": "2026-07-06",
   "endDate": "2026-12-31",
@@ -152,7 +170,7 @@ appendBars(store, { id: 'fusion-live', version: '1' }, {
 ```
 
 ```bash
-yarn thunderdome match forward run fusion-live fusion-fundamental-v2
+yarn thunderdome match forward run fusion-live fusion-fundamental-v3
 yarn thunderdome match forward inspect fusion-live   # check status/progress anytime
 ```
 
@@ -182,8 +200,8 @@ see [`decision.ts`](src/decision.ts)):
    ([`portfolio.ts`](src/portfolio.ts)). `STRONG_SELL` is the one exception to a simple lookup: it
    only maps to a NEGATIVE target (a short) when `signal.confidence` also clears
    `policy.minShortConfidence` — otherwise it degrades to the same 0% target as a plain `SELL`.
-   Shorting is a materially higher-risk move than sizing a long, so it needs its own, higher
-   confidence bar, not just an extreme score.
+6. **Veto the trade if it fights the trend** — a NEW or larger long/short that would open into a
+   steep recent move against it is downgraded to a hold instead, per the trend filter above.
 
 A security the bot has zero position in is a **valid, deliberate outcome** — being in this bot's
 tracked universe means "worth evaluating," not "must be owned." See
@@ -220,8 +238,9 @@ rather than hide it behind a point estimate. Adding a new tracked security means
 these entries (plus its own real price history under `backtest/`) — nothing else in the pipeline
 needs to change, since every security is evaluated independently.
 
-`signal`/`portfolio` (also in `config.ts`) are the shared threshold/target-weight policy every
-security uses — see [How it decides](#how-it-decides) above for what each field controls.
+`signal`/`portfolio`/`trendFilter` (also in `config.ts`) are the shared threshold/target-weight/
+trend policy every security uses — see [How it decides](#how-it-decides) above for what each field
+controls.
 
 ## How research reaches it
 

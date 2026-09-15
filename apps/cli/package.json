@@ -14,7 +14,9 @@
   "dependencies": {
     "@thunderdome/engine": "^0.1.0",
     "@thunderdome/forward-match-store": "^0.1.0",
+    "@thunderdome/market-data": "^0.1.0",
     "@thunderdome/registry": "^0.1.0",
+    "@thunderdome/research-fusion": "^0.1.0",
     "@thunderdome/rng": "^0.1.0",
     "@thunderdome/runtime": "^0.1.0",
     "@thunderdome/tournament-formats": "^0.1.0",

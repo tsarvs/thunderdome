@@ -1,6 +1,6 @@
 /**
  * A hand-declared local copy of the parts of `@thunderdome/research-core`'s schema
- * (packages/research/core/src/**) this bot actually reads — not imported, for the same reason
+ * (packages/stock-market-4/research/core/src/**) this bot actually reads — not imported, for the same reason
  * `../marketTypes.ts` doesn't import `@thunderdome/game-stock-market-4`: `bots/**` isn't a Yarn
  * workspace member. This is also the architectural boundary the task requires: the GAME
  * (`stock-market-4`) never knows this shape exists — `observation.research` is `unknown` to it —
@@ -8,7 +8,7 @@
  * `config.researchTimeline[].payload` is produced by calling research-core's own
  * `createResearchSnapshot(dataset, timestamp)` outside the game entirely; what lands in
  * `observation.research` is exactly that function's return value, field-for-field as declared
- * in packages/research/core/src/snapshot/snapshot.ts and state/state.ts.
+ * in packages/stock-market-4/research/core/src/snapshot/snapshot.ts and state/state.ts.
  */
 
 export type ResearchTimestamp = string;
@@ -116,7 +116,7 @@ export interface ResearchAssertion {
   confidence?: Confidence;
 }
 
-/** What was knowable as of `timestamp` — see packages/research/core/src/state/state.ts. This
+/** What was knowable as of `timestamp` — see packages/stock-market-4/research/core/src/state/state.ts. This
  * bot only reads entities/relationships/evidence/hypotheses/events/questions; assumptions/
  * variables/models/scenarios exist in the real schema but nothing in v0.1 needs them yet. */
 export interface ResearchState {
@@ -131,7 +131,7 @@ export interface ResearchState {
 }
 
 /** The self-contained, opaque-to-the-game payload a real match puts in
- * `config.researchTimeline[].payload` — see packages/research/core/src/snapshot/snapshot.ts. */
+ * `config.researchTimeline[].payload` — see packages/stock-market-4/research/core/src/snapshot/snapshot.ts. */
 export interface ResearchSnapshot {
   datasetId: string;
   datasetVersion: string;

@@ -1,4 +1,4 @@
-import type { DailyBar } from '../src/marketTypes.js';
+import type { DailyBar } from '@thunderdome/quant-sdk-js';
 
 /**
  * Vitzro Nextech (KOSDAQ:488900) REAL daily price history, pulled from stockanalysis.com on

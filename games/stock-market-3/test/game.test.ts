@@ -18,7 +18,11 @@ function initialState(
   participantIds = PARTICIPANT_IDS,
   seed = 1,
 ): StockMarket3State {
-  return stockMarket3.initialize({ config: config(overrides), participantIds, rng: createRng(Buffer.alloc(16, seed)) });
+  return stockMarket3.initialize({
+    config: config(overrides),
+    participantIds,
+    rng: createRng(Buffer.alloc(16, seed)),
+  });
 }
 
 function hold(): StockMarket3Action {
@@ -60,8 +64,22 @@ describe('stockMarket3.parseConfig', () => {
   });
 
   it('rejects a duplicate equity symbol or one colliding with indexSymbol', () => {
-    expect(stockMarket3.parseConfig({ equities: [{ symbol: 'A', sector: 'TECHNOLOGY' }, { symbol: 'A', sector: 'CONSUMER' }] }).ok).toBe(false);
-    expect(stockMarket3.parseConfig({ equities: [{ symbol: 'SYNTH_INDEX', sector: 'TECHNOLOGY' }, { symbol: 'B', sector: 'CONSUMER' }] }).ok).toBe(false);
+    expect(
+      stockMarket3.parseConfig({
+        equities: [
+          { symbol: 'A', sector: 'TECHNOLOGY' },
+          { symbol: 'A', sector: 'CONSUMER' },
+        ],
+      }).ok,
+    ).toBe(false);
+    expect(
+      stockMarket3.parseConfig({
+        equities: [
+          { symbol: 'SYNTH_INDEX', sector: 'TECHNOLOGY' },
+          { symbol: 'B', sector: 'CONSUMER' },
+        ],
+      }).ok,
+    ).toBe(false);
   });
 });
 
@@ -100,7 +118,9 @@ describe('warmup', () => {
   it('rejects real orders before warmupRounds, but allows an empty order list', () => {
     const state = initialState(FAST);
     const symbol = must(config(FAST).equities[0]?.symbol, 'first equity symbol');
-    const buy: StockMarket3Action = { orders: [{ kind: 'MARKET', symbol, side: 'BUY', quantity: 1 }] };
+    const buy: StockMarket3Action = {
+      orders: [{ kind: 'MARKET', symbol, side: 'BUY', quantity: 1 }],
+    };
     expect(stockMarket3.validateAction(state, 'alice', buy).ok).toBe(false);
     expect(stockMarket3.validateAction(state, 'alice', hold()).ok).toBe(true);
   });
@@ -109,11 +129,17 @@ describe('warmup', () => {
     let state = initialState(FAST);
     const rng = createRng(Buffer.alloc(16, 1));
     for (let i = 0; i < config(FAST).warmupRounds; i++) {
-      state = stockMarket3.resolve({ state, actions: actionsOf(PARTICIPANT_IDS.map((id) => [id, hold()])), rng }).nextState;
+      state = stockMarket3.resolve({
+        state,
+        actions: actionsOf(PARTICIPANT_IDS.map((id) => [id, hold()])),
+        rng,
+      }).nextState;
     }
     expect(state.round).toBe(config(FAST).warmupRounds);
     const symbol = must(config(FAST).equities[0]?.symbol, 'first equity symbol');
-    const buy: StockMarket3Action = { orders: [{ kind: 'MARKET', symbol, side: 'BUY', quantity: 1 }] };
+    const buy: StockMarket3Action = {
+      orders: [{ kind: 'MARKET', symbol, side: 'BUY', quantity: 1 }],
+    };
     expect(stockMarket3.validateAction(state, 'alice', buy).ok).toBe(true);
   });
 
@@ -121,7 +147,11 @@ describe('warmup', () => {
     let state = initialState(FAST);
     const rng = createRng(Buffer.alloc(16, 1));
     for (let i = 0; i < 5; i++) {
-      state = stockMarket3.resolve({ state, actions: actionsOf(PARTICIPANT_IDS.map((id) => [id, hold()])), rng }).nextState;
+      state = stockMarket3.resolve({
+        state,
+        actions: actionsOf(PARTICIPANT_IDS.map((id) => [id, hold()])),
+        rng,
+      }).nextState;
     }
     const observation = stockMarket3.getObservation(state, 'alice');
     const security = observation.securities[0];
@@ -134,11 +164,17 @@ describe('trading', () => {
     let state = initialState(FAST);
     const rng = createRng(Buffer.alloc(16, 1));
     for (let i = 0; i < config(FAST).warmupRounds; i++) {
-      state = stockMarket3.resolve({ state, actions: actionsOf(PARTICIPANT_IDS.map((id) => [id, hold()])), rng }).nextState;
+      state = stockMarket3.resolve({
+        state,
+        actions: actionsOf(PARTICIPANT_IDS.map((id) => [id, hold()])),
+        rng,
+      }).nextState;
     }
     const symbol = must(config(FAST).equities[0]?.symbol, 'first equity symbol');
     const before = must(state.portfolios.get('alice'), "alice's portfolio");
-    const buy: StockMarket3Action = { orders: [{ kind: 'MARKET', symbol, side: 'BUY', quantity: 10 }] };
+    const buy: StockMarket3Action = {
+      orders: [{ kind: 'MARKET', symbol, side: 'BUY', quantity: 10 }],
+    };
     const actions = actionsOf([
       ['alice', buy],
       ['bob', hold()],
@@ -153,29 +189,59 @@ describe('trading', () => {
     let state = initialState(FAST);
     const rng = createRng(Buffer.alloc(16, 1));
     for (let i = 0; i < config(FAST).warmupRounds; i++) {
-      state = stockMarket3.resolve({ state, actions: actionsOf(PARTICIPANT_IDS.map((id) => [id, hold()])), rng }).nextState;
+      state = stockMarket3.resolve({
+        state,
+        actions: actionsOf(PARTICIPANT_IDS.map((id) => [id, hold()])),
+        rng,
+      }).nextState;
     }
     const symbol = must(config(FAST).equities[0]?.symbol, 'first equity symbol');
-    const referencePrice = must(state.securities.get(symbol), `security ${symbol}`).referencePriceCents / 100;
+    const referencePrice =
+      must(state.securities.get(symbol), `security ${symbol}`).referencePriceCents / 100;
     // A limit price far below the market should rest unfilled.
     const lowball: StockMarket3Action = {
-      orders: [{ kind: 'LIMIT', symbol, side: 'BUY', quantity: 5, limitPrice: Math.max(0.01, referencePrice * 0.1), timeInForce: 'GTC' }],
+      orders: [
+        {
+          kind: 'LIMIT',
+          symbol,
+          side: 'BUY',
+          quantity: 5,
+          limitPrice: Math.max(0.01, referencePrice * 0.1),
+          timeInForce: 'GTC',
+        },
+      ],
     };
-    state = stockMarket3.resolve({ state, actions: actionsOf(PARTICIPANT_IDS.map((id) => [id, id === 'alice' ? lowball : hold()])), rng }).nextState;
+    state = stockMarket3.resolve({
+      state,
+      actions: actionsOf(PARTICIPANT_IDS.map((id) => [id, id === 'alice' ? lowball : hold()])),
+      rng,
+    }).nextState;
     const restingOrder = must(
-      must(state.securities.get(symbol), `security ${symbol}`).openOrders.find((o) => o.participantId === 'alice'),
+      must(state.securities.get(symbol), `security ${symbol}`).openOrders.find(
+        (o) => o.participantId === 'alice',
+      ),
       'alice resting order',
     );
 
     const cancel: StockMarket3Action = { orders: [{ kind: 'CANCEL', orderId: restingOrder.id }] };
     expect(stockMarket3.validateAction(state, 'alice', cancel).ok).toBe(true);
-    state = stockMarket3.resolve({ state, actions: actionsOf(PARTICIPANT_IDS.map((id) => [id, id === 'alice' ? cancel : hold()])), rng }).nextState;
-    expect(must(state.securities.get(symbol), `security ${symbol}`).openOrders.some((o) => o.participantId === 'alice')).toBe(false);
+    state = stockMarket3.resolve({
+      state,
+      actions: actionsOf(PARTICIPANT_IDS.map((id) => [id, id === 'alice' ? cancel : hold()])),
+      rng,
+    }).nextState;
+    expect(
+      must(state.securities.get(symbol), `security ${symbol}`).openOrders.some(
+        (o) => o.participantId === 'alice',
+      ),
+    ).toBe(false);
   });
 
   it('rejects an order for an unknown or inactive symbol', () => {
     const state = initialState(FAST);
-    const bogus: StockMarket3Action = { orders: [{ kind: 'MARKET', symbol: 'NOT_A_SYMBOL', side: 'BUY', quantity: 1 }] };
+    const bogus: StockMarket3Action = {
+      orders: [{ kind: 'MARKET', symbol: 'NOT_A_SYMBOL', side: 'BUY', quantity: 1 }],
+    };
     expect(stockMarket3.validateAction(state, 'alice', bogus).ok).toBe(false);
   });
 });

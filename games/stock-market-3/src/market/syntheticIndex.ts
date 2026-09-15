@@ -11,11 +11,14 @@ const INDEX_SPECIFIC_VOLATILITY = 0.004;
  * breakdown (spec §18-19).
  */
 export function computeIndexWeights(equities: readonly SecurityState[]): Record<string, number> {
-  const capsCents = equities.map((security) => security.sharesOutstanding * security.fundamentalValueCents);
+  const capsCents = equities.map(
+    (security) => security.sharesOutstanding * security.fundamentalValueCents,
+  );
   const totalCents = capsCents.reduce((sum, cap) => sum + cap, 0);
   const weights: Record<string, number> = {};
   equities.forEach((security, index) => {
-    weights[security.symbol] = totalCents > 0 ? (capsCents[index] ?? 0) / totalCents : 1 / equities.length;
+    weights[security.symbol] =
+      totalCents > 0 ? (capsCents[index] ?? 0) / totalCents : 1 / equities.length;
   });
   return weights;
 }

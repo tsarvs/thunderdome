@@ -32,13 +32,22 @@ const decideAction = createDecideAction(undefined, (decision) => {
   }
 });
 
-console.log(`Running fusion-fundamental-v1 solo, ${startDate} -> ${endDate}, real engine, shorting ENABLED.\n`);
-const summary = runFusionMatch({ decideAction, startDate, endDate, risk: { allowShortSelling: true } });
+console.log(
+  `Running fusion-fundamental-v1 solo, ${startDate} -> ${endDate}, real engine, shorting ENABLED.\n`,
+);
+const summary = runFusionMatch({
+  decideAction,
+  startDate,
+  endDate,
+  risk: { allowShortSelling: true },
+});
 
 console.log('\n--- Result ---');
 console.log(`Rounds played: ${String(summary.totalRounds)}`);
 console.log(`Final equity: $${(summary.finalEquityCents / 100).toFixed(2)}`);
-console.log(`High-confidence STRONG_SELL decisions that called for a short: ${String(shortsOpened)}`);
+console.log(
+  `High-confidence STRONG_SELL decisions that called for a short: ${String(shortsOpened)}`,
+);
 if (summary.totalReturn !== undefined) {
   console.log(`Total return: ${(summary.totalReturn * 100).toFixed(2)}%`);
   console.log(`Max drawdown: ${((summary.maxDrawdown ?? 0) * 100).toFixed(2)}%`);
@@ -48,5 +57,7 @@ if (summary.totalReturn !== undefined) {
   );
 }
 if (summary.benchmarkReturn !== null) {
-  console.log(`ELMT buy-and-hold return over the same window: ${(summary.benchmarkReturn * 100).toFixed(2)}%`);
+  console.log(
+    `ELMT buy-and-hold return over the same window: ${(summary.benchmarkReturn * 100).toFixed(2)}%`,
+  );
 }

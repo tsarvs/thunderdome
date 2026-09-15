@@ -6,10 +6,21 @@ import type { DailyCandle, Trade } from '../types.js';
  * (spec §20). If no trades executed at all this round, the documented fallback is open = high =
  * low = close = the day's reference price, volume = 0.
  */
-export function buildDailyCandle(date: string, referencePriceCents: number, trades: readonly Trade[]): DailyCandle {
+export function buildDailyCandle(
+  date: string,
+  referencePriceCents: number,
+  trades: readonly Trade[],
+): DailyCandle {
   if (trades.length === 0) {
     const referencePrice = toDollars(referencePriceCents);
-    return { date, open: referencePrice, high: referencePrice, low: referencePrice, close: referencePrice, volume: 0 };
+    return {
+      date,
+      open: referencePrice,
+      high: referencePrice,
+      low: referencePrice,
+      close: referencePrice,
+      volume: 0,
+    };
   }
 
   let high = -Infinity;

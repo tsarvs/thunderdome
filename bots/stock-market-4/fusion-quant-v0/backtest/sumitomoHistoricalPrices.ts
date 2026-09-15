@@ -1,4 +1,4 @@
-import type { DailyBar } from '../src/marketTypes.js';
+import type { DailyBar } from '@thunderdome/quant-sdk-js';
 
 /**
  * Sumitomo Electric Industries, Ltd. (TYO:5802) REAL daily price history, pulled from stockanalysis.com on

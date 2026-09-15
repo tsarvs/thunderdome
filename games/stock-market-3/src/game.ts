@@ -111,10 +111,16 @@ function lastOf<T>(items: readonly T[], label: string): T {
   return last;
 }
 
-function buildInitialLiquidity(security: SecurityState, config: StockMarket3Config, rng: Parameters<typeof generateLiquiditySnapshot>[0]['rng']): LiquiditySnapshot {
+function buildInitialLiquidity(
+  security: SecurityState,
+  config: StockMarket3Config,
+  rng: Parameters<typeof generateLiquiditySnapshot>[0]['rng'],
+): LiquiditySnapshot {
   return generateLiquiditySnapshot({
     referencePriceCents: security.referencePriceCents,
-    expectedDailyVolume: config.liquidity.averageDailyVolume * (security.kind === 'INDEX' ? INDEX_LIQUIDITY_MULTIPLIER : 1),
+    expectedDailyVolume:
+      config.liquidity.averageDailyVolume *
+      (security.kind === 'INDEX' ? INDEX_LIQUIDITY_MULTIPLIER : 1),
     volatilityHint: 0.02,
     profile: config.liquidity,
     bidQuantityMultiplier: 1,
@@ -135,7 +141,9 @@ export const stockMarket3: GameDefinition<
 
   parseConfig(raw) {
     const result = StockMarket3ConfigSchema.safeParse(raw);
-    return result.success ? ok(result.data) : err(result.error.issues.map((issue) => issue.message).join('; '));
+    return result.success
+      ? ok(result.data)
+      : err(result.error.issues.map((issue) => issue.message).join('; '));
   },
 
   redactConfigForBots(config) {
@@ -164,7 +172,9 @@ export const stockMarket3: GameDefinition<
       const sharesOutstanding = Math.round(20_000_000 + rng.nextFloat() * 280_000_000);
       const priceCents = toCents(15 + rng.nextFloat() * 185);
       const pendingActual = reportedFinancialsFor(fundamentals, sharesOutstanding);
-      const nextEarningsRound = calendar.find((e) => e.type === 'EARNINGS_REPORT' && e.symbol === def.symbol)?.round ?? config.rounds;
+      const nextEarningsRound =
+        calendar.find((e) => e.type === 'EARNINGS_REPORT' && e.symbol === def.symbol)?.round ??
+        config.rounds;
       const initialConsensus = initialConsensusEstimate(pendingActual, rng);
 
       const security: SecurityState = {
@@ -187,7 +197,13 @@ export const stockMarket3: GameDefinition<
         pendingLiquidity: { bids: [], asks: [] },
         borrowFeeAnnualized: config.risk.borrowFeeAnnualized,
         borrowableShares: config.risk.borrowableShares,
-        analystRevisions: [{ observedAtRound: 0, periodLabel: quarterLabelFor(nextEarningsRound), consensus: initialConsensus }],
+        analystRevisions: [
+          {
+            observedAtRound: 0,
+            periodLabel: quarterLabelFor(nextEarningsRound),
+            consensus: initialConsensus,
+          },
+        ],
         events: [],
       };
       return security;
@@ -224,14 +240,23 @@ export const stockMarket3: GameDefinition<
     }
 
     const lastEconomicReadings = Object.fromEntries(
-      ECONOMIC_RELEASE_INDICATORS.map((indicator) => [indicator, initialIndicatorReading(indicator)]),
+      ECONOMIC_RELEASE_INDICATORS.map((indicator) => [
+        indicator,
+        initialIndicatorReading(indicator),
+      ]),
     ) as StockMarket3State['lastEconomicReadings'];
 
     const startingCashCents = toCents(config.startingCash);
     const portfolios = new Map<string, PortfolioAccount>(
       participantIds.map((id) => [
         id,
-        { cashCents: startingCashCents, positions: new Map(), bankrupt: false, peakEquityCents: startingCashCents, maxDrawdown: 0 },
+        {
+          cashCents: startingCashCents,
+          positions: new Map(),
+          bankrupt: false,
+          peakEquityCents: startingCashCents,
+          maxDrawdown: 0,
+        },
       ]),
     );
     const riskStats = new Map(participantIds.map((id) => [id, emptyRiskStats()]));
@@ -273,7 +298,9 @@ export const stockMarket3: GameDefinition<
     }
     const action = result.data;
     if (action.orders.length > state.config.maxOrdersPerRound) {
-      return err(`too many orders: submitted ${String(action.orders.length)}, max ${String(state.config.maxOrdersPerRound)}`);
+      return err(
+        `too many orders: submitted ${String(action.orders.length)}, max ${String(state.config.maxOrdersPerRound)}`,
+      );
     }
     const portfolio = state.portfolios.get(participantId);
     if (portfolio === undefined) {
@@ -282,14 +309,21 @@ export const stockMarket3: GameDefinition<
     if (portfolio.bankrupt && action.orders.length > 0) {
       return err('participant is bankrupt and can no longer trade');
     }
-    if (state.round < state.config.warmupRounds && action.orders.some((order) => order.kind !== 'CANCEL')) {
-      return err(`trading is not allowed during warmup (round ${String(state.round)} of ${String(state.config.warmupRounds)})`);
+    if (
+      state.round < state.config.warmupRounds &&
+      action.orders.some((order) => order.kind !== 'CANCEL')
+    ) {
+      return err(
+        `trading is not allowed during warmup (round ${String(state.round)} of ${String(state.config.warmupRounds)})`,
+      );
     }
 
     for (const order of action.orders) {
       if (order.kind === 'CANCEL') {
-        const exists = [...state.securities.values()].some(
-          (security) => security.openOrders.some((o) => o.id === order.orderId && o.participantId === participantId),
+        const exists = [...state.securities.values()].some((security) =>
+          security.openOrders.some(
+            (o) => o.id === order.orderId && o.participantId === participantId,
+          ),
         );
         if (!exists) {
           return err(`cannot cancel unknown or foreign order "${order.orderId}"`);
@@ -310,9 +344,13 @@ export const stockMarket3: GameDefinition<
     const risk = config.risk;
     const nextRoundNumber = state.round + 1;
 
-    const activeSecurities = [...state.securities.values()].filter((s) => s.active).sort((a, b) => a.symbol.localeCompare(b.symbol));
+    const activeSecurities = [...state.securities.values()]
+      .filter((s) => s.active)
+      .sort((a, b) => a.symbol.localeCompare(b.symbol));
     const activeSymbols = activeSecurities.map((s) => s.symbol);
-    const referencePricesCents = new Map(activeSecurities.map((s) => [s.symbol, s.referencePriceCents]));
+    const referencePricesCents = new Map(
+      activeSecurities.map((s) => [s.symbol, s.referencePriceCents]),
+    );
     const openOrders: RestingOrder[] = activeSecurities.flatMap((s) => s.openOrders);
     const pendingLiquidity = new Map(activeSecurities.map((s) => [s.symbol, s.pendingLiquidity]));
 
@@ -353,19 +391,33 @@ export const stockMarket3: GameDefinition<
           if (security === undefined) {
             continue;
           }
-          totalFeeCents += dailyBorrowFeeCents(-position.shares, referencePricesCents.get(symbol) ?? security.referencePriceCents, security.borrowFeeAnnualized);
+          totalFeeCents += dailyBorrowFeeCents(
+            -position.shares,
+            referencePricesCents.get(symbol) ?? security.referencePriceCents,
+            security.borrowFeeAnnualized,
+          );
         }
         if (totalFeeCents > 0) {
           portfolios = new Map(portfolios);
-          portfolios.set(participantId, { ...portfolio, cashCents: portfolio.cashCents - totalFeeCents });
+          portfolios.set(participantId, {
+            ...portfolio,
+            cashCents: portfolio.cashCents - totalFeeCents,
+          });
           const stats = riskStats.get(participantId) ?? emptyRiskStats();
-          riskStats.set(participantId, { ...stats, borrowFeesPaidCents: stats.borrowFeesPaidCents + totalFeeCents });
+          riskStats.set(participantId, {
+            ...stats,
+            borrowFeesPaidCents: stats.borrowFeesPaidCents + totalFeeCents,
+          });
         }
       }
 
       for (const participantId of state.participantIds) {
         const portfolio = portfolios.get(participantId);
-        if (portfolio === undefined || portfolio.bankrupt || !isBelowMaintenance(portfolio, referencePricesCents, risk)) {
+        if (
+          portfolio === undefined ||
+          portfolio.bankrupt ||
+          !isBelowMaintenance(portfolio, referencePricesCents, risk)
+        ) {
           continue;
         }
         openOrdersNext = openOrdersNext.filter((o) => o.participantId !== participantId);
@@ -381,7 +433,10 @@ export const stockMarket3: GameDefinition<
         forcedTrades.push(...liquidation.trades);
         const equityAfter = equityCents(liquidation.portfolio, referencePricesCents);
         portfolios = new Map(portfolios);
-        portfolios.set(participantId, equityAfter < 0 ? { ...liquidation.portfolio, bankrupt: true } : liquidation.portfolio);
+        portfolios.set(
+          participantId,
+          equityAfter < 0 ? { ...liquidation.portfolio, bankrupt: true } : liquidation.portfolio,
+        );
         const stats = riskStats.get(participantId) ?? emptyRiskStats();
         riskStats.set(participantId, {
           ...stats,
@@ -427,7 +482,9 @@ export const stockMarket3: GameDefinition<
       const net = netDemandBySymbol.get(trade.symbol) ?? 0;
       netDemandBySymbol.set(
         trade.symbol,
-        net + (trade.buyerParticipantId !== null ? trade.quantity : 0) - (trade.sellerParticipantId !== null ? trade.quantity : 0),
+        net +
+          (trade.buyerParticipantId !== null ? trade.quantity : 0) -
+          (trade.sellerParticipantId !== null ? trade.quantity : 0),
       );
     }
 
@@ -443,13 +500,21 @@ export const stockMarket3: GameDefinition<
       const priceHistory = [...security.priceHistory, candle].slice(-config.priceHistoryLength);
       newPriceHistoryBySymbol.set(symbol, priceHistory);
 
-      const previousClose = security.priceHistory[security.priceHistory.length - 1]?.close ?? toDollars(referencePriceCents);
-      oneRoundReturnBySymbol.set(symbol, previousClose > 0 ? Math.log(candle.close / previousClose) : 0);
+      const previousClose =
+        security.priceHistory[security.priceHistory.length - 1]?.close ??
+        toDollars(referencePriceCents);
+      oneRoundReturnBySymbol.set(
+        symbol,
+        previousClose > 0 ? Math.log(candle.close / previousClose) : 0,
+      );
     }
 
     // --- Portfolio equity/drawdown tracking, marked at this round's realized closes. ---
     const closeMarksCents = new Map(
-      activeSymbols.map((symbol) => [symbol, toCents(lastOf(mustGet(newPriceHistoryBySymbol, symbol), `priceHistory[${symbol}]`).close)]),
+      activeSymbols.map((symbol) => [
+        symbol,
+        toCents(lastOf(mustGet(newPriceHistoryBySymbol, symbol), `priceHistory[${symbol}]`).close),
+      ]),
     );
     for (const participantId of state.participantIds) {
       const portfolio = portfolios.get(participantId);
@@ -458,7 +523,10 @@ export const stockMarket3: GameDefinition<
       }
       const nlvCents = equityCents(portfolio, closeMarksCents);
       const peakEquityCents = Math.max(portfolio.peakEquityCents, nlvCents);
-      const maxDrawdown = peakEquityCents > 0 ? Math.max(portfolio.maxDrawdown, (peakEquityCents - nlvCents) / peakEquityCents) : portfolio.maxDrawdown;
+      const maxDrawdown =
+        peakEquityCents > 0
+          ? Math.max(portfolio.maxDrawdown, (peakEquityCents - nlvCents) / peakEquityCents)
+          : portfolio.maxDrawdown;
       portfolios = new Map(portfolios);
       portfolios.set(participantId, { ...portfolio, peakEquityCents, maxDrawdown });
     }
@@ -470,7 +538,10 @@ export const stockMarket3: GameDefinition<
     for (const factor of ECONOMIC_FACTORS) {
       factorDeltas[factor] = nextEconomicFactors[factor] - state.economicFactors[factor];
     }
-    const marketShock = gaussian(rng) * MARKET_SHOCK_VOLATILITY * REGIME_PROFILES[nextRegimeValue].volatilityMultiplier;
+    const marketShock =
+      gaussian(rng) *
+      MARKET_SHOCK_VOLATILITY *
+      REGIME_PROFILES[nextRegimeValue].volatilityMultiplier;
 
     // --- Cross-sector terms: explicit sparse links (spec §12) + market-impact bleed (spec §35), both lagged one round. ---
     const explicitSectorTermBySymbol: Record<string, number> = {};
@@ -482,9 +553,14 @@ export const stockMarket3: GameDefinition<
       if (fromPeers.length === 0) {
         continue;
       }
-      const average = fromPeers.reduce((sum, symbol) => sum + (oneRoundReturnBySymbol.get(symbol) ?? 0), 0) / fromPeers.length;
-      for (const toSymbol of activeSecurities.filter((s) => s.sector === link.to).map((s) => s.symbol)) {
-        explicitSectorTermBySymbol[toSymbol] = (explicitSectorTermBySymbol[toSymbol] ?? 0) + link.weight * average;
+      const average =
+        fromPeers.reduce((sum, symbol) => sum + (oneRoundReturnBySymbol.get(symbol) ?? 0), 0) /
+        fromPeers.length;
+      for (const toSymbol of activeSecurities
+        .filter((s) => s.sector === link.to)
+        .map((s) => s.symbol)) {
+        explicitSectorTermBySymbol[toSymbol] =
+          (explicitSectorTermBySymbol[toSymbol] ?? 0) + link.weight * average;
       }
     }
     const marketImpactTermBySymbol = computeSectorImpactNudges({
@@ -494,28 +570,48 @@ export const stockMarket3: GameDefinition<
     });
 
     // --- Scheduled maturities (acquisitions/delistings taking effect this round). ---
-    const maturing = state.scheduledCorporateActions.filter((a) => !a.applied && a.effectiveRound === nextRoundNumber);
+    const maturing = state.scheduledCorporateActions.filter(
+      (a) => !a.applied && a.effectiveRound === nextRoundNumber,
+    );
     const maturingSymbols = new Set(maturing.map((a) => a.symbol));
     for (const action of maturing) {
       for (const participantId of state.participantIds) {
         const portfolio = portfolios.get(participantId);
-        const position = portfolio !== undefined ? getPosition(portfolio, action.symbol) : undefined;
+        const position =
+          portfolio !== undefined ? getPosition(portfolio, action.symbol) : undefined;
         if (portfolio === undefined || position === undefined || position.shares === 0) {
           continue;
         }
         const side = position.shares > 0 ? 'SELL' : 'BUY';
         portfolios = new Map(portfolios);
-        portfolios.set(participantId, applyFill(portfolio, action.symbol, side, Math.abs(position.shares), action.cashPerShareCents, 0));
+        portfolios.set(
+          participantId,
+          applyFill(
+            portfolio,
+            action.symbol,
+            side,
+            Math.abs(position.shares),
+            action.cashPerShareCents,
+            0,
+          ),
+        );
       }
     }
     openOrdersNext = openOrdersNext.filter((o) => !maturingSymbols.has(o.symbol));
-    const scheduledCorporateActions: ScheduledCorporateAction[] = state.scheduledCorporateActions.map((a) =>
-      a.effectiveRound === nextRoundNumber && !a.applied ? { ...a, applied: true } : a,
-    );
+    const scheduledCorporateActions: ScheduledCorporateAction[] =
+      state.scheduledCorporateActions.map((a) =>
+        a.effectiveRound === nextRoundNumber && !a.applied ? { ...a, applied: true } : a,
+      );
 
     // --- Calendar-driven public information for nextRoundNumber. ---
-    const earningsToday = new Set(state.calendar.filter((e) => e.type === 'EARNINGS_REPORT' && e.round === nextRoundNumber).map((e) => e.symbol));
-    const economicReleaseToday = state.calendar.find((e) => e.type === 'ECONOMIC_RELEASE' && e.round === nextRoundNumber);
+    const earningsToday = new Set(
+      state.calendar
+        .filter((e) => e.type === 'EARNINGS_REPORT' && e.round === nextRoundNumber)
+        .map((e) => e.symbol),
+    );
+    const economicReleaseToday = state.calendar.find(
+      (e) => e.type === 'ECONOMIC_RELEASE' && e.round === nextRoundNumber,
+    );
 
     let marketEvents = state.marketEvents;
     let lastEconomicReadings = state.lastEconomicReadings;
@@ -523,7 +619,11 @@ export const stockMarket3: GameDefinition<
       const indicator = economicReleaseToday.indicator;
       const previous = lastEconomicReadings[indicator];
       const consensus = forecastIndicatorReading(indicator, previous, rng);
-      const reported = deriveIndicatorReading(indicator, nextEconomicFactors[factorFor(indicator)], rng);
+      const reported = deriveIndicatorReading(
+        indicator,
+        nextEconomicFactors[factorFor(indicator)],
+        rng,
+      );
       const release: EconomicReleaseEvent = {
         type: 'ECONOMIC_RELEASE',
         observedAtRound: nextRoundNumber,
@@ -556,7 +656,9 @@ export const stockMarket3: GameDefinition<
         continue;
       }
       if (security.fundamentals === null || security.pendingActual === null) {
-        throw new Error(`stock-market-3 internal error: EQUITY "${symbol}" is missing fundamentals/pendingActual`);
+        throw new Error(
+          `stock-market-3 internal error: EQUITY "${symbol}" is missing fundamentals/pendingActual`,
+        );
       }
 
       let events: PublicEvent[] = security.events;
@@ -566,7 +668,8 @@ export const stockMarket3: GameDefinition<
       let analystRevisions = security.analystRevisions;
 
       if (earningsToday.has(symbol)) {
-        const lastConsensus = analystRevisions[analystRevisions.length - 1]?.consensus ?? pendingActual;
+        const lastConsensus =
+          analystRevisions[analystRevisions.length - 1]?.consensus ?? pendingActual;
         eventImpactReturn = earningsSurpriseImpact(pendingActual, lastConsensus);
         const periodLabel = quarterLabelFor(nextRoundNumber);
         const earningsEvent: PublicEvent = {
@@ -579,12 +682,20 @@ export const stockMarket3: GameDefinition<
         };
         events = [...events, earningsEvent].slice(-config.eventHistoryLength);
 
-        fundamentals = stepFundamentalsForNextQuarter(fundamentals, nextEconomicFactors.GROWTH, rng);
+        fundamentals = stepFundamentalsForNextQuarter(
+          fundamentals,
+          nextEconomicFactors.GROWTH,
+          rng,
+        );
         pendingActual = reportedFinancialsFor(fundamentals, security.sharesOutstanding);
         const nextConsensus = initialConsensusEstimate(pendingActual, rng);
         analystRevisions = [
           ...analystRevisions,
-          { observedAtRound: nextRoundNumber, periodLabel: quarterLabelFor(nextRoundNumber + 63), consensus: nextConsensus },
+          {
+            observedAtRound: nextRoundNumber,
+            periodLabel: quarterLabelFor(nextRoundNumber + 63),
+            consensus: nextConsensus,
+          },
         ].slice(-config.eventHistoryLength);
       } else {
         const news = maybeUnscheduledNews(symbol, nextRegimeValue, nextRoundNumber, rng);
@@ -592,17 +703,29 @@ export const stockMarket3: GameDefinition<
           events = [...events, news.event].slice(-config.eventHistoryLength);
         }
         eventImpactReturn = news.impactReturn;
-        const lastConsensus = analystRevisions[analystRevisions.length - 1]?.consensus ?? pendingActual;
+        const lastConsensus =
+          analystRevisions[analystRevisions.length - 1]?.consensus ?? pendingActual;
         const revised = reviseConsensus(lastConsensus, pendingActual, rng);
         analystRevisions = [
           ...analystRevisions,
-          { observedAtRound: nextRoundNumber, periodLabel: analystRevisions[analystRevisions.length - 1]?.periodLabel ?? quarterLabelFor(nextRoundNumber), consensus: revised },
+          {
+            observedAtRound: nextRoundNumber,
+            periodLabel:
+              analystRevisions[analystRevisions.length - 1]?.periodLabel ??
+              quarterLabelFor(nextRoundNumber),
+            consensus: revised,
+          },
         ].slice(-config.eventHistoryLength);
       }
 
-      const crossSectorTerm = (explicitSectorTermBySymbol[symbol] ?? 0) + (marketImpactTermBySymbol[symbol] ?? 0);
+      const crossSectorTerm =
+        (explicitSectorTermBySymbol[symbol] ?? 0) + (marketImpactTermBySymbol[symbol] ?? 0);
       const stepPriceHistory = mustGet(newPriceHistoryBySymbol, symbol);
-      const securityForStep: SecurityState = { ...security, fundamentals, priceHistory: stepPriceHistory };
+      const securityForStep: SecurityState = {
+        ...security,
+        fundamentals,
+        priceHistory: stepPriceHistory,
+      };
       const nextFundamentalValueCents = stepEquityFundamentalValue({
         security: securityForStep,
         factorDeltas,
@@ -641,15 +764,23 @@ export const stockMarket3: GameDefinition<
       // oscillates around the trigger threshold from splitting every few rounds — real companies
       // split at most a handful of times ever, not routinely.
       const recentlySplit = draft.events.some(
-        (event) => (event.type === 'STOCK_SPLIT' || event.type === 'REVERSE_SPLIT') && nextRoundNumber - event.observedAtRound < SPLIT_COOLDOWN_ROUNDS,
+        (event) =>
+          (event.type === 'STOCK_SPLIT' || event.type === 'REVERSE_SPLIT') &&
+          nextRoundNumber - event.observedAtRound < SPLIT_COOLDOWN_ROUNDS,
       );
       const dividend = maybeTriggerDividend(draft, rng);
       const buyback = dividend === null ? maybeTriggerBuyback(draft, rng) : null;
-      const split = buyback === null && !recentlySplit ? maybeTriggerSplit(draft, draft.initialReferencePriceCents) : null;
+      const split =
+        buyback === null && !recentlySplit
+          ? maybeTriggerSplit(draft, draft.initialReferencePriceCents)
+          : null;
       const details = dividend ?? buyback ?? split;
       if (details !== null) {
         draft = applyCorporateActionToSecurity(draft, details);
-        events = [...events, { type: details.type, observedAtRound: nextRoundNumber, symbol, details }].slice(-config.eventHistoryLength);
+        events = [
+          ...events,
+          { type: details.type, observedAtRound: nextRoundNumber, symbol, details },
+        ].slice(-config.eventHistoryLength);
         draft = { ...draft, events };
         for (const participantId of state.participantIds) {
           const portfolio = portfolios.get(participantId);
@@ -660,18 +791,33 @@ export const stockMarket3: GameDefinition<
           if (position.shares === 0 && details.type !== 'CASH_DIVIDEND') {
             continue;
           }
-          const { position: nextPosition, cashDeltaCents } = adjustPositionForCorporateAction(position, details);
+          const { position: nextPosition, cashDeltaCents } = adjustPositionForCorporateAction(
+            position,
+            details,
+          );
           const nextPositions = new Map(portfolio.positions);
           nextPositions.set(symbol, nextPosition);
           portfolios = new Map(portfolios);
-          portfolios.set(participantId, { ...portfolio, cashCents: portfolio.cashCents + cashDeltaCents, positions: nextPositions });
+          portfolios.set(participantId, {
+            ...portfolio,
+            cashCents: portfolio.cashCents + cashDeltaCents,
+            positions: nextPositions,
+          });
         }
       }
 
       // --- New acquisition/delisting announcements (only if not already scheduled). ---
       if (!nextScheduledCorporateActions.some((a) => a.symbol === symbol && !a.applied)) {
-        const acquisition = maybeAnnounceAcquisition(draft, draft.initialReferencePriceCents, nextRoundNumber, rng);
-        const delisting = acquisition === null ? maybeAnnounceDelisting(draft, draft.initialReferencePriceCents, nextRoundNumber, rng) : null;
+        const acquisition = maybeAnnounceAcquisition(
+          draft,
+          draft.initialReferencePriceCents,
+          nextRoundNumber,
+          rng,
+        );
+        const delisting =
+          acquisition === null
+            ? maybeAnnounceDelisting(draft, draft.initialReferencePriceCents, nextRoundNumber, rng)
+            : null;
         const announcement = acquisition ?? delisting;
         if (announcement !== null) {
           nextScheduledCorporateActions.push(announcement);
@@ -685,8 +831,16 @@ export const stockMarket3: GameDefinition<
                 symbol,
                 details:
                   announcement.type === 'ACQUISITION'
-                    ? { type: 'ACQUISITION', effectiveRound: announcement.effectiveRound, cashPerShareCents: announcement.cashPerShareCents }
-                    : { type: 'DELISTING', effectiveRound: announcement.effectiveRound, reason: announcement.reason },
+                    ? {
+                        type: 'ACQUISITION',
+                        effectiveRound: announcement.effectiveRound,
+                        cashPerShareCents: announcement.cashPerShareCents,
+                      }
+                    : {
+                        type: 'DELISTING',
+                        effectiveRound: announcement.effectiveRound,
+                        reason: announcement.reason,
+                      },
               } satisfies CorporateActionEvent,
             ].slice(-config.eventHistoryLength),
           };
@@ -732,8 +886,14 @@ export const stockMarket3: GameDefinition<
         pendingLiquidity: nextLiquidity,
         lastRoundVolume: (() => {
           const trades = tradesBySymbol.get(symbol) ?? [];
-          const sharesBought = trades.reduce((sum, t) => sum + (t.buyerParticipantId !== null ? t.quantity : 0), 0);
-          const sharesSold = trades.reduce((sum, t) => sum + (t.sellerParticipantId !== null ? t.quantity : 0), 0);
+          const sharesBought = trades.reduce(
+            (sum, t) => sum + (t.buyerParticipantId !== null ? t.quantity : 0),
+            0,
+          );
+          const sharesSold = trades.reduce(
+            (sum, t) => sum + (t.sellerParticipantId !== null ? t.quantity : 0),
+            0,
+          );
           return { sharesBought, sharesSold, netDemand: sharesBought - sharesSold };
         })(),
         openOrders: openOrdersNext.filter((o) => o.symbol === symbol),
@@ -747,7 +907,9 @@ export const stockMarket3: GameDefinition<
       const before = state.securities.get(symbol);
       const after = preCorporateActionFundamentalValueCents.get(symbol);
       constituentLogReturns[symbol] =
-        before !== undefined && after !== undefined && before.fundamentalValueCents > 0 ? Math.log(after / before.fundamentalValueCents) : 0;
+        before !== undefined && after !== undefined && before.fundamentalValueCents > 0
+          ? Math.log(after / before.fundamentalValueCents)
+          : 0;
     }
     const nextIndexFundamentalValueCents = stepIndexFundamentalValue({
       currentIndexValueCents: indexSecurity.fundamentalValueCents,
@@ -779,8 +941,14 @@ export const stockMarket3: GameDefinition<
       priceHistory: indexPriceHistory,
       lastRoundVolume: (() => {
         const trades = tradesBySymbol.get(config.indexSymbol) ?? [];
-        const sharesBought = trades.reduce((sum, t) => sum + (t.buyerParticipantId !== null ? t.quantity : 0), 0);
-        const sharesSold = trades.reduce((sum, t) => sum + (t.sellerParticipantId !== null ? t.quantity : 0), 0);
+        const sharesBought = trades.reduce(
+          (sum, t) => sum + (t.buyerParticipantId !== null ? t.quantity : 0),
+          0,
+        );
+        const sharesSold = trades.reduce(
+          (sum, t) => sum + (t.sellerParticipantId !== null ? t.quantity : 0),
+          0,
+        );
         return { sharesBought, sharesSold, netDemand: sharesBought - sharesSold };
       })(),
       pendingLiquidity: generateLiquiditySnapshot({
@@ -816,7 +984,11 @@ export const stockMarket3: GameDefinition<
         {
           type: 'round-result',
           participantIds: state.participantIds,
-          data: { round: state.round, trades: matchResult.trades, forcedLiquidations: forcedTrades },
+          data: {
+            round: state.round,
+            trades: matchResult.trades,
+            forcedLiquidations: forcedTrades,
+          },
         },
       ],
     };
@@ -831,7 +1003,12 @@ export const stockMarket3: GameDefinition<
   },
 
   getResult(state) {
-    const markPricesCents = new Map([...state.securities.values()].map((security) => [security.symbol, markPriceCentsOf(security)]));
+    const markPricesCents = new Map(
+      [...state.securities.values()].map((security) => [
+        security.symbol,
+        markPriceCentsOf(security),
+      ]),
+    );
     const scores: Record<string, number> = {};
     const startingCapital: Record<string, number> = {};
     const totalReturn: Record<string, number> = {};
@@ -853,7 +1030,8 @@ export const stockMarket3: GameDefinition<
       const nlv = toDollars(equityCents(portfolio, markPricesCents));
       scores[participantId] = nlv;
       startingCapital[participantId] = state.config.startingCash;
-      totalReturn[participantId] = state.config.startingCash > 0 ? nlv / state.config.startingCash - 1 : 0;
+      totalReturn[participantId] =
+        state.config.startingCash > 0 ? nlv / state.config.startingCash - 1 : 0;
       bankrupt[participantId] = portfolio.bankrupt;
       maxDrawdown[participantId] = portfolio.maxDrawdown;
       const stats = state.riskStats.get(participantId);
@@ -870,11 +1048,13 @@ export const stockMarket3: GameDefinition<
     const leaders = state.participantIds.filter((id) => scores[id] === bestScore);
     const indexSecurity = state.securities.get(state.config.indexSymbol);
 
-    const securityPrices: SecurityPriceSummary[] = [...state.securities.values()].map((security) => ({
-      symbol: security.symbol,
-      startingPrice: toDollars(security.initialReferencePriceCents),
-      finalPrice: toDollars(markPriceCentsOf(security)),
-    }));
+    const securityPrices: SecurityPriceSummary[] = [...state.securities.values()].map(
+      (security) => ({
+        symbol: security.symbol,
+        startingPrice: toDollars(security.initialReferencePriceCents),
+        finalPrice: toDollars(markPriceCentsOf(security)),
+      }),
+    );
 
     const portfolioSummaries: Record<string, PortfolioSummary> = {};
     for (const participantId of state.participantIds) {
@@ -891,7 +1071,9 @@ export const stockMarket3: GameDefinition<
             shares: position.shares,
             averageEntryPrice: toDollars(position.averageEntryPriceCents),
             marketValue: toDollars(position.shares * markCents),
-            unrealizedPnl: toDollars(position.shares * (markCents - position.averageEntryPriceCents)),
+            unrealizedPnl: toDollars(
+              position.shares * (markCents - position.averageEntryPriceCents),
+            ),
           };
         });
       portfolioSummaries[participantId] = {
@@ -920,7 +1102,10 @@ export const stockMarket3: GameDefinition<
       winnerId: leaders.length === 1 ? (leaders[0] ?? null) : null,
       indexSymbol: state.config.indexSymbol,
       indexStartingPrice: toDollars(state.startingIndexPriceCents),
-      indexFinalPrice: indexSecurity !== undefined ? toDollars(markPriceCentsOf(indexSecurity)) : toDollars(state.startingIndexPriceCents),
+      indexFinalPrice:
+        indexSecurity !== undefined
+          ? toDollars(markPriceCentsOf(indexSecurity))
+          : toDollars(state.startingIndexPriceCents),
       securityPrices,
       portfolioSummaries,
     };
@@ -935,7 +1120,13 @@ export const stockMarket3: GameDefinition<
     return ids.map((id): StandingOutcome => {
       const rank = 1 + ids.filter((other) => scoreOf(other) > scoreOf(id)).length;
       const outcome: NonNullable<StandingOutcome['outcome']> =
-        bestIds.length > 1 ? (bestIds.includes(id) ? 'draw' : 'loss') : id === bestIds[0] ? 'win' : 'loss';
+        bestIds.length > 1
+          ? bestIds.includes(id)
+            ? 'draw'
+            : 'loss'
+          : id === bestIds[0]
+            ? 'win'
+            : 'loss';
       return { participantId: id, rank, score: scoreOf(id), outcome };
     });
   },

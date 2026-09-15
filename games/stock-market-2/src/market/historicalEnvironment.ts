@@ -46,7 +46,9 @@ function readDataFile(fileName: string): unknown {
 function at<T>(items: readonly T[], index: number): T {
   const value = items[index];
   if (value === undefined) {
-    throw new Error(`historicalEnvironment: index ${String(index)} out of bounds (length ${String(items.length)})`);
+    throw new Error(
+      `historicalEnvironment: index ${String(index)} out of bounds (length ${String(items.length)})`,
+    );
   }
   return value;
 }

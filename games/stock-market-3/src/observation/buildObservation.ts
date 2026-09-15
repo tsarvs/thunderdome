@@ -33,13 +33,18 @@ import type {
  * can never leak a hidden field (see the `HIDDEN — never read below this line` markers). Grepping
  * this file against `SecurityState`'s own doc comment in types.ts is the audit.
  */
-export function buildObservation(state: StockMarket3State, participantId: string): StockMarket3Observation {
+export function buildObservation(
+  state: StockMarket3State,
+  participantId: string,
+): StockMarket3Observation {
   const portfolio = state.portfolios.get(participantId);
   if (portfolio === undefined) {
     throw new Error(`unknown participant "${participantId}"`);
   }
 
-  const allOpenOrders: RestingOrder[] = [...state.securities.values()].flatMap((security) => security.openOrders);
+  const allOpenOrders: RestingOrder[] = [...state.securities.values()].flatMap(
+    (security) => security.openOrders,
+  );
   const markPricesCents = new Map<string, number>();
   for (const security of state.securities.values()) {
     markPricesCents.set(security.symbol, markPriceCentsOf(security));
@@ -53,7 +58,12 @@ export function buildObservation(state: StockMarket3State, participantId: string
     .filter(([, position]) => position.shares !== 0)
     .map(([symbol, position]) => {
       const markCents = markPricesCents.get(symbol) ?? 0;
-      const { availableShares } = computeAvailability(portfolio, allOpenOrders, participantId, symbol);
+      const { availableShares } = computeAvailability(
+        portfolio,
+        allOpenOrders,
+        participantId,
+        symbol,
+      );
       return {
         symbol,
         shares: position.shares,
@@ -92,14 +102,24 @@ export function buildObservation(state: StockMarket3State, participantId: string
     nlv: toDollars(nlvCents),
     buyingPower: toDollars(remainingBuyingPowerCents(portfolio, markPricesCents, risk)),
     marginUsed: toDollars(grossCents),
-    maintenanceRequirement: toDollars(maintenanceRequirementCents(portfolio, markPricesCents, risk)),
+    maintenanceRequirement: toDollars(
+      maintenanceRequirementCents(portfolio, markPricesCents, risk),
+    ),
     grossExposure: toDollars(grossCents),
-    netExposure: toDollars(longExposureCents(portfolio, markPricesCents) - shortExposureCents(portfolio, markPricesCents)),
+    netExposure: toDollars(
+      longExposureCents(portfolio, markPricesCents) -
+        shortExposureCents(portfolio, markPricesCents),
+    ),
     longExposure: toDollars(longExposureCents(portfolio, markPricesCents)),
     shortExposure: toDollars(shortExposureCents(portfolio, markPricesCents)),
     leverage: nlvCents > 0 ? grossCents / nlvCents : 0,
     drawdown: portfolio.maxDrawdown,
-    realizedPnl: toDollars([...portfolio.positions.values()].reduce((sum, position) => sum + position.realizedPnlCents, 0)),
+    realizedPnl: toDollars(
+      [...portfolio.positions.values()].reduce(
+        (sum, position) => sum + position.realizedPnlCents,
+        0,
+      ),
+    ),
     bankrupt: portfolio.bankrupt,
     positions,
     openOrders,
@@ -120,7 +140,9 @@ export function buildObservation(state: StockMarket3State, participantId: string
 
 export function markPriceCentsOf(security: SecurityState): number {
   const lastCandle = security.priceHistory[security.priceHistory.length - 1];
-  return lastCandle !== undefined ? Math.round(lastCandle.close * 100) : security.referencePriceCents;
+  return lastCandle !== undefined
+    ? Math.round(lastCandle.close * 100)
+    : security.referencePriceCents;
 }
 
 function aggregateBookLevels(
@@ -134,10 +156,16 @@ function aggregateBookLevels(
     map.set(order.limitPriceCents, (map.get(order.limitPriceCents) ?? 0) + order.quantity);
   }
   for (const level of security.pendingLiquidity.bids) {
-    bidCentsByPrice.set(level.priceCents, (bidCentsByPrice.get(level.priceCents) ?? 0) + level.quantity);
+    bidCentsByPrice.set(
+      level.priceCents,
+      (bidCentsByPrice.get(level.priceCents) ?? 0) + level.quantity,
+    );
   }
   for (const level of security.pendingLiquidity.asks) {
-    askCentsByPrice.set(level.priceCents, (askCentsByPrice.get(level.priceCents) ?? 0) + level.quantity);
+    askCentsByPrice.set(
+      level.priceCents,
+      (askCentsByPrice.get(level.priceCents) ?? 0) + level.quantity,
+    );
   }
 
   const bids = [...bidCentsByPrice.entries()]
@@ -159,7 +187,9 @@ function latestFundamentalsOf(security: SecurityState): PublicFundamentalsSnapsh
       return {
         periodLabel: event.periodLabel,
         revenue: toDollars(event.reported.revenueCents),
-        earnings: toDollars(Math.round((event.reported.revenueCents * event.reported.marginBps) / 10000)),
+        earnings: toDollars(
+          Math.round((event.reported.revenueCents * event.reported.marginBps) / 10000),
+        ),
         marginBps: event.reported.marginBps,
       };
     }
@@ -171,8 +201,16 @@ function toPublicEvent(event: PublicEvent): PublicEventDollars {
   if (event.type === 'EARNINGS_REPORT') {
     return {
       ...event,
-      reported: { eps: toDollars(event.reported.epsCents), revenue: toDollars(event.reported.revenueCents), marginBps: event.reported.marginBps },
-      consensus: { eps: toDollars(event.consensus.epsCents), revenue: toDollars(event.consensus.revenueCents), marginBps: event.consensus.marginBps },
+      reported: {
+        eps: toDollars(event.reported.epsCents),
+        revenue: toDollars(event.reported.revenueCents),
+        marginBps: event.reported.marginBps,
+      },
+      consensus: {
+        eps: toDollars(event.consensus.epsCents),
+        revenue: toDollars(event.consensus.revenueCents),
+        marginBps: event.consensus.marginBps,
+      },
     };
   }
   if (event.type === 'ECONOMIC_RELEASE') {
@@ -184,31 +222,74 @@ function toPublicEvent(event: PublicEvent): PublicEventDollars {
   const details = event.details;
   switch (details.type) {
     case 'CASH_DIVIDEND':
-      return { ...event, details: { type: 'CASH_DIVIDEND', perShare: toDollars(details.perShareCents) } };
+      return {
+        ...event,
+        details: { type: 'CASH_DIVIDEND', perShare: toDollars(details.perShareCents) },
+      };
     case 'STOCK_SPLIT':
-      return { ...event, details: { type: 'STOCK_SPLIT', fromShares: details.fromShares, toShares: details.toShares } };
+      return {
+        ...event,
+        details: {
+          type: 'STOCK_SPLIT',
+          fromShares: details.fromShares,
+          toShares: details.toShares,
+        },
+      };
     case 'REVERSE_SPLIT':
-      return { ...event, details: { type: 'REVERSE_SPLIT', fromShares: details.fromShares, toShares: details.toShares } };
+      return {
+        ...event,
+        details: {
+          type: 'REVERSE_SPLIT',
+          fromShares: details.fromShares,
+          toShares: details.toShares,
+        },
+      };
     case 'BUYBACK':
-      return { ...event, details: { type: 'BUYBACK', sharesRepurchased: details.sharesRepurchased, price: toDollars(details.priceCents) } };
+      return {
+        ...event,
+        details: {
+          type: 'BUYBACK',
+          sharesRepurchased: details.sharesRepurchased,
+          price: toDollars(details.priceCents),
+        },
+      };
     case 'ACQUISITION':
-      return { ...event, details: { type: 'ACQUISITION', effectiveRound: details.effectiveRound, cashPerShare: toDollars(details.cashPerShareCents) } };
+      return {
+        ...event,
+        details: {
+          type: 'ACQUISITION',
+          effectiveRound: details.effectiveRound,
+          cashPerShare: toDollars(details.cashPerShareCents),
+        },
+      };
     case 'DELISTING':
-      return { ...event, details: { type: 'DELISTING', effectiveRound: details.effectiveRound, reason: details.reason } };
+      return {
+        ...event,
+        details: {
+          type: 'DELISTING',
+          effectiveRound: details.effectiveRound,
+          reason: details.reason,
+        },
+      };
   }
 }
 
-function buildSecurityObservation(security: SecurityState, orderBookDepth: number): SecurityObservation {
+function buildSecurityObservation(
+  security: SecurityState,
+  orderBookDepth: number,
+): SecurityObservation {
   const lastCandle = security.priceHistory[security.priceHistory.length - 1];
   const book = aggregateBookLevels(security, orderBookDepth);
 
-  const analystRevisionHistory: AnalystRevisionPublic[] = security.analystRevisions.map((revision) => ({
-    observedAtRound: revision.observedAtRound,
-    periodLabel: revision.periodLabel,
-    eps: toDollars(revision.consensus.epsCents),
-    revenue: toDollars(revision.consensus.revenueCents),
-    marginBps: revision.consensus.marginBps,
-  }));
+  const analystRevisionHistory: AnalystRevisionPublic[] = security.analystRevisions.map(
+    (revision) => ({
+      observedAtRound: revision.observedAtRound,
+      periodLabel: revision.periodLabel,
+      eps: toDollars(revision.consensus.epsCents),
+      revenue: toDollars(revision.consensus.revenueCents),
+      marginBps: revision.consensus.marginBps,
+    }),
+  );
   const latestRevision = security.analystRevisions[security.analystRevisions.length - 1];
 
   return {
@@ -218,7 +299,8 @@ function buildSecurityObservation(security: SecurityState, orderBookDepth: numbe
     active: security.active,
     sharesOutstanding: security.sharesOutstanding,
     quote: {
-      lastClose: lastCandle !== undefined ? lastCandle.close : toDollars(security.referencePriceCents),
+      lastClose:
+        lastCandle !== undefined ? lastCandle.close : toDollars(security.referencePriceCents),
       bid: book.bids[0]?.price ?? null,
       ask: book.asks[0]?.price ?? null,
       bidSize: book.bids[0]?.quantity ?? 0,
@@ -227,7 +309,10 @@ function buildSecurityObservation(security: SecurityState, orderBookDepth: numbe
     },
     priceHistory: security.priceHistory,
     lastRoundVolume: security.lastRoundVolume,
-    borrow: { availableShares: security.borrowableShares, feeAnnualized: security.borrowFeeAnnualized },
+    borrow: {
+      availableShares: security.borrowableShares,
+      feeAnnualized: security.borrowFeeAnnualized,
+    },
     latestFundamentals: latestFundamentalsOf(security),
     analystConsensus:
       latestRevision !== undefined

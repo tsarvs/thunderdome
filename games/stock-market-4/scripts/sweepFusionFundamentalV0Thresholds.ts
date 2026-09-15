@@ -59,9 +59,7 @@ function main(): void {
 
   rows.sort((a, b) => (b.sharpeRatio ?? -Infinity) - (a.sharpeRatio ?? -Infinity));
 
-  console.log(
-    'hysteresisBand  rebalanceTolerance  trades  totalReturn  maxDrawdown  sharpe',
-  );
+  console.log('hysteresisBand  rebalanceTolerance  trades  totalReturn  maxDrawdown  sharpe');
   for (const row of rows) {
     console.log(
       `${row.hysteresisBand.toFixed(2).padStart(14)}  ` +
@@ -73,8 +71,10 @@ function main(): void {
     );
   }
 
-  console.log(`\nCurrent default: hysteresisBand=${String(DEFAULT_FUSION_FUNDAMENTAL_CONFIG.signal.hysteresisBand)}, ` +
-    `rebalanceToleranceWeight=${String(DEFAULT_FUSION_FUNDAMENTAL_CONFIG.portfolio.rebalanceToleranceWeight)}`);
+  console.log(
+    `\nCurrent default: hysteresisBand=${String(DEFAULT_FUSION_FUNDAMENTAL_CONFIG.signal.hysteresisBand)}, ` +
+      `rebalanceToleranceWeight=${String(DEFAULT_FUSION_FUNDAMENTAL_CONFIG.portfolio.rebalanceToleranceWeight)}`,
+  );
 }
 
 main();
