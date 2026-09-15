@@ -28,7 +28,7 @@ import { createDecideAction } from '../../../bots/stock-market-4/fusion-fundamen
 import {
   DATASET_ID,
   DATASET_VERSION,
-  DEFAULT_STORE_DIR,
+  DEFAULT_DB_PATH,
 } from '../../../packages/stock-market-4/market-data/scripts/seedFusionFundamentalV0.js';
 
 export const PARTICIPANT_ID = 'fusion-fundamental-v0';
@@ -101,7 +101,11 @@ export function runFusionMatch(params: {
     startDate,
     endDate,
     marketDataUniverse: TICKERS,
-    marketDataset: { id: DATASET_ID, version: DATASET_VERSION, storeDir: DEFAULT_STORE_DIR },
+    marketDataset: {
+      id: DATASET_ID,
+      version: DATASET_VERSION,
+      dbPath: DEFAULT_DB_PATH,
+    },
     researchTimeline: buildResearchTimeline(startDate, endDate),
     benchmarkTicker: params.benchmarkTicker ?? 'ELMT',
     ...(params.risk ? { risk: params.risk } : {}),

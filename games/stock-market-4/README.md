@@ -1,14 +1,40 @@
 # Stock Market 4
 
-Where [`stock-market-2`](../stock-market-2/README.md) and [`stock-market-3`](../stock-market-3/README.md)
-_simulate_ a market — a hidden price model, a hidden macro economy, an order book matching bots
-against each other — this version **replays one**. You supply the daily bars (real historical
-data, or a synthetic series you generated yourself); the game replays them day by day, gated so a
-bot never sees a bar, corporate action, or research payload before its own date. Nothing here
-invents prices. Execution is deliberately simplified (every fill is against the tape itself, never
-against another participant — no order book) to keep the focus on portfolio-management decisions:
-sizing, risk, leverage, and — optionally — incorporating an external research signal, rather than
-exchange microstructure.
+_The Assemblies didn't fall to war, or famine, or another sky turning black. They fell the way
+everything since the Griddle went dark eventually falls: something bigger showed up wanting the
+same thing. Only difference was they brought a better balance sheet._
+
+_The Combines were never nations, and never pretended to be — no flag, no treasury anyone could
+audit, no border that wasn't also a supply chain._
+
+_What they inherited from the Assemblies was the appetite, not the apparatus. No synthetic index.
+No invented macro economy. No hidden fundamental value some engine rolled up out of noise — a
+Combine doesn't gamble on a number it can't trace back to something that actually happened. It
+trades the real tape: real companies, real closes, exactly as history recorded them. At this
+scale, fiction just doesn't move enough capital to be worth fabricating._
+
+_Denny's outlived all of it anyway. The Concern, the Last Griddle, whatever a given era called
+it — it didn't survive as a company, and it didn't survive as a black-market invitation. It
+survived as scripture._
+
+_**The Church of the Bottomless Cup** doesn't sell breakfast; nobody left alive has tasted a real Grand Slam, and most
+Combines have quietly stopped pretending that's the point. What matters now is Standing — a portfolio large enough, and
+cleanly enough won, to count as an offering the Grand Slam Gods might actually notice — and the honor of
+having built it by grinding every rival Combine's own ledger down to nothing in the process._
+
+_Nobody trades for breakfast anymore. Everybody still trades for Denny's._
+
+## About this game
+
+Where [`stock-market-2`](../stock-market-2/README.md) and
+[`stock-market-3`](../stock-market-3/README.md) _simulate_ a market — a hidden price model, a
+hidden macro economy, an order book matching bots against each other — this version **replays
+one**. You supply the daily bars (real historical data, or a synthetic series you generated
+yourself); the game replays them day by day, gated so a bot never sees a bar, corporate action, or
+research payload before its own date. Nothing here invents prices. Execution is deliberately
+simplified (every fill is against the tape itself, never against another participant — no order
+book) to keep the focus on portfolio-management decisions: sizing, risk, leverage, and —
+optionally — incorporating an external research signal, rather than exchange microstructure.
 
 One round = one real trading day.
 
@@ -22,11 +48,11 @@ section after it goes deeper into the reasoning behind each piece, for once you'
 make this run."
 
 - [Quickstart](#quickstart)
-  - [1. Supply market data](#1-supply-market-data)
-  - [2. Write a config](#2-write-a-config)
-  - [3. Run a match](#3-run-a-match)
-  - [4. Feed in research (optional)](#4-feed-in-research-optional)
-  - [5. Create and execute orders](#5-create-and-execute-orders)
+    - [1. Supply market data](#1-supply-market-data)
+    - [2. Write a config](#2-write-a-config)
+    - [3. Run a match](#3-run-a-match)
+    - [4. Feed in research (optional)](#4-feed-in-research-optional)
+    - [5. Create and execute orders](#5-create-and-execute-orders)
 - [Running a real forward-shadow match (beginner walkthrough)](#running-a-real-forward-shadow-match-beginner-walkthrough) —
   no code, just the CLI: seeding a dataset, wiring in research, creating/resuming a match, and
   checking in on it
@@ -226,9 +252,12 @@ yarn workspace @thunderdome/market-data run seed:fusion-fundamental-v0
 ```
 
 This publishes dataset id `fusion-fundamental-v0` (check its own script,
-[`packages/stock-market-4/market-data/scripts/seedFusionFundamentalV0.ts`](../../packages/stock-market-4/market-data/scripts/seedFusionFundamentalV0.ts),
+[
+`packages/stock-market-4/market-data/scripts/seedFusionFundamentalV0.ts`](../../packages/stock-market-4/market-data/scripts/seedFusionFundamentalV0.ts),
 for the current `DATASET_VERSION` — it bumps whenever the published data itself is corrected) into
-`.thunderdome/market-data/` (gitignored local state, not committed). See
+the shared Stock Market 4 database at `.thunderdome/stock-market-4/db.sqlite` (gitignored local
+state, not committed — see
+[ADR-0014](../../docs/adr/0014-sqlite-standard-and-migrations.md)). See
 [`@thunderdome/market-data`'s own README](../../packages/stock-market-4/market-data/README.md) for the full
 picture, including tracking a brand-new ticker of your own.
 
@@ -238,7 +267,7 @@ than what's currently seeded:
 ```bash
 yarn workspace @thunderdome/market-data run fetch:append-bars -- \
   --dataset-id fusion-fundamental-v0 --dataset-version <the version you seeded> \
-  --store-dir ./.thunderdome/market-data
+  --db-path ./.thunderdome/stock-market-4/db.sqlite
 ```
 
 This fetches straight from Yahoo Finance's public chart API and only ever adds bars strictly after
@@ -259,12 +288,12 @@ If your bot uses [`@thunderdome/research-fusion`](../../packages/stock-market-4/
 fixture (as every `fusion-fundamental-*` version does), generate a real `researchTimeline` from it:
 
 ```bash
-STORE_DIR="$(pwd)/.thunderdome/market-data"
+DB_PATH="$(pwd)/.thunderdome/stock-market-4/db.sqlite"
 (cd packages/stock-market-4/research/fusion && yarn run emit:forward-config --silent -- \
   --market-dataset-id fusion-fundamental-v0 --market-dataset-version <the version you seeded> \
   --start-date 2026-07-13 --end-date 2026-12-31 --as-of-date "$(date +%F)" \
   --universe ELMT,FURUKAWA,VITZRONEXTECH,ALM,FREEM,OPTX,GFUZ,FUJIKURA,SUMITOMO,KMT,AMSC \
-  --store-dir "$STORE_DIR") \
+  --db-path "$DB_PATH") \
   > ./.thunderdome/preview-configs/my-match.json
 ```
 
@@ -322,19 +351,21 @@ Read-only: never persists a round or changes the match. Reports which securities
 between the match's own stored config and this freshly-generated one — or plainly says there's no
 new round to preview yet if the price dataset hasn't grown past what's already been played.
 
-Full flag reference for every command above: [`apps/cli/README.md`](../../apps/cli/README.md#match-forward-run--list--inspect).
+Full flag reference for every command above: [
+`apps/cli/README.md`](../../apps/cli/README.md#match-forward-run--list--inspect).
 
 ---
 
 ## You supply the data
 
-There is no procedural price engine in this game, historical or synthetic. `config.historicalPrices`
-is a plain `{ [ticker]: DailyBar[] }` map — every bar you want this match to ever show a bot, for
-every ticker in `config.marketDataUniverse`. `config.marketDataMode` (`'historical'` or
-`'synthetic'`, default `'historical'`) is a label only: nothing about how a series is read,
-replayed, split-adjusted, or traded against differs by mode. If you want a synthetic match, you
-generate the synthetic series yourself (however you like) and hand it in exactly the same way you'd
-hand in real data — see [`market/historicalPrices.ts`](src/market/historicalPrices.ts) and
+There is no procedural price engine in this game, historical or synthetic.
+`config.historicalPrices` is a plain `{ [ticker]: DailyBar[] }` map — every bar you want this match
+to ever show a bot, for every ticker in `config.marketDataUniverse`. `config.marketDataMode`
+(`'historical'` or `'synthetic'`, default `'historical'`) is a label only: nothing about how a
+series is read, replayed, split-adjusted, or traded against differs by mode. If you want a
+synthetic match, you generate the synthetic series yourself (however you like) and hand it in
+exactly the same way you'd hand in real data — see
+[`market/historicalPrices.ts`](src/market/historicalPrices.ts) and
 [`market/calendar.ts`](src/market/calendar.ts).
 
 ```
@@ -460,7 +491,7 @@ See [`metrics/performance.ts`](src/metrics/performance.ts).
 ## Results, ranking, and determinism
 
 Ranked by final equity, highest wins — ties share a rank (competition ranking: 1, 1, 3, never 1,
-1, 2), same convention as `stock-market-3`'s own net-liquidation-value scoring. This was chosen
+1, 2), same convention `stock-market-3`'s own net-liquidation-value scoring used. This was chosen
 over a Sharpe-based ranking because `sharpeRatio` is legitimately `null` for plenty of real
 portfolios, which would need its own tiebreak rule anyway — `performanceMetrics`/`riskStats` stay
 on the result for anyone who wants a different scoring rule downstream.
@@ -510,3 +541,6 @@ solo against real history is a complete match on its own, reported as a solo win
   actually receives via `init` has all three stripped to their empty shape.
 - 229 tests across 15 files cover every module in this package — see `test/` for the full suite,
   organized to mirror `src/`.
+- None of this is a comment on the real, present-day financial markets or any real, currently
+  publicly traded company — every ticker you supply here is whatever real (or synthetic) data you
+  hand in, replayed exactly as given.

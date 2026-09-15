@@ -154,7 +154,7 @@ again later, once more data has arrived:
 
 ```bash
 yarn thunderdome match forward run fusion-live fusion-fundamental-v0 \
-  --config '{"gameType":"FORWARD_SHADOW","marketDataUniverse":["ELMT"],"marketDataset":{"id":"fusion","version":"1","storeDir":"./.thunderdome/market-data"},"startDate":"2026-09-01","endDate":"2026-12-31"}'
+  --config '{"gameType":"FORWARD_SHADOW","marketDataUniverse":["ELMT"],"marketDataset":{"id":"fusion","version":"1","dbPath":"./.thunderdome/stock-market-4/db.sqlite"},"startDate":"2026-09-01","endDate":"2026-12-31"}'
 ```
 
 ```

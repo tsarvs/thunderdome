@@ -13,6 +13,7 @@
   "dependencies": {
     "@thunderdome/engine": "^0.1.0",
     "@thunderdome/market-data": "^0.1.0",
+    "@thunderdome/stock-market-4-db": "^0.1.0",
     "zod": "^3.23.8"
   }
 }

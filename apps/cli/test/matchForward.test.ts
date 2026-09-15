@@ -1,6 +1,8 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { saveForwardMatchRecord, type ForwardMatchRecord } from '@thunderdome/forward-match-store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,12 +24,17 @@ import {
  */
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
-let storeDir: string;
+// See `@thunderdome/market-data`'s `src/store/db.ts` for why `node:sqlite` is loaded this way.
+const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as {
+  DatabaseSync: typeof DatabaseSyncType;
+};
+
+let dbPath: string;
 let root: string;
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'thunderdome-match-forward-test-'));
-  storeDir = join(root, 'forward-matches');
+  dbPath = join(root, 'db.sqlite');
 });
 
 afterEach(async () => {
@@ -68,7 +75,7 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
   it('exits 1 for an unknown bot id', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardRunCommand(
-      ['new-match', 'not-a-real-bot', '--config', '{}', '--store-dir', storeDir],
+      ['new-match', 'not-a-real-bot', '--config', '{}', '--store-dir', dbPath],
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
@@ -78,7 +85,7 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
   it('exits 1 when creating a new match without --config', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardRunCommand(
-      ['new-match', 'fusion-fundamental-v0', '--store-dir', storeDir],
+      ['new-match', 'fusion-fundamental-v0', '--store-dir', dbPath],
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
@@ -88,7 +95,7 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
   it('exits 1 for invalid --config JSON', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardRunCommand(
-      ['new-match', 'fusion-fundamental-v0', '--config', 'not json{{', '--store-dir', storeDir],
+      ['new-match', 'fusion-fundamental-v0', '--config', 'not json{{', '--store-dir', dbPath],
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
@@ -98,7 +105,7 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
   it('exits 1 when --config is missing required fields the game itself rejects', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardRunCommand(
-      ['new-match', 'fusion-fundamental-v0', '--config', '{}', '--store-dir', storeDir],
+      ['new-match', 'fusion-fundamental-v0', '--config', '{}', '--store-dir', dbPath],
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
@@ -121,7 +128,7 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
           },
         }),
         '--store-dir',
-        storeDir,
+        dbPath,
       ],
       { rootDir: repoRoot },
     );
@@ -135,7 +142,7 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
 
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardRunCommand(
-      ['new-match', 'not-a-real-bot', '--config-file', configPath, '--store-dir', storeDir],
+      ['new-match', 'not-a-real-bot', '--config-file', configPath, '--store-dir', dbPath],
       { rootDir: repoRoot },
     );
     // Reaches the same "unknown bot id" failure --config '{}' would — proves the file's contents
@@ -158,7 +165,7 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
         '--config-file',
         configPath,
         '--store-dir',
-        storeDir,
+        dbPath,
       ],
       { rootDir: repoRoot },
     );
@@ -175,7 +182,7 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
         '--config-file',
         join(root, 'missing.json'),
         '--store-dir',
-        storeDir,
+        dbPath,
       ],
       { rootDir: repoRoot },
     );
@@ -184,26 +191,30 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
   });
 
   it('exits 1 for a corrupt existing record, never silently creating a fresh match', async () => {
-    await mkdir(storeDir, { recursive: true });
-    await writeFile(join(storeDir, 'broken.json'), 'not json{{{', 'utf8');
+    await saveForwardMatchRecord(dbPath, sampleRecord({ matchId: 'broken' }));
+    const db = new DatabaseSync(dbPath);
+    db.prepare("UPDATE forward_matches SET snapshot = 'not json{{{' WHERE match_id = ?").run(
+      'broken',
+    );
+    db.close();
 
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardRunCommand(
-      ['broken', 'fusion-fundamental-v0', '--store-dir', storeDir],
+      ['broken', 'fusion-fundamental-v0', '--store-dir', dbPath],
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
-    expect(error).toHaveBeenCalledWith(expect.stringContaining('not valid JSON'));
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('unparseable JSON'));
   });
 
   it('exits 1 when resuming a match recorded for a different game', async () => {
     const record = sampleRecord({ matchId: 'wrong-game', gameId: 'connect-four' });
-    const saved = await saveForwardMatchRecord(storeDir, record);
+    const saved = await saveForwardMatchRecord(dbPath, record);
     expect(saved.ok).toBe(true);
 
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardRunCommand(
-      ['wrong-game', 'fusion-fundamental-v0', '--store-dir', storeDir],
+      ['wrong-game', 'fusion-fundamental-v0', '--store-dir', dbPath],
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
@@ -214,12 +225,12 @@ describe('runMatchForwardRunCommand: validation paths (no Docker touched)', () =
 
   it('exits 0 without touching Docker when resuming an already-completed match', async () => {
     const record = sampleRecord({ matchId: 'already-done', status: 'completed' });
-    const saved = await saveForwardMatchRecord(storeDir, record);
+    const saved = await saveForwardMatchRecord(dbPath, record);
     expect(saved.ok).toBe(true);
 
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const code = await runMatchForwardRunCommand(
-      ['already-done', 'fusion-fundamental-v0', '--store-dir', storeDir],
+      ['already-done', 'fusion-fundamental-v0', '--store-dir', dbPath],
       { rootDir: repoRoot },
     );
     expect(code).toBe(0);
@@ -234,23 +245,27 @@ describe('runMatchForwardListCommand', () => {
 
   it('reports no matches when the store is empty', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    const code = await runMatchForwardListCommand(['--store-dir', storeDir], { rootDir: repoRoot });
+    const code = await runMatchForwardListCommand(['--store-dir', dbPath], { rootDir: repoRoot });
     expect(code).toBe(0);
     expect(log).toHaveBeenCalledWith('No forward matches recorded yet.');
   });
 
   it('lists every valid record and warns about a corrupt one without hiding the rest', async () => {
-    await saveForwardMatchRecord(storeDir, sampleRecord({ matchId: 'valid-one' }));
-    await mkdir(storeDir, { recursive: true });
-    await writeFile(join(storeDir, 'corrupt.json'), 'not json{{{', 'utf8');
+    await saveForwardMatchRecord(dbPath, sampleRecord({ matchId: 'valid-one' }));
+    await saveForwardMatchRecord(dbPath, sampleRecord({ matchId: 'corrupt-one' }));
+    const db = new DatabaseSync(dbPath);
+    db.prepare("UPDATE forward_matches SET snapshot = 'not json{{{' WHERE match_id = ?").run(
+      'corrupt-one',
+    );
+    db.close();
 
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const code = await runMatchForwardListCommand(['--store-dir', storeDir], { rootDir: repoRoot });
+    const code = await runMatchForwardListCommand(['--store-dir', dbPath], { rootDir: repoRoot });
 
     expect(code).toBe(0);
     expect(log).toHaveBeenCalledWith(expect.stringContaining('valid-one'));
-    expect(error).toHaveBeenCalledWith(expect.stringContaining('corrupt.json'));
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('corrupt-one'));
   });
 });
 
@@ -268,7 +283,7 @@ describe('runMatchForwardInspectCommand', () => {
 
   it('exits 1 for a matchId with no saved record', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const code = await runMatchForwardInspectCommand(['never-saved', '--store-dir', storeDir], {
+    const code = await runMatchForwardInspectCommand(['never-saved', '--store-dir', dbPath], {
       rootDir: repoRoot,
     });
     expect(code).toBe(1);
@@ -276,13 +291,10 @@ describe('runMatchForwardInspectCommand', () => {
   });
 
   it('prints details for an existing record', async () => {
-    await saveForwardMatchRecord(
-      storeDir,
-      sampleRecord({ matchId: 'inspectable', roundsPlayed: 3 }),
-    );
+    await saveForwardMatchRecord(dbPath, sampleRecord({ matchId: 'inspectable', roundsPlayed: 3 }));
 
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    const code = await runMatchForwardInspectCommand(['inspectable', '--store-dir', storeDir], {
+    const code = await runMatchForwardInspectCommand(['inspectable', '--store-dir', dbPath], {
       rootDir: repoRoot,
     });
     expect(code).toBe(0);

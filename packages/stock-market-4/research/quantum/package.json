@@ -8,9 +8,12 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.test.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate:quantum-seed-migration": "tsx --tsconfig tsconfig.test.json scripts/generateQuantumSeedMigration.ts"
   },
   "dependencies": {
-    "@thunderdome/research-core": "^0.1.0"
+    "@thunderdome/research-core": "^0.1.0",
+    "@thunderdome/research-store": "^0.1.0",
+    "@thunderdome/sqlite-migrations": "^0.1.0"
   }
 }

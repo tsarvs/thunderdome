@@ -30,10 +30,14 @@ import {
   startBotLifecycles,
   untrackLifecycles,
 } from '../lib/match-execution.js';
-import { printRoundEvents } from './match.js';
+import { printForwardStandings, printRoundEvents } from './match.js';
 
+// Despite the name (kept for call-site/flag-name compatibility — `--store-dir`), this now
+// resolves to the ONE shared Stock Market 4 SQLite file, not a directory of per-match JSON files
+// — see docs/adr/0014-sqlite-standard-and-migrations.md. `@thunderdome/forward-match-store`
+// creates this file (and its parent directory) on first use if it doesn't exist yet.
 function defaultForwardMatchStoreDir(rootDir: string): string {
-  return path.join(rootDir, '.thunderdome', 'forward-matches');
+  return path.join(rootDir, '.thunderdome', 'stock-market-4', 'db.sqlite');
 }
 
 /**
@@ -51,6 +55,11 @@ interface ForwardResumableGameModule {
     snapshot: unknown;
   }) => unknown;
   isForwardMatchFullyResolved: (state: unknown) => boolean;
+  /** Optional: a game that also exports this (stock-market-4's `getCurrentStandings`) gets a
+   * standings/portfolio/"what each bot did today" summary printed after `run` processes whatever
+   * new rounds were available — see `printForwardStandings` (`./match.js`). Absent for any other
+   * forward-resumable game, which just skips the summary rather than failing. */
+  getCurrentStandings?: (state: unknown) => unknown;
 }
 
 function isForwardResumableGameModule(value: unknown): value is ForwardResumableGameModule {
@@ -326,6 +335,11 @@ export async function runMatchForwardRunCommand(
     if (!finalSave.ok) {
       console.error(finalSave.reason);
       return 1;
+    }
+
+    const standingsSummary = forwardModule.getCurrentStandings?.(outcome.finalState);
+    if (standingsSummary !== undefined) {
+      printForwardStandings(standingsSummary, record.participantIds);
     }
 
     console.log(

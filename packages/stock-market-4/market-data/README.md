@@ -65,4 +65,16 @@ if (readResult.ok) {
 ```
 
 See `scripts/seedFusionFixture.ts` for a fuller worked example, and
-`test/fixtures/fusionProofDataset.ts` for the small synthetic dataset it seeds.
+`test/fixtures/sampleDataset.ts` for the small synthetic dataset it seeds.
+
+## Growing real, curated data
+
+`scripts/seedFusionFundamentalV0.ts`, `scripts/appendBarsFromFile.ts`, and
+`scripts/fetchAndAppendBars.ts` don't write into a database file directly — they render a NEW,
+auto-numbered migration file (via `renderPublishDatasetVersionSql`/`renderAppendBarsSql`, see
+`src/store/sqlGen.ts`) under `src/migrations/`, git-tracked and reviewed in a PR like any other
+code change (see `docs/adr/0014-sqlite-standard-and-migrations.md`). Each prints the one manual
+step left afterward: adding the new file's import + array entry to `src/migrations/index.ts`.
+`seedFusionFixture.ts` is the one exception — it seeds this package's own unit-test fixture, which
+is already published independently inside every isolated test store, so it stays a plain
+direct-write dev convenience instead.

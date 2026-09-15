@@ -293,6 +293,133 @@ export function printPerformanceMetrics(result: unknown): void {
   }
 }
 
+/** Renders one `stock-market-4` `Fill` (games/stock-market-4/src/types.ts) as a human-readable
+ * line, or `null` if `fill` isn't shaped like one. A `filledQuantity` of `0` is reported
+ * explicitly ("no fill") rather than skipped — a bot that ASKED to trade and got nothing (no
+ * cash/shares available, a LIMIT that never crossed, no bar that day) is meaningfully different
+ * from a bot that submitted no orders at all, which `printForwardStandings` below already
+ * reports separately ("held (no trades)"). */
+function describeFill(fill: unknown): string | null {
+  if (typeof fill !== 'object' || fill === null) {
+    return null;
+  }
+  const { ticker, side, kind, requestedQuantity, filledQuantity, priceCents, feeCents } =
+    fill as Record<string, unknown>;
+  if (
+    typeof ticker !== 'string' ||
+    typeof side !== 'string' ||
+    typeof filledQuantity !== 'number' ||
+    typeof priceCents !== 'number'
+  ) {
+    return null;
+  }
+  if (filledQuantity === 0) {
+    const requested = typeof requestedQuantity === 'number' ? String(requestedQuantity) : '?';
+    return `${side} ${ticker}: requested ${requested}, filled 0 (no fill)`;
+  }
+  const kindLabel = typeof kind === 'string' && kind !== 'MARKET' ? ` (${kind})` : '';
+  const feeLabel =
+    typeof feeCents === 'number' && feeCents > 0 ? `, fee $${(feeCents / 100).toFixed(2)}` : '';
+  return `${side} ${String(filledQuantity)} ${ticker}${kindLabel} @ $${(priceCents / 100).toFixed(2)}${feeLabel}`;
+}
+
+/**
+ * Prints current standings/portfolio stats/today's fills from a `CurrentStandingsSummary`-shaped
+ * object (games/stock-market-4/src/game.ts's `getCurrentStandings`) — read generically off
+ * `unknown`, same idiom as every other printer in this file, so this stays a no-op for a game
+ * that doesn't expose this shape rather than needing a hard dependency on stock-market-4's own
+ * types. `participantIds` (not derived from `summary` itself) drives "what each bot did today" so
+ * every participant gets a line even if `summary` reports zero standings for some reason.
+ */
+export function printForwardStandings(summary: unknown, participantIds: readonly string[]): void {
+  if (typeof summary !== 'object' || summary === null) {
+    return;
+  }
+  const { asOfDate, benchmarkReturn, standings } = summary as Record<string, unknown>;
+  if (!Array.isArray(standings) || standings.length === 0) {
+    return;
+  }
+
+  const dateLabel = typeof asOfDate === 'string' ? asOfDate : '(unknown date)';
+  console.log(`\nStandings as of ${dateLabel}:`);
+  const byParticipantId = new Map<string, Record<string, unknown>>();
+  for (const entryRaw of standings) {
+    if (typeof entryRaw !== 'object' || entryRaw === null) continue;
+    const entry = entryRaw as Record<string, unknown>;
+    const {
+      participantId,
+      rank,
+      equityCents,
+      cashCents,
+      totalReturn,
+      maxDrawdown,
+      annualizedVolatility,
+      sharpeRatio,
+      positions,
+    } = entry;
+    if (
+      typeof participantId !== 'string' ||
+      typeof rank !== 'number' ||
+      typeof equityCents !== 'number'
+    ) {
+      continue;
+    }
+    byParticipantId.set(participantId, entry);
+
+    const sharpeLabel = typeof sharpeRatio === 'number' ? sharpeRatio.toFixed(2) : 'n/a';
+    const returnLabel =
+      typeof totalReturn === 'number' ? `, return ${(totalReturn * 100).toFixed(2)}%` : '';
+    const drawdownLabel =
+      typeof maxDrawdown === 'number' ? `, max drawdown ${(maxDrawdown * 100).toFixed(2)}%` : '';
+    const volLabel =
+      typeof annualizedVolatility === 'number'
+        ? `, volatility ${(annualizedVolatility * 100).toFixed(2)}%`
+        : '';
+    const cashLabel =
+      typeof cashCents === 'number' ? `, cash $${(cashCents / 100).toFixed(2)}` : '';
+    console.log(
+      `  ${String(rank)}. ${participantId}: equity $${(equityCents / 100).toFixed(2)}` +
+        `${cashLabel}${returnLabel}${drawdownLabel}${volLabel}, Sharpe ${sharpeLabel}`,
+    );
+
+    if (!Array.isArray(positions) || positions.length === 0) continue;
+    for (const positionRaw of positions) {
+      if (typeof positionRaw !== 'object' || positionRaw === null) continue;
+      const { ticker, shares, marketValueCents, unrealizedPnlCents } = positionRaw as Record<
+        string,
+        unknown
+      >;
+      if (typeof ticker !== 'string' || typeof shares !== 'number') continue;
+      const valueLabel =
+        typeof marketValueCents === 'number'
+          ? `, value $${(marketValueCents / 100).toFixed(2)}`
+          : '';
+      const pnlLabel =
+        typeof unrealizedPnlCents === 'number'
+          ? ` (${unrealizedPnlCents >= 0 ? '+' : ''}$${(unrealizedPnlCents / 100).toFixed(2)} unrealized)`
+          : '';
+      console.log(`       ${ticker}: ${String(shares)} sh${valueLabel}${pnlLabel}`);
+    }
+  }
+  if (typeof benchmarkReturn === 'number') {
+    console.log(`  (benchmark buy-and-hold return so far: ${(benchmarkReturn * 100).toFixed(2)}%)`);
+  }
+
+  console.log(`\nWhat each bot did on ${dateLabel}:`);
+  for (const participantId of participantIds) {
+    const lastFills = byParticipantId.get(participantId)?.lastFills;
+    if (!Array.isArray(lastFills) || lastFills.length === 0) {
+      console.log(`  ${participantId}: held (no trades)`);
+      continue;
+    }
+    console.log(`  ${participantId}:`);
+    for (const fill of lastFills) {
+      const line = describeFill(fill);
+      if (line !== null) console.log(`    ${line}`);
+    }
+  }
+}
+
 export interface MatchRunOptions {
   /** Repo root to scan games/ and bots/ under. */
   rootDir: string;

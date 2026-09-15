@@ -1,10 +1,17 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { saveForwardMatchRecord, type ForwardMatchRecord } from '@thunderdome/forward-match-store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runMatchForwardPreviewCommand } from '../src/commands/matchForwardPreview.js';
+
+// See `@thunderdome/market-data`'s `src/store/db.ts` for why `node:sqlite` is loaded this way.
+const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as {
+  DatabaseSync: typeof DatabaseSyncType;
+};
 
 /**
  * Unit-level coverage against the REAL registry, same spirit as `matchForward.test.ts` — every
@@ -14,12 +21,12 @@ import { runMatchForwardPreviewCommand } from '../src/commands/matchForwardPrevi
  */
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
-let storeDir: string;
+let dbPath: string;
 let root: string;
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'thunderdome-match-forward-preview-test-'));
-  storeDir = join(root, 'forward-matches');
+  dbPath = join(root, 'db.sqlite');
 });
 
 afterEach(async () => {
@@ -32,7 +39,7 @@ const VALID_FORWARD_CONFIG = {
   marketDataset: {
     id: 'fusion-fundamental-v0',
     version: '3',
-    storeDir: './.thunderdome/market-data',
+    dbPath: './.thunderdome/stock-market-4/db.sqlite',
   },
   startDate: '2026-07-13',
   endDate: '2026-12-31',
@@ -75,7 +82,7 @@ describe('runMatchForwardPreviewCommand: validation paths (no Docker touched)', 
 
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardPreviewCommand(
-      ['no-such-match', '--config-file', configPath, '--store-dir', storeDir],
+      ['no-such-match', '--config-file', configPath, '--store-dir', dbPath],
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
@@ -83,12 +90,12 @@ describe('runMatchForwardPreviewCommand: validation paths (no Docker touched)', 
   });
 
   it('exits 1 when --config-file does not exist', async () => {
-    const saved = await saveForwardMatchRecord(storeDir, sampleRecord());
+    const saved = await saveForwardMatchRecord(dbPath, sampleRecord());
     expect(saved.ok).toBe(true);
 
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardPreviewCommand(
-      ['test-forward-match', '--config-file', join(root, 'missing.json'), '--store-dir', storeDir],
+      ['test-forward-match', '--config-file', join(root, 'missing.json'), '--store-dir', dbPath],
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
@@ -96,14 +103,14 @@ describe('runMatchForwardPreviewCommand: validation paths (no Docker touched)', 
   });
 
   it('exits 1 for invalid --config-file JSON', async () => {
-    const saved = await saveForwardMatchRecord(storeDir, sampleRecord());
+    const saved = await saveForwardMatchRecord(dbPath, sampleRecord());
     expect(saved.ok).toBe(true);
     const configPath = join(root, 'config.json');
     await writeFile(configPath, 'not json{{', 'utf8');
 
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardPreviewCommand(
-      ['test-forward-match', '--config-file', configPath, '--store-dir', storeDir],
+      ['test-forward-match', '--config-file', configPath, '--store-dir', dbPath],
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
@@ -112,7 +119,7 @@ describe('runMatchForwardPreviewCommand: validation paths (no Docker touched)', 
 
   it("exits 1 when --config-file fails the game's own schema", async () => {
     const saved = await saveForwardMatchRecord(
-      storeDir,
+      dbPath,
       sampleRecord({ config: VALID_FORWARD_CONFIG }),
     );
     expect(saved.ok).toBe(true);
@@ -121,7 +128,7 @@ describe('runMatchForwardPreviewCommand: validation paths (no Docker touched)', 
 
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardPreviewCommand(
-      ['test-forward-match', '--config-file', configPath, '--store-dir', storeDir],
+      ['test-forward-match', '--config-file', configPath, '--store-dir', dbPath],
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
@@ -129,17 +136,21 @@ describe('runMatchForwardPreviewCommand: validation paths (no Docker touched)', 
   });
 
   it('exits 1 for a corrupt existing record', async () => {
-    await mkdir(storeDir, { recursive: true });
-    await writeFile(join(storeDir, 'broken.json'), 'not json{{{', 'utf8');
+    await saveForwardMatchRecord(dbPath, sampleRecord({ matchId: 'broken' }));
+    const db = new DatabaseSync(dbPath);
+    db.prepare("UPDATE forward_matches SET snapshot = 'not json{{{' WHERE match_id = ?").run(
+      'broken',
+    );
+    db.close();
     const configPath = join(root, 'config.json');
     await writeFile(configPath, '{}', 'utf8');
 
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const code = await runMatchForwardPreviewCommand(
-      ['broken', '--config-file', configPath, '--store-dir', storeDir],
+      ['broken', '--config-file', configPath, '--store-dir', dbPath],
       { rootDir: repoRoot },
     );
     expect(code).toBe(1);
-    expect(error).toHaveBeenCalledWith(expect.stringContaining('not valid JSON'));
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('unparseable JSON'));
   });
 });

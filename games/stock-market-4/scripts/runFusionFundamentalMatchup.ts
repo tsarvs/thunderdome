@@ -25,7 +25,7 @@ import { createDecideAction as createDecideActionV1 } from '../../../bots/stock-
 import {
   DATASET_ID,
   DATASET_VERSION,
-  DEFAULT_STORE_DIR,
+  DEFAULT_DB_PATH,
 } from '../../../packages/stock-market-4/market-data/scripts/seedFusionFundamentalV0.js';
 import { buildResearchTimeline, TICKERS } from './runFusionFundamentalV0.js';
 
@@ -40,7 +40,11 @@ const configResult = stockMarket4.parseConfig({
   startDate,
   endDate,
   marketDataUniverse: TICKERS,
-  marketDataset: { id: DATASET_ID, version: DATASET_VERSION, storeDir: DEFAULT_STORE_DIR },
+  marketDataset: {
+    id: DATASET_ID,
+    version: DATASET_VERSION,
+    dbPath: DEFAULT_DB_PATH,
+  },
   researchTimeline: buildResearchTimeline(startDate, endDate),
   benchmarkTicker: 'ELMT',
   risk: { allowShortSelling: true },

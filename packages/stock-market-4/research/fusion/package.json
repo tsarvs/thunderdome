@@ -11,10 +11,13 @@
     "test": "vitest run",
     "emit:forward-config": "tsx --tsconfig tsconfig.test.json scripts/emitForwardMatchConfig.ts",
     "apply:research-update": "tsx --tsconfig tsconfig.test.json scripts/applyResearchUpdate.ts",
-    "list:entities": "tsx --tsconfig tsconfig.test.json scripts/printKnownEntities.ts"
+    "list:entities": "tsx --tsconfig tsconfig.test.json scripts/printKnownEntities.ts",
+    "generate:fusion-seed-migration": "tsx --tsconfig tsconfig.test.json scripts/generateFusionSeedMigration.ts"
   },
   "dependencies": {
     "@thunderdome/fusion-universe": "^0.1.0",
-    "@thunderdome/research-core": "^0.1.0"
+    "@thunderdome/research-core": "^0.1.0",
+    "@thunderdome/research-store": "^0.1.0",
+    "@thunderdome/sqlite-migrations": "^0.1.0"
   }
 }

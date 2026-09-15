@@ -1,6 +1,6 @@
 import { createRng } from '@thunderdome/rng';
 import { describe, expect, it } from 'vitest';
-import { stockMarket4 } from '../src/game.js';
+import { getCurrentStandings, stockMarket4 } from '../src/game.js';
 import type { StockMarket4Action } from '../src/types.js';
 
 const rng = createRng(Buffer.alloc(16, 1));
@@ -547,6 +547,116 @@ describe('stockMarket4.resolve / isTerminal / getResult / getStandingOutcomes', 
     }
     expect(stockMarket4.isTerminal(state)).toBe(true);
     expect(stockMarket4.getResult(state).totalRounds).toBe(4);
+  });
+});
+
+describe('getCurrentStandings', () => {
+  it("reflects the current round's marks/fills, safe to call on a non-terminal state", () => {
+    let state = initialState();
+    const actions = noopActions();
+    actions.set('alice', {
+      orders: [{ kind: 'MARKET', ticker: 'NVDA', side: 'BUY', quantity: 10 }],
+    });
+    state = stockMarket4.resolve({ state, actions, rng }).nextState;
+    expect(stockMarket4.isTerminal(state)).toBe(false);
+
+    const feeCents = Math.round(10 * 105_00 * 0.001);
+    const summary = getCurrentStandings(state);
+    expect(summary.asOfDate).toBe('2026-01-06'); // round 1 — same date getObservation marks at
+
+    const alice = summary.standings.find((s) => s.participantId === 'alice');
+    const bob = summary.standings.find((s) => s.participantId === 'bob');
+    expect(alice?.equityCents).toBe(100_000_00 - 10 * 105_00 - feeCents + 10 * 106_00);
+    expect(bob?.equityCents).toBe(100_000_00);
+    expect(alice?.rank).toBe(1);
+    expect(bob?.rank).toBe(2);
+    expect(alice?.lastFills).toEqual([
+      {
+        ticker: 'NVDA',
+        side: 'BUY',
+        kind: 'MARKET',
+        requestedQuantity: 10,
+        filledQuantity: 10,
+        priceCents: 105_00,
+        feeCents,
+      },
+    ]);
+    expect(bob?.lastFills).toEqual([]);
+  });
+
+  it('ranks by current equity, ties sharing a rank (both still flat at match start)', () => {
+    const summary = getCurrentStandings(initialState());
+    expect(summary.standings.map((s) => s.rank)).toEqual([1, 1]);
+  });
+
+  it('lastFills only ever reflects the MOST RECENT round, never an earlier one', () => {
+    let state = initialState();
+    const actions = noopActions();
+    actions.set('alice', {
+      orders: [{ kind: 'MARKET', ticker: 'NVDA', side: 'BUY', quantity: 10 }],
+    });
+    state = stockMarket4.resolve({ state, actions, rng }).nextState;
+    // Round 2: alice submits no new orders — still holds the position, but traded nothing today.
+    state = stockMarket4.resolve({ state, actions: noopActions(), rng }).nextState;
+
+    const summary = getCurrentStandings(state);
+    const alice = summary.standings.find((s) => s.participantId === 'alice');
+    expect(alice?.positions).toEqual([expect.objectContaining({ ticker: 'NVDA', shares: 10 })]);
+    expect(alice?.lastFills).toEqual([]);
+  });
+
+  it('computes benchmarkReturn as-of the CURRENT round, not the whole match window', () => {
+    let state = initialState({ benchmarkTicker: 'NVDA' });
+    state = stockMarket4.resolve({ state, actions: noopActions(), rng }).nextState;
+
+    const summary = getCurrentStandings(state);
+    expect(summary.asOfDate).toBe('2026-01-06');
+    // (106 - 105) / 105 as-of-now — NOT the full match's (109 - 105) / 105 `getResult` would
+    // report once the match is actually terminal.
+    expect(summary.benchmarkReturn).toBeCloseTo((106 - 105) / 105, 10);
+  });
+
+  it("is safe to call once terminal, reporting the match's last trading day", () => {
+    let state = initialState();
+    const actions = noopActions();
+    for (let i = 0; i < 5; i++) {
+      state = stockMarket4.resolve({ state, actions, rng }).nextState;
+    }
+    expect(stockMarket4.isTerminal(state)).toBe(true);
+
+    const summary = getCurrentStandings(state);
+    expect(summary.asOfDate).toBe('2026-01-09');
+  });
+
+  it('reports REAL market value once terminal — unlike getObservation, which zeroes positions out once its own `date` goes null', () => {
+    // Regression test: an earlier version of getCurrentStandings called getObservation directly,
+    // whose own `date` is `calendar[state.round] ?? null` with NO further fallback — exactly
+    // `null` once state.round reaches calendar.length (the ordinary post-invocation state for a
+    // FORWARD_SHADOW match that just caught up to everything currently known), which zeroes every
+    // position's marketValueCents (see PortfolioObservation's own doc comment on `date === null`).
+    // That's correct for a BOT's own observation, but wrong for a host-side standings summary.
+    let state = initialState();
+    const actions = noopActions();
+    actions.set('alice', {
+      orders: [{ kind: 'MARKET', ticker: 'NVDA', side: 'BUY', quantity: 10 }],
+    });
+    state = stockMarket4.resolve({ state, actions, rng }).nextState; // round 0 (2026-01-05, close 105)
+    for (let i = 0; i < 4; i++) {
+      state = stockMarket4.resolve({ state, actions: noopActions(), rng }).nextState;
+    }
+    expect(stockMarket4.isTerminal(state)).toBe(true);
+    // getObservation itself is now cash-only, by design — confirms the premise above.
+    expect(
+      stockMarket4.getObservation(state, 'alice').portfolio.positions[0]?.marketValueCents,
+    ).toBe(0);
+
+    const summary = getCurrentStandings(state);
+    const alice = summary.standings.find((s) => s.participantId === 'alice');
+    // Marked at 2026-01-09's real close (109), not zeroed out.
+    expect(alice?.positions).toEqual([
+      expect.objectContaining({ ticker: 'NVDA', shares: 10, marketValueCents: 10 * 109_00 }),
+    ]);
+    expect(alice?.equityCents).not.toBe(alice?.cashCents);
   });
 });
 

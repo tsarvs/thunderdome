@@ -8,7 +8,9 @@ set -euo pipefail
 INDEPENDENT_PACKAGES=(
   "@thunderdome/protocol"
   "@thunderdome/rng"
+  "@thunderdome/sqlite-migrations"
   "@thunderdome/research-core"
+  "@thunderdome/research-store"
   "@thunderdome/fusion-universe"
   "@thunderdome/research-fusion"
   "@thunderdome/research-quantum"
@@ -20,6 +22,7 @@ INDEPENDENT_PACKAGES=(
   "@thunderdome/tournament-formats"
   "@thunderdome/tournament-store"
   "@thunderdome/forward-match-store"
+  "@thunderdome/stock-market-4-db"
   "@thunderdome/bot-sdk-js"
   "@thunderdome/game-sdk"
   "@thunderdome/registry"

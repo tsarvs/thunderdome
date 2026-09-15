@@ -2,14 +2,17 @@
 // persisted forward match's own `FORWARD_SHADOW` config fields without a real game/config parse.
 import path from 'node:path';
 
+// Despite the name (kept for call-site/flag-name compatibility — `--store-dir`), this now
+// resolves to the ONE shared Stock Market 4 SQLite file, not a directory of per-match JSON files
+// — see docs/adr/0014-sqlite-standard-and-migrations.md.
 export function defaultForwardMatchStoreDir(rootDir: string): string {
-  return path.join(rootDir, '.thunderdome', 'forward-matches');
+  return path.join(rootDir, '.thunderdome', 'stock-market-4', 'db.sqlite');
 }
 
 export interface MarketDatasetRef {
   id: string;
   version: string;
-  storeDir?: string;
+  dbPath?: string;
 }
 
 /** `record.config` is opaque (`unknown`) to `@thunderdome/forward-match-store` — this reads only
@@ -31,7 +34,7 @@ export function readForwardShadowFields(
     marketDataset: {
       id: d.id,
       version: d.version,
-      ...(typeof d.storeDir === 'string' ? { storeDir: d.storeDir } : {}),
+      ...(typeof d.dbPath === 'string' ? { dbPath: d.dbPath } : {}),
     },
   };
 }

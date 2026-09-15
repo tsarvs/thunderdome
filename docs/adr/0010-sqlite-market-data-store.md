@@ -89,9 +89,10 @@ a bot's `init` payload is built, while passing through the harmless `id`/`versio
   datasets seeded ahead of a match, whether historical or synthetic. A live ingestion pipeline
   feeding new rows into a dataset as real trading days close is future roadmap work built on top
   of this same provider interface, not a reason to revisit the interface itself.
-- This does not license any other package to add a database. A future case for persistence
-  elsewhere in the platform needs its own ADR making the same "why don't the existing plain-file
-  patterns fit" argument this one makes.
+- This does not, on its own, license any other package to add a database — that generalization,
+  plus a shared migration mechanism so schema changes don't mean re-inventing this package's own
+  `CREATE TABLE IF NOT EXISTS` approach per store, is ADR-0014's job, once research data and
+  forward-match/portfolio data hit the same wall this ADR describes.
 - No explicit close/dispose hook exists yet for the SQLite handle a match's `initialize()` opens —
   there is currently no `GameDefinition` teardown callback to call it from (see
   ADR-0005's own consequences on `TState` lifecycle). Acceptable for a single match process today;

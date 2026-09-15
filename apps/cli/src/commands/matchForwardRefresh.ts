@@ -85,7 +85,7 @@ export async function runMatchForwardRefreshCommand(
     toRefresh.push({ matchId, participantIds: record.participantIds });
   }
 
-  for (const { id, version, storeDir: marketStoreDir, tickers } of datasetsByKey.values()) {
+  for (const { id, version, dbPath: marketDbPath, tickers } of datasetsByKey.values()) {
     console.log(
       `\nFetching latest prices for dataset "${id}" v${version} (${String(tickers.size)} ticker(s))...`,
     );
@@ -102,12 +102,13 @@ export async function runMatchForwardRefreshCommand(
       '--tickers',
       [...tickers].join(','),
       // `yarn workspace <pkg> run <script>` executes with cwd set to that PACKAGE's own
-      // directory, not the invoking cwd — so a config's own `marketDataset.storeDir` (stored
-      // relative to the repo root by `emitForwardMatchConfig.ts`, e.g. "./.thunderdome/market-
-      // data") must be resolved against `options.rootDir` here, or it resolves against
-      // packages/stock-market-4/market-data/ instead and the fetch fails with "unable to open database file".
-      ...(marketStoreDir !== undefined
-        ? ['--store-dir', path.resolve(options.rootDir, marketStoreDir)]
+      // directory, not the invoking cwd — so a config's own `marketDataset.dbPath` (stored
+      // relative to the repo root by `emitForwardMatchConfig.ts`, e.g. "./.thunderdome/
+      // stock-market-4/db.sqlite") must be resolved against `options.rootDir` here, or it
+      // resolves against packages/stock-market-4/market-data/ instead and the fetch fails with
+      // "unable to open database file".
+      ...(marketDbPath !== undefined
+        ? ['--db-path', path.resolve(options.rootDir, marketDbPath)]
         : []),
     ];
     const result = spawnSync('yarn', args, { cwd: options.rootDir, stdio: 'inherit' });

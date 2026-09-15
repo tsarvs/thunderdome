@@ -103,7 +103,11 @@ function configInput(storeDir: string, overrides: Record<string, unknown> = {}) 
     marketDataUniverse: ['FAST', 'SLOW'],
     historicalContextDays: 10,
     gameType: 'FORWARD_SHADOW',
-    marketDataset: { id: DATASET_ID, version: DATASET_VERSION, storeDir },
+    marketDataset: {
+      id: DATASET_ID,
+      version: DATASET_VERSION,
+      dbPath: join(storeDir, `${DATASET_ID}.sqlite`),
+    },
     ...overrides,
   };
 }

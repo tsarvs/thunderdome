@@ -78,16 +78,16 @@ export async function runMatchForwardStatusCommand(
       continue;
     }
 
-    const { id, version, storeDir: marketStoreDir } = fields.marketDataset;
-    const key = `${id}@${version}@${marketStoreDir ?? ''}`;
+    const { id, version, dbPath: marketDbPath } = fields.marketDataset;
+    const key = `${id}@${version}@${marketDbPath ?? ''}`;
     let latestByTicker = priceCacheByKey.get(key);
     if (latestByTicker === undefined) {
-      const dbDir =
-        marketStoreDir !== undefined
-          ? path.resolve(options.rootDir, marketStoreDir)
-          : path.join(options.rootDir, '.thunderdome', 'market-data');
+      const resolvedDbPath =
+        marketDbPath !== undefined
+          ? path.resolve(options.rootDir, marketDbPath)
+          : path.join(options.rootDir, '.thunderdome', 'stock-market-4', 'db.sqlite');
       try {
-        latestByTicker = latestPriceDatesByTicker(path.join(dbDir, `${id}.sqlite`), id, version);
+        latestByTicker = latestPriceDatesByTicker(resolvedDbPath, id, version);
       } catch (error) {
         console.log(
           `  warning: could not read market-data store for "${id}"@${version}: ${error instanceof Error ? error.message : String(error)}`,

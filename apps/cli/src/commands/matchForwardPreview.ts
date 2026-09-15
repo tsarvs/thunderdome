@@ -18,8 +18,11 @@ import {
   untrackLifecycles,
 } from '../lib/match-execution.js';
 
+// Despite the name (kept for call-site/flag-name compatibility — `--store-dir`), this now
+// resolves to the ONE shared Stock Market 4 SQLite file, not a directory of per-match JSON files
+// — see docs/adr/0014-sqlite-standard-and-migrations.md.
 function defaultForwardMatchStoreDir(rootDir: string): string {
-  return path.join(rootDir, '.thunderdome', 'forward-matches');
+  return path.join(rootDir, '.thunderdome', 'stock-market-4', 'db.sqlite');
 }
 
 interface ForwardResumableGameModule {

@@ -5,7 +5,7 @@
  * `createResearchSnapshot` fresh per simulated day, a real match's config carries the whole
  * timeline up front once, at creation).
  *
- * Usage (`--universe` and `--store-dir` are both optional — see their defaults below; NOTE:
+ * Usage (`--universe` and `--db-path` are both optional — see their defaults below; NOTE:
  * `yarn workspace <pkg> run <script>` always writes its own "yarn run vX"/"$ <command>"/"Done in
  * Xs" banner to STDOUT — even with `--silent` — corrupting piped JSON; `cd` into the package and
  * use plain `yarn run --silent` instead, see scripts/README.md's own "known yarn
@@ -21,12 +21,13 @@ import { createFusionFixtureDataset } from '../src/fixture.js';
 import { buildResearchTimeline } from '../src/timeline.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// Absolute, not "./.thunderdome/market-data" — a relative default silently broke when this
-// config's storeDir was later read from a different cwd (see apps/cli's `matchForwardRefresh.ts`,
-// which had to work around exactly this by re-resolving it at call time). Anchoring it here, once,
-// at the actual source of the config, removes that whole class of bug for every future consumer.
+// Absolute, not "./.thunderdome/stock-market-4/db.sqlite" — a relative default silently broke
+// when this config's dbPath was later read from a different cwd (see apps/cli's
+// `matchForwardRefresh.ts`, which had to work around exactly this by re-resolving it at call
+// time). Anchoring it here, once, at the actual source of the config, removes that whole class of
+// bug for every future consumer.
 const REPO_ROOT = resolve(__dirname, '../../../../..');
-const DEFAULT_STORE_DIR = resolve(REPO_ROOT, '.thunderdome/market-data');
+const DEFAULT_DB_PATH = resolve(REPO_ROOT, '.thunderdome/stock-market-4/db.sqlite');
 
 function requireArg(args: Record<string, string>, name: string): string {
   const value = args[name];
@@ -51,7 +52,7 @@ function parseArgs(argv: string[]): Record<string, string> {
 function main(): void {
   const args = parseArgs(process.argv.slice(2));
   const asOfDate = args['as-of-date'] ?? requireArg(args, 'end-date');
-  const storeDir = args['store-dir'] ?? DEFAULT_STORE_DIR;
+  const dbPath = args['db-path'] ?? DEFAULT_DB_PATH;
   // Defaults to the full 11-ticker universe (@thunderdome/fusion-universe's own canonical order)
   // rather than requiring it be hand-typed on every invocation — pass --universe to trade a subset.
   const universe = args.universe ?? TRACKED_SECURITIES.map((s) => s.ticker).join(',');
@@ -65,7 +66,7 @@ function main(): void {
     marketDataset: {
       id: requireArg(args, 'market-dataset-id'),
       version: requireArg(args, 'market-dataset-version'),
-      storeDir,
+      dbPath,
     },
     startDate: requireArg(args, 'start-date'),
     endDate: requireArg(args, 'end-date'),

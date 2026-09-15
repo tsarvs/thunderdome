@@ -421,25 +421,29 @@ export type GameType = (typeof GAME_TYPES)[number];
 export const GameTypeSchema = z.enum(GAME_TYPES);
 
 // ---------------------------------------------------------------------------
-// Market dataset reference (roadmap Phase 1 — see docs/adr/0010-sqlite-market-data-store.md).
-// An ALTERNATIVE to declaring `historicalPrices`/`corporateActions` inline: a match may instead
-// point at a published, versioned dataset in a `@thunderdome/market-data` SQLite store, so a
-// competition stays reproducible against the exact dataset version it ran with even after that
-// dataset is later corrected (a correction publishes a new version; it never mutates an existing
-// one). The two are mutually exclusive (enforced below) — inline fields remain fully supported so
-// every existing match config keeps working unchanged; this is additive, not a replacement.
+// Market dataset reference (roadmap Phase 1 — see docs/adr/0010-sqlite-market-data-store.md,
+// docs/adr/0014-sqlite-standard-and-migrations.md). An ALTERNATIVE to declaring
+// `historicalPrices`/`corporateActions` inline: a match may instead point at a published,
+// versioned dataset in the shared Stock Market 4 SQLite database, so a competition stays
+// reproducible against the exact dataset version it ran with even after that dataset is later
+// corrected (a correction publishes a new version; it never mutates an existing one). The two are
+// mutually exclusive (enforced below) — inline fields remain fully supported so every existing
+// match config keeps working unchanged; this is additive, not a replacement.
 // ---------------------------------------------------------------------------
 
 export const MarketDatasetRefSchema = z
   .object({
     id: z.string().min(1),
     version: z.string().min(1),
-    /** Directory containing `<id>.sqlite`. Not something a match organizer typically hand-authors
-     * inline — resolved by whatever builds `configRaw` (e.g. a CLI default, mirroring
-     * `tournament-store`'s own `defaultStoreDir` convention) and merged in before `parseConfig`
-     * runs, so `parseConfig`/`initialize` themselves stay pure functions of their own `raw`/
-     * `config` input. Stripped from what a bot ever sees — see `redactConfigForBots` below. */
-    storeDir: z.string().min(1),
+    /** Path to the shared Stock Market 4 SQLite file (`@thunderdome/stock-market-4-db`) —
+     * ADR-0014 moved this off a per-dataset-id `<storeDir>/<id>.sqlite` convention onto ONE
+     * shared file holding every domain's data. Not something a match organizer typically
+     * hand-authors inline — resolved by whatever builds `configRaw` (e.g. a CLI default,
+     * mirroring `tournament-store`'s own `defaultStoreDir` convention) and merged in before
+     * `parseConfig` runs, so `parseConfig`/`initialize` themselves stay pure functions of their
+     * own `raw`/`config` input. Stripped from what a bot ever sees — see `redactConfigForBots`
+     * below. */
+    dbPath: z.string().min(1),
   })
   .strict();
 export type MarketDatasetRef = z.infer<typeof MarketDatasetRefSchema>;

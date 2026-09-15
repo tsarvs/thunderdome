@@ -1,10 +1,6 @@
 import { err, ok, type GameDefinition, type StandingOutcome } from '@thunderdome/engine';
-import {
-  createSqliteMarketDataProvider,
-  openMarketDataStore,
-  type MarketDataProvider,
-} from '@thunderdome/market-data';
-import { join } from 'node:path';
+import { createSqliteMarketDataProvider, type MarketDataProvider } from '@thunderdome/market-data';
+import { openStockMarket4Db } from '@thunderdome/stock-market-4-db';
 import { resolveOrdersForPortfolio } from './execution/orders.js';
 import { generateTradingCalendar } from './market/calendar.js';
 import {
@@ -44,6 +40,7 @@ import {
   type StockMarket4Action,
   type StockMarket4Config,
   type StockMarket4ForwardSnapshot,
+  type PositionObservation,
   type StockMarket4Observation,
   type StockMarket4Result,
   type StockMarket4State,
@@ -134,13 +131,15 @@ function assertHasPlayableDays(config: StockMarket4Config, cutoff: CalendarDate 
  */
 function buildMarketDataProvider(config: StockMarket4Config): MarketDataProvider | null {
   if (config.marketDataset === undefined) return null;
-  const { id, version, storeDir } = config.marketDataset;
+  const { id, version, dbPath } = config.marketDataset;
 
-  const storeResult = openMarketDataStore(join(storeDir, `${id}.sqlite`));
-  if (!storeResult.ok) {
-    throw new Error(`stock-market-4: ${storeResult.reason}`);
+  let store: ReturnType<typeof openStockMarket4Db>;
+  try {
+    store = openStockMarket4Db(dbPath);
+  } catch (error) {
+    throw new Error(`stock-market-4: ${error instanceof Error ? error.message : String(error)}`);
   }
-  const providerResult = createSqliteMarketDataProvider(storeResult.value, { id, version });
+  const providerResult = createSqliteMarketDataProvider(store, { id, version });
   if (!providerResult.ok) {
     throw new Error(`stock-market-4: ${providerResult.reason}`);
   }
@@ -314,8 +313,8 @@ export const stockMarket4: GameDefinition<
   // tickers, fees, risk settings, ...) is uniform, static match-ruleset information with nothing
   // to redact.
   //
-  // `marketDataset.storeDir` gets the same treatment for a different reason: it's a filesystem
-  // path into this HOST's `@thunderdome/market-data` store, not match data a bot could use to see
+  // `marketDataset.dbPath` gets the same treatment for a different reason: it's a filesystem
+  // path into this HOST's shared Stock Market 4 database, not match data a bot could use to see
   // the future — a bot has no legitimate use for it either way, so it's stripped while `id`/
   // `version` (harmless identifiers) pass through.
   redactConfigForBots(config) {
@@ -822,4 +821,116 @@ export function isForwardMatchFullyResolved(
   return (
     state.forwardShadowCutoffDate !== null && state.forwardShadowCutoffDate >= state.config.endDate
   );
+}
+
+// ---------------------------------------------------------------------------
+// Current standings (used by `apps/cli`'s `match forward run` to print a summary after each
+// invocation — see that command for how). Not part of `GameDefinition` for the same reason the
+// forward-resumability functions above aren't: a host that knows it's holding a concrete
+// `stockMarket4` state imports this directly.
+// ---------------------------------------------------------------------------
+
+export interface CurrentStanding {
+  participantId: string;
+  /** Competition ranking by current equity (ties share a rank: 1, 1, 3), same convention as
+   * `getStandingOutcomes`. */
+  rank: number;
+  equityCents: number;
+  cashCents: number;
+  totalReturn: number;
+  maxDrawdown: number;
+  annualizedVolatility: number;
+  sharpeRatio: number | null;
+  positions: PositionObservation[];
+  /** This participant's fills from the MOST RECENT round resolved so far — "what it decided to do
+   * today," the same `fills` `getObservation` itself reports, not re-derived. */
+  lastFills: Fill[];
+}
+
+export interface CurrentStandingsSummary {
+  /** The most recent trading day resolved so far — the match's last trading day once terminal,
+   * rather than `null` the way `getObservation`'s own `date` field goes past that point (this
+   * summary always has SOME real date's marks/fills to report as of, even once there's no more
+   * NEW data to trade against). `null` only in the degenerate case of an empty calendar, which
+   * `assertHasPlayableDays` already prevents at `initialize()`/`resumeForwardState()` time. */
+  asOfDate: CalendarDate | null;
+  benchmarkReturn: number | null;
+  /** Ranked best-to-worst by current equity. */
+  standings: CurrentStanding[];
+}
+
+/**
+ * Current standings/portfolio stats/most-recent fills for every participant — safe to call on a
+ * NON-terminal, still-active match (a `FORWARD_SHADOW` match waiting on tomorrow's bar, most
+ * often), unlike `getResult`. `getResult` marks-to-market at the WHOLE match calendar's END date
+ * (`config.endDate`) — correct once a match is actually over, but wrong mid-flight: a still-active
+ * forward match's `config.endDate` is typically months past whatever's currently known, so pricing
+ * "final" positions there would use stale/unavailable marks. This instead marks as of the most
+ * recent trading day actually resolved — `asOfDate` below — even once `state.round` has advanced
+ * PAST the end of `effectiveTradingCalendar(state)` (the ordinary post-invocation state for an
+ * active `FORWARD_SHADOW` match that just caught up to everything currently known).
+ *
+ * Deliberately does NOT call `getObservation` for this: that function's own `date` is
+ * `calendar[state.round] ?? null` with no further fallback, by design (see `PortfolioObservation`'s
+ * own doc comment) — exactly `null`, and therefore cash-only marks with every position's market
+ * value zeroed out, in precisely this "just caught up" case. That's the right behavior for a BOT's
+ * own observation (there's genuinely no fresher mark to trade against), but the wrong one for a
+ * host-side standings summary, which should keep showing real portfolio value at the last real
+ * mark rather than degrading to cash-only the moment a match is fully caught up. So this calls
+ * `portfolioObservationFor` directly with securities priced at `asOfDate` instead.
+ */
+export function getCurrentStandings(state: StockMarket4State): CurrentStandingsSummary {
+  const calendar = effectiveTradingCalendar(state);
+  const asOfDate = calendar[Math.min(state.round, calendar.length - 1)] ?? null;
+  const firstDate = calendar[0];
+  const securities = securitiesAsOf(state.config, state.marketData, asOfDate);
+
+  const benchmarkTicker = state.config.benchmarkTicker;
+  const benchmarkSeries =
+    benchmarkTicker === undefined
+      ? []
+      : state.marketData === null
+        ? (state.config.historicalPrices[benchmarkTicker] ?? [])
+        : state.marketData.barsAsOf(
+            benchmarkTicker,
+            asOfDate ?? state.config.endDate,
+            Number.POSITIVE_INFINITY,
+          );
+  const benchmarkReturn =
+    benchmarkTicker === undefined || firstDate === undefined || asOfDate === null
+      ? null
+      : benchmarkBuyAndHoldReturn(benchmarkSeries, firstDate, asOfDate);
+
+  const unranked = state.participantIds.map((participantId) => {
+    const portfolio =
+      state.portfolios.get(participantId) ?? createPortfolio(toCents(state.config.startingCapital));
+    const observation = portfolioObservationFor(
+      portfolio,
+      securities,
+      state.config.risk,
+      state.riskStats.get(participantId) ?? EMPTY_RISK_STATS,
+      state.equityHistory.get(participantId) ?? [],
+    );
+    const metrics = computePerformanceMetrics(observation.equityHistory, state.config.riskFreeRate);
+    return {
+      participantId,
+      equityCents: observation.equityCents,
+      cashCents: observation.cashCents,
+      totalReturn: metrics.totalReturn,
+      maxDrawdown: metrics.maxDrawdown,
+      annualizedVolatility: metrics.annualizedVolatility,
+      sharpeRatio: metrics.sharpeRatio,
+      positions: observation.positions,
+      lastFills: state.lastFills.get(participantId) ?? [],
+    };
+  });
+
+  const standings: CurrentStanding[] = [...unranked]
+    .sort((a, b) => b.equityCents - a.equityCents)
+    .map((standing) => ({
+      ...standing,
+      rank: 1 + unranked.filter((other) => other.equityCents > standing.equityCents).length,
+    }));
+
+  return { asOfDate, benchmarkReturn, standings };
 }

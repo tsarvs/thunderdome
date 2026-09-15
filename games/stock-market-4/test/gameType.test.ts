@@ -43,10 +43,12 @@ const STALE_BAR = [flatBar('2026-01-02', 5)]; // known only through a date BEFOR
 const BENCH_BARS = [flatBar('2026-01-02', 1)]; // deliberately even more stale than STALE_BAR
 
 let dir: string;
+let dbPath: string;
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'sm4-gametype-'));
-  const store = createMarketDataStore(join(dir, `${DATASET_ID}.sqlite`));
+  dbPath = join(dir, 'db.sqlite');
+  const store = createMarketDataStore(dbPath);
   const published = publishDatasetVersion(
     store,
     { id: DATASET_ID, version: DATASET_VERSION },
@@ -67,7 +69,7 @@ function marketDatasetConfigInput(overrides: Record<string, unknown> = {}) {
     endDate: '2026-01-12',
     marketDataUniverse: ['FAST', 'SLOW'],
     historicalContextDays: 10,
-    marketDataset: { id: DATASET_ID, version: DATASET_VERSION, storeDir: dir },
+    marketDataset: { id: DATASET_ID, version: DATASET_VERSION, dbPath },
     ...overrides,
   };
 }

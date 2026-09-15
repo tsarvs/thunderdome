@@ -430,11 +430,16 @@ without touching the engine.
 
 ## 10. What's deliberately out of scope right now
 
-No database, except the one narrow, explicit exception documented in ADR-0010: `@thunderdome/
-market-data` uses SQLite for versioned market-data storage specifically, behind a
-`MarketDataProvider` interface no other package depends on directly. That ADR does not reopen this
-constraint generally — any other case for persistence still needs its own ADR making the same
-case. No auth system. No HTTP API. No React app. No multi-language CI build matrix (the
+No database beyond SQLite, and only where a package's own need is genuinely relational, indexed,
+or versioned — per ADR-0010 (which introduced it, for market data) and ADR-0014 (which generalized
+it into a standing standard covering also research data and forward-match/portfolio data). Every
+use stays light and portable: `node:sqlite` only (no native/compiled dependency), no server
+process, no ORM. Stock Market 4's price/research/portfolio data all live in ONE shared,
+gitignored file under `.thunderdome/`, owned by `@thunderdome/stock-market-4-db`, built entirely
+by replaying a git-tracked sequence of migrations (ADR-0014) — schema changes AND curated content
+(a research update, a batch of newly-fetched price bars) are each a new migration file, applied
+through the one shared `@thunderdome/sqlite-migrations` runner rather than each store hand-rolling
+its own. No auth system. No HTTP API. No React app. No multi-language CI build matrix (the
 Java bot, once it exists, is proven by `docker build`/`docker run` + a protocol handshake, not a
 Gradle CI job). No Yarn zero-installs/PnP. No Dependabot/Renovate. No release/publish pipeline. No
 telemetry/observability stack. No tournament formats beyond round robin and single elimination yet
@@ -457,3 +462,4 @@ sequential/no-hidden-information case it was meant to validate).
 - `docs/adr/0011-explicit-game-types.md`
 - `docs/adr/0012-incremental-market-data-growth.md`
 - `docs/adr/0013-forward-match-persistence.md`
+- `docs/adr/0014-sqlite-standard-and-migrations.md`

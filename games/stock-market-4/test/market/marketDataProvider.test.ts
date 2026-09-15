@@ -44,10 +44,12 @@ function noopActions(): Map<string, StockMarket4Action> {
 }
 
 let dir: string;
+let dbPath: string;
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'sm4-market-data-parity-'));
-  const store = createMarketDataStore(join(dir, `${DATASET_ID}.sqlite`));
+  dbPath = join(dir, 'db.sqlite');
+  const store = createMarketDataStore(dbPath);
   const published = publishDatasetVersion(
     store,
     { id: DATASET_ID, version: DATASET_VERSION },
@@ -79,7 +81,7 @@ function marketDatasetConfigInput(overrides: Record<string, unknown> = {}) {
     endDate: '2026-01-09',
     marketDataUniverse: [TICKER],
     historicalContextDays: 3,
-    marketDataset: { id: DATASET_ID, version: DATASET_VERSION, storeDir: dir },
+    marketDataset: { id: DATASET_ID, version: DATASET_VERSION, dbPath },
     benchmarkTicker: TICKER,
     ...overrides,
   };
@@ -166,7 +168,7 @@ describe('initialize() dataset resolution', () => {
   it('throws a clear error when the referenced dataset version was never published', () => {
     const configResult = stockMarket4.parseConfig(
       marketDatasetConfigInput({
-        marketDataset: { id: DATASET_ID, version: 'nope', storeDir: dir },
+        marketDataset: { id: DATASET_ID, version: 'nope', dbPath },
       }),
     );
     if (!configResult.ok) throw new Error(configResult.reason);
@@ -177,14 +179,14 @@ describe('initialize() dataset resolution', () => {
 });
 
 describe('redactConfigForBots', () => {
-  it('strips storeDir but keeps id/version when marketDataset is set', () => {
+  it('strips dbPath but keeps id/version when marketDataset is set', () => {
     const configResult = stockMarket4.parseConfig(marketDatasetConfigInput());
     if (!configResult.ok) throw new Error(configResult.reason);
     const redacted = stockMarket4.redactConfigForBots?.(configResult.value) as {
-      marketDataset?: { id: string; version: string; storeDir?: string };
+      marketDataset?: { id: string; version: string; dbPath?: string };
     };
     expect(redacted.marketDataset).toEqual({ id: DATASET_ID, version: DATASET_VERSION });
-    expect(redacted.marketDataset?.storeDir).toBeUndefined();
+    expect(redacted.marketDataset?.dbPath).toBeUndefined();
   });
 
   it('has no marketDataset field at all in inline mode', () => {

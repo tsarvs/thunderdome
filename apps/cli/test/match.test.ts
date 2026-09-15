@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  printForwardStandings,
   printPortfolioSummaries,
   printSecurityPriceTable,
   printStockPriceRange,
@@ -125,6 +126,112 @@ describe('printPortfolioSummaries', () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     printPortfolioSummaries(null);
     printPortfolioSummaries('not an object');
+    expect(log).not.toHaveBeenCalled();
+  });
+});
+
+describe('printForwardStandings', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function sampleSummary(aliceLastFills: unknown[] = []) {
+    return {
+      asOfDate: '2026-08-31',
+      benchmarkReturn: -0.1475,
+      standings: [
+        {
+          participantId: 'alice',
+          rank: 1,
+          equityCents: 11979401,
+          cashCents: 500000,
+          totalReturn: 0.1979,
+          maxDrawdown: 0.2287,
+          annualizedVolatility: 0.5795,
+          sharpeRatio: 2.07,
+          positions: [
+            { ticker: 'ELMT', shares: 100, marketValueCents: 173200, unrealizedPnlCents: 5000 },
+          ],
+          lastFills: aliceLastFills,
+        },
+        {
+          participantId: 'bob',
+          rank: 2,
+          equityCents: 10000000,
+          cashCents: 10000000,
+          totalReturn: 0,
+          maxDrawdown: 0,
+          annualizedVolatility: 0,
+          sharpeRatio: null,
+          positions: [],
+          lastFills: [],
+        },
+      ],
+    };
+  }
+
+  it('prints ranked standings with portfolio stats, positions, and a benchmark comparison', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    printForwardStandings(sampleSummary(), ['alice', 'bob']);
+
+    expect(log).toHaveBeenCalledWith('\nStandings as of 2026-08-31:');
+    expect(log).toHaveBeenCalledWith(
+      '  1. alice: equity $119794.01, cash $5000.00, return 19.79%, max drawdown 22.87%, volatility 57.95%, Sharpe 2.07',
+    );
+    expect(log).toHaveBeenCalledWith('       ELMT: 100 sh, value $1732.00 (+$50.00 unrealized)');
+    expect(log).toHaveBeenCalledWith(
+      '  2. bob: equity $100000.00, cash $100000.00, return 0.00%, max drawdown 0.00%, volatility 0.00%, Sharpe n/a',
+    );
+    expect(log).toHaveBeenCalledWith('  (benchmark buy-and-hold return so far: -14.75%)');
+  });
+
+  it('summarizes each bot\'s most recent fills under a "what each bot did" section', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    printForwardStandings(
+      sampleSummary([
+        {
+          ticker: 'ELMT',
+          side: 'BUY',
+          kind: 'MARKET',
+          requestedQuantity: 100,
+          filledQuantity: 100,
+          priceCents: 1732,
+          feeCents: 17,
+        },
+      ]),
+      ['alice', 'bob'],
+    );
+
+    expect(log).toHaveBeenCalledWith('\nWhat each bot did on 2026-08-31:');
+    expect(log).toHaveBeenCalledWith('  alice:');
+    expect(log).toHaveBeenCalledWith('    BUY 100 ELMT @ $17.32, fee $0.17');
+    expect(log).toHaveBeenCalledWith('  bob: held (no trades)');
+  });
+
+  it('reports a requested-but-unfilled order distinctly from "held"', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    printForwardStandings(
+      sampleSummary([
+        {
+          ticker: 'ELMT',
+          side: 'BUY',
+          kind: 'LIMIT',
+          requestedQuantity: 50,
+          filledQuantity: 0,
+          priceCents: 1000,
+          feeCents: 0,
+        },
+      ]),
+      ['alice'],
+    );
+    expect(log).toHaveBeenCalledWith('    BUY ELMT: requested 50, filled 0 (no fill)');
+  });
+
+  it('is a no-op when standings is missing/empty, or the summary is not object-shaped', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    printForwardStandings({ asOfDate: '2026-08-31', standings: [] }, ['alice']);
+    printForwardStandings({ winnerId: 'alice' }, ['alice']);
+    printForwardStandings(null, ['alice']);
     expect(log).not.toHaveBeenCalled();
   });
 });
